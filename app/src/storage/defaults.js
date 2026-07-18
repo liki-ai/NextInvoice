@@ -11,5 +11,5 @@ export const DEFAULT_COMPANY_PROFILE = {
 
 export const DEFAULT_SETTINGS = {
   language: 'sq',
-  apiBaseUrl: 'http://localhost:4000',
+  apiBaseUrl: 'https://nextinvoice.onrender.com',
 };

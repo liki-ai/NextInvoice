@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
@@ -10,6 +11,7 @@ import { extractCompanyInfo } from '../api/extract';
 export default function ProfileScreen() {
   const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl } = useApp();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   const [form, setForm] = useState(companyProfile);
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(settings.apiBaseUrl);
@@ -55,7 +57,10 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ padding: spacing.md, paddingTop: insets.top + spacing.md, paddingBottom: spacing.xl }}
+    >
       <Text style={typography.title}>{t('profile.title')}</Text>
 
       <Section title={t('profile.languageSectionTitle')} style={{ marginTop: spacing.md }}>

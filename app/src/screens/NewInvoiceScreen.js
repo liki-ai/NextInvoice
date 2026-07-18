@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
@@ -13,7 +14,7 @@ import { extractClientInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 
 function emptyItem() {
-  return { id: generateId(), description: '', quantity: '1', unitPrice: '' };
+  return { id: generateId(), description: 'Fustan Solemn / Dress', quantity: '1', unitPrice: '80' };
 }
 
 function emptyClient() {
@@ -23,6 +24,7 @@ function emptyClient() {
 export default function NewInvoiceScreen({ navigation }) {
   const { invoices, companyProfile, settings, addInvoice } = useApp();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState('manual');
   const [aiText, setAiText] = useState('');
@@ -112,7 +114,7 @@ export default function NewInvoiceScreen({ navigation }) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>

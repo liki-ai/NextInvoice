@@ -8,3 +8,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# local secrets (API tokens per automatizim - never commit)
+.env
+.env.*
