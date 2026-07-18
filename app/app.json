@@ -2,14 +2,14 @@
   "expo": {
     "name": "NextInvoice",
     "slug": "nextinvoice",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F5F7F8"
+      "backgroundColor": "#2C6E7F"
     },
     "ios": {
       "supportsTablet": true,

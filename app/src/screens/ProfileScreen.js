@@ -56,9 +56,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
-      <Text style={typography.title}>{t('profile.title')}</Text>
-
-      <Section title={t('profile.languageSectionTitle')} style={{ marginTop: spacing.md }}>
+      <Section title={t('profile.languageSectionTitle')}>
         <SegmentedControl
           value={settings.language}
           onChange={setLanguage}

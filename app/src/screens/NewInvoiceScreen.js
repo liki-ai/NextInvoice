@@ -5,12 +5,25 @@ import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { Button, FormField, Section, SegmentedControl } from '../components/ui';
+import InvoicePreviewModal from '../components/InvoicePreviewModal';
 import { generateInvoiceNumber, formatDateForInvoice } from '../utils/invoiceNumber';
 import { computeTotals } from '../pdf/invoiceTemplate';
 import { formatMoney, toNumber } from '../utils/money';
 import { generateId } from '../utils/id';
 import { extractClientInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
+
+const DEFAULT_ITEM_DESCRIPTION = 'Fustan Solemn/ Dress';
+const DEFAULT_ITEM_PRICE = '80';
+
+function defaultItem() {
+  return {
+    id: generateId(),
+    description: DEFAULT_ITEM_DESCRIPTION,
+    quantity: '1',
+    unitPrice: DEFAULT_ITEM_PRICE,
+  };
+}
 
 function emptyItem() {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' };
@@ -30,10 +43,11 @@ export default function NewInvoiceScreen({ navigation }) {
   const [client, setClient] = useState(emptyClient());
   const [invoiceNumber, setInvoiceNumber] = useState(() => generateInvoiceNumber(invoices));
   const [date, setDate] = useState(() => formatDateForInvoice(new Date()));
-  const [items, setItems] = useState([emptyItem()]);
+  const [items, setItems] = useState([defaultItem()]);
   const [discount, setDiscount] = useState('0');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   const { subtotal, total } = computeTotals(items, discount);
 
@@ -52,11 +66,24 @@ export default function NewInvoiceScreen({ navigation }) {
     setAiText('');
     setInvoiceNumber(generateInvoiceNumber(invoices));
     setDate(formatDateForInvoice(new Date()));
-    setItems([emptyItem()]);
+    setItems([defaultItem()]);
     setDiscount('0');
     setNotes('');
     setMode('manual');
   };
+
+  const buildDraftInvoice = (validItems) => ({
+    number: invoiceNumber,
+    date,
+    client,
+    items: validItems,
+    discount,
+    notes,
+    subtotal,
+    total,
+  });
+
+  const getValidItems = () => items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
 
   const handleExtract = async () => {
     if (!aiText.trim()) return;
@@ -75,12 +102,25 @@ export default function NewInvoiceScreen({ navigation }) {
     }
   };
 
+  const handlePreview = () => {
+    if (!client.fullName.trim()) {
+      Alert.alert(t('common.error'), t('newInvoice.validationClient'));
+      return;
+    }
+    const validItems = getValidItems();
+    if (validItems.length === 0) {
+      Alert.alert(t('common.error'), t('newInvoice.validationItems'));
+      return;
+    }
+    setPreviewVisible(true);
+  };
+
   const handleSave = async () => {
     if (!client.fullName.trim()) {
       Alert.alert(t('common.error'), t('newInvoice.validationClient'));
       return;
     }
-    const validItems = items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
+    const validItems = getValidItems();
     if (validItems.length === 0) {
       Alert.alert(t('common.error'), t('newInvoice.validationItems'));
       return;
@@ -88,16 +128,7 @@ export default function NewInvoiceScreen({ navigation }) {
 
     setSaving(true);
     try {
-      const invoice = {
-        number: invoiceNumber,
-        date,
-        client,
-        items: validItems,
-        discount,
-        notes,
-        subtotal,
-        total,
-      };
+      const invoice = buildDraftInvoice(validItems);
       await addInvoice(invoice);
       await shareInvoicePdf({ company: companyProfile, client, invoice, pdfLabels: t('pdf') });
       Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
@@ -110,14 +141,14 @@ export default function NewInvoiceScreen({ navigation }) {
     }
   };
 
+  const previewInvoice = buildDraftInvoice(getValidItems());
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
-        <Text style={typography.title}>{t('newInvoice.title')}</Text>
-
         <SegmentedControl
           value={mode}
           onChange={setMode}
@@ -208,7 +239,10 @@ export default function NewInvoiceScreen({ navigation }) {
               </Text>
             </View>
           ))}
-          <Button title={t('newInvoice.addItem')} onPress={addItem} variant="secondary" />
+          <Pressable onPress={addItem} style={styles.addItemLink} hitSlop={8}>
+            <Ionicons name="add" size={16} color={colors.textMuted} />
+            <Text style={styles.addItemText}>{t('newInvoice.addItem')}</Text>
+          </Pressable>
         </Section>
 
         <Section>
@@ -236,8 +270,24 @@ export default function NewInvoiceScreen({ navigation }) {
           </View>
         </Section>
 
+        <Button
+          title={t('newInvoice.previewInvoice')}
+          onPress={handlePreview}
+          variant="secondary"
+          style={{ marginBottom: spacing.sm }}
+        />
         <Button title={t('newInvoice.saveAndShare')} onPress={handleSave} loading={saving} />
       </ScrollView>
+
+      <InvoicePreviewModal
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+        company={companyProfile}
+        client={client}
+        invoice={previewInvoice}
+        pdfLabels={t('pdf')}
+        title={t('newInvoice.previewInvoice')}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -260,4 +310,17 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row' },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  addItemLink: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  addItemText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '500',
+  },
 });
