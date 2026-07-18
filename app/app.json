@@ -14,8 +14,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lirim123.nextinvoice",
-      "buildNumber": "4",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import a sample invoice image.",
         "NSCameraUsageDescription": "NextInvoice needs camera access so you can photograph a sample invoice."
       }
