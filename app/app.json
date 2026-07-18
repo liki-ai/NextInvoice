@@ -13,6 +13,8 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.lirim123.nextinvoice",
+      "buildNumber": "4",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import a sample invoice image.",
         "NSCameraUsageDescription": "NextInvoice needs camera access so you can photograph a sample invoice."
@@ -24,13 +26,21 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.lirim123.nextinvoice"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-document-picker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ac954ef6-cf98-46bc-8811-41ae697dc89d"
+      }
+    },
+    "owner": "lirim123"
   }
 }
+
