@@ -123,7 +123,7 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
       .signatures {
         display: flex;
         justify-content: space-between;
-        margin-top: 60px;
+        margin-top: 72px;
       }
       .signature {
         width: 45%;
@@ -135,7 +135,7 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
       }
       .thank-you {
         text-align: center;
-        margin-top: 30px;
+        margin-top: 56px;
         font-size: 13px;
         color: #2C6E7F;
         font-weight: 600;

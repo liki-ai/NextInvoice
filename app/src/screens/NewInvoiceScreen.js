@@ -49,6 +49,7 @@ export default function NewInvoiceScreen({ navigation }) {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [showExtras, setShowExtras] = useState(false);
 
   const refreshInvoiceMeta = useCallback((invoiceList = invoices) => {
     const now = new Date();
@@ -81,6 +82,7 @@ export default function NewInvoiceScreen({ navigation }) {
     setItems([defaultItem()]);
     setDiscount('0');
     setNotes('');
+    setShowExtras(false);
     setMode('manual');
   };
 
@@ -252,26 +254,36 @@ export default function NewInvoiceScreen({ navigation }) {
             </View>
           ))}
           <Pressable onPress={addItem} style={styles.addItemLink} hitSlop={8}>
-            <Ionicons name="add" size={16} color={colors.textMuted} />
-            <Text style={styles.addItemText}>{t('newInvoice.addItem')}</Text>
+            <Text style={styles.addItemText}>+ {t('newInvoice.addItem')}</Text>
           </Pressable>
         </Section>
 
         <Section>
-          <FormField
-            label={t('newInvoice.discount')}
-            value={String(discount)}
-            onChangeText={setDiscount}
-            keyboardType="numeric"
-          />
-          <FormField
-            label={t('newInvoice.notes')}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-            style={{ height: 70, textAlignVertical: 'top' }}
-          />
+          {!showExtras ? (
+            <Pressable onPress={() => setShowExtras(true)} style={styles.extrasLink} hitSlop={8}>
+              <Text style={styles.extrasLinkText}>{t('newInvoice.addDiscountNotes')}</Text>
+            </Pressable>
+          ) : (
+            <>
+              <Pressable onPress={() => setShowExtras(false)} style={styles.extrasLink} hitSlop={8}>
+                <Text style={styles.extrasLinkText}>{t('newInvoice.hideDiscountNotes')}</Text>
+              </Pressable>
+              <FormField
+                label={t('newInvoice.discount')}
+                value={String(discount)}
+                onChangeText={setDiscount}
+                keyboardType="numeric"
+              />
+              <FormField
+                label={t('newInvoice.notes')}
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+                style={{ height: 70, textAlignVertical: 'top' }}
+              />
+            </>
+          )}
           <View style={styles.totalsRow}>
             <Text style={typography.muted}>{t('newInvoice.subtotal')}</Text>
             <Text style={typography.body}>{formatMoney(subtotal, companyProfile.currency)}</Text>
@@ -324,15 +336,22 @@ const styles = StyleSheet.create({
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   addItemLink: {
     alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 2,
   },
   addItemText: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  extrasLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    marginBottom: spacing.sm,
+  },
+  extrasLinkText: {
+    color: colors.primary,
+    fontSize: 14,
     fontWeight: '500',
   },
 });
