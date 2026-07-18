@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { spacing, typography, colors } from '../theme';
 import { Button, FormField, Section, SegmentedControl } from '../components/ui';
 import { extractCompanyInfo } from '../api/extract';
+import { LEGAL_URLS, SAMPLE_COMPANY_PROFILE } from '../constants/legal';
 
 export default function ProfileScreen() {
   const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl } = useApp();
@@ -15,7 +16,34 @@ export default function ProfileScreen() {
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(settings.apiBaseUrl);
   const [importing, setImporting] = useState(false);
 
+  useEffect(() => {
+    setForm(companyProfile);
+  }, [companyProfile]);
+
+  useEffect(() => {
+    setApiBaseUrlInput(settings.apiBaseUrl);
+  }, [settings.apiBaseUrl]);
+
   const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  const openUrl = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert(t('common.error'), t('profile.linkOpenError'));
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (err) {
+      Alert.alert(t('common.error'), t('profile.linkOpenError'));
+    }
+  };
+
+  const handleLoadSample = async () => {
+    setForm({ ...SAMPLE_COMPANY_PROFILE });
+    await updateCompanyProfile(SAMPLE_COMPANY_PROFILE);
+    Alert.alert(t('common.success'), t('profile.sampleLoaded'));
+  };
 
   const handleImport = async () => {
     try {
@@ -42,7 +70,7 @@ export default function ProfileScreen() {
       }));
       Alert.alert(t('common.success'), t('profile.importSuccess'));
     } catch (err) {
-      Alert.alert(t('common.error'), t('profile.importError'));
+      Alert.alert(t('common.error'), err?.message || t('profile.importError'));
     } finally {
       setImporting(false);
     }
@@ -76,6 +104,13 @@ export default function ProfileScreen() {
       <Section title={t('profile.importSectionTitle')}>
         <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.importDescription')}</Text>
         <Button
+          title={t('profile.loadSampleButton')}
+          onPress={handleLoadSample}
+          variant="secondary"
+          style={{ marginBottom: spacing.sm }}
+        />
+        <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.importAiDescription')}</Text>
+        <Button
           title={importing ? t('profile.importing') : t('profile.importButton')}
           onPress={handleImport}
           loading={importing}
@@ -105,6 +140,18 @@ export default function ProfileScreen() {
         <Text style={[typography.muted, { marginTop: 4 }]}>{t('profile.apiBaseUrlHint')}</Text>
       </Section>
 
+      <Section title={t('profile.legalSectionTitle')}>
+        <Pressable onPress={() => openUrl(LEGAL_URLS.privacyPolicy)} style={styles.linkRow}>
+          <Text style={styles.linkText}>{t('profile.privacyPolicy')}</Text>
+        </Pressable>
+        <Pressable onPress={() => openUrl(LEGAL_URLS.termsOfUse)} style={styles.linkRow}>
+          <Text style={styles.linkText}>{t('profile.termsOfUse')}</Text>
+        </Pressable>
+        <Pressable onPress={() => openUrl(LEGAL_URLS.supportMailto)} style={styles.linkRow}>
+          <Text style={styles.linkText}>{t('profile.support')}</Text>
+        </Pressable>
+      </Section>
+
       <Button title={t('common.save')} onPress={handleSave} />
     </ScrollView>
   );
@@ -112,4 +159,14 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  linkRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  linkText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

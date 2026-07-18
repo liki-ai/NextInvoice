@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "NextInvoice",
+    "name": "Faturimi",
     "slug": "nextinvoice",
-    "version": "1.0.7",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,9 +15,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.lirim123.nextinvoice",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import a sample invoice image.",
-        "NSCameraUsageDescription": "NextInvoice needs camera access so you can photograph a sample invoice."
+        "CFBundleDisplayName": "Faturimi",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

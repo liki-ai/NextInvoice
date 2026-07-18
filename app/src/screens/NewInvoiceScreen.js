@@ -13,6 +13,7 @@ import { formatMoney, toNumber } from '../utils/money';
 import { generateId } from '../utils/id';
 import { extractClientInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
+import { SAMPLE_CLIENT_TEXT } from '../constants/legal';
 
 const DEFAULT_ITEM_DESCRIPTION = 'Fustan Solemn/ Dress';
 const DEFAULT_ITEM_PRICE = '80';
@@ -122,7 +123,7 @@ export default function NewInvoiceScreen({ navigation }) {
       });
       setAiRevealed(true);
     } catch (err) {
-      Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
+      Alert.alert(t('common.error'), err?.message || t('newInvoice.aiExtractError'));
     } finally {
       setExtracting(false);
     }
@@ -205,6 +206,13 @@ export default function NewInvoiceScreen({ navigation }) {
               onPress={handleExtract}
               loading={extracting}
               disabled={!aiText.trim()}
+            />
+            <Button
+              title={t('newInvoice.loadSampleClient')}
+              onPress={() => setAiText(SAMPLE_CLIENT_TEXT)}
+              variant="secondary"
+              style={{ marginTop: spacing.sm }}
+              disabled={extracting}
             />
           </Section>
         )}

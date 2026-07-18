@@ -1,12 +1,12 @@
-# NextInvoice Privacy Policy
+# Faturimi Privacy Policy
 
 **Last updated:** July 18, 2026
 
-NextInvoice (“the App”) is an invoicing application for creating, storing, previewing, and sharing invoices from your phone. This Privacy Policy explains what information the App handles and how it is used.
+Faturimi (“the App”) is an invoicing application for creating, storing, previewing, and sharing invoices from your phone. This Privacy Policy explains what information the App handles and how it is used.
 
 ## 1. Who we are
 
-NextInvoice is provided by Tretek LLC / Nina Fashion Studio.  
+Faturimi is provided by Tretek LLC / Nina Fashion Studio.  
 For privacy questions, contact: [lirim.sylejmani@tretek.io](mailto:lirim.sylejmani@tretek.io).
 
 ## 2. Information the App stores on your device
@@ -28,9 +28,9 @@ If you use AI-assisted fields, the App may send content you provide to the API s
 
 That server may process the content with a third-party AI provider (for example OpenAI) solely to return structured form suggestions. Do not use these features with information you are not allowed to share with your configured server or AI provider.
 
-## 4. Photos and files
+## 4. Files you choose
 
-With your permission, the App may access photos or documents so you can import a sample invoice. Selected files are used only for that import action and are not uploaded unless you start the AI import feature.
+If you use optional AI import, you may pick a PDF or image through the system document picker. The selected file is sent only to the AI server URL you configured for extraction. The App does not use the device camera and does not request camera permission.
 
 ## 5. Sharing PDFs
 
