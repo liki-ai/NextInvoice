@@ -14,15 +14,20 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     (async () => {
-      const [profile, storedSettings, storedInvoices] = await Promise.all([
-        getJson(KEYS.COMPANY_PROFILE, DEFAULT_COMPANY_PROFILE),
-        getJson(KEYS.SETTINGS, DEFAULT_SETTINGS),
-        getJson(KEYS.INVOICES, []),
-      ]);
-      setCompanyProfile({ ...DEFAULT_COMPANY_PROFILE, ...profile });
-      setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
-      setInvoices(storedInvoices);
-      setLoading(false);
+      try {
+        const [profile, storedSettings, storedInvoices] = await Promise.all([
+          getJson(KEYS.COMPANY_PROFILE, DEFAULT_COMPANY_PROFILE),
+          getJson(KEYS.SETTINGS, DEFAULT_SETTINGS),
+          getJson(KEYS.INVOICES, []),
+        ]);
+        setCompanyProfile({ ...DEFAULT_COMPANY_PROFILE, ...profile });
+        setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
+        setInvoices(Array.isArray(storedInvoices) ? storedInvoices : []);
+      } catch (err) {
+        console.warn('[AppProvider] failed to hydrate storage', err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
