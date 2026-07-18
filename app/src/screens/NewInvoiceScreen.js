@@ -177,7 +177,7 @@ export default function NewInvoiceScreen({ navigation }) {
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
         <SegmentedControl
           value={mode}
-          onChange={setMode}
+          onChange={handleModeChange}
           options={[
             { value: 'manual', label: t('newInvoice.modeManual') },
             { value: 'ai', label: t('newInvoice.modeAi') },
@@ -204,6 +204,8 @@ export default function NewInvoiceScreen({ navigation }) {
           </Section>
         )}
 
+        {showInvoiceForm && (
+          <>
         <Section title={t('newInvoice.clientSectionTitle')}>
           <FormField
             label={t('newInvoice.fullName')}
@@ -313,6 +315,8 @@ export default function NewInvoiceScreen({ navigation }) {
           style={{ marginBottom: spacing.sm }}
         />
         <Button title={t('newInvoice.saveAndShare')} onPress={handleSave} loading={saving} />
+          </>
+        )}
       </ScrollView>
 
       <InvoicePreviewModal
