@@ -50,6 +50,7 @@ export default function NewInvoiceScreen({ navigation }) {
   const [saving, setSaving] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [showExtras, setShowExtras] = useState(false);
+  const [aiRevealed, setAiRevealed] = useState(false);
 
   const refreshInvoiceMeta = useCallback((invoiceList = invoices) => {
     const now = new Date();
@@ -62,6 +63,15 @@ export default function NewInvoiceScreen({ navigation }) {
       refreshInvoiceMeta(invoices);
     }, [invoices, refreshInvoiceMeta])
   );
+
+  const showInvoiceForm = mode === 'manual' || aiRevealed;
+
+  const handleModeChange = (nextMode) => {
+    setMode(nextMode);
+    if (nextMode === 'ai') {
+      setAiRevealed(false);
+    }
+  };
 
   const { subtotal, total } = computeTotals(items, discount);
 
@@ -83,6 +93,7 @@ export default function NewInvoiceScreen({ navigation }) {
     setDiscount('0');
     setNotes('');
     setShowExtras(false);
+    setAiRevealed(false);
     setMode('manual');
   };
 
@@ -109,6 +120,7 @@ export default function NewInvoiceScreen({ navigation }) {
         address: result.address || '',
         phone: result.phone || '',
       });
+      setAiRevealed(true);
     } catch (err) {
       Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
     } finally {
