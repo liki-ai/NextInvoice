@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
@@ -49,6 +50,18 @@ export default function NewInvoiceScreen({ navigation }) {
   const [saving, setSaving] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
 
+  const refreshInvoiceMeta = useCallback((invoiceList = invoices) => {
+    const now = new Date();
+    setInvoiceNumber(generateInvoiceNumber(invoiceList, now));
+    setDate(formatDateForInvoice(now));
+  }, [invoices]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshInvoiceMeta(invoices);
+    }, [invoices, refreshInvoiceMeta])
+  );
+
   const { subtotal, total } = computeTotals(items, discount);
 
   const updateItem = (id, field, value) => {
@@ -61,11 +74,10 @@ export default function NewInvoiceScreen({ navigation }) {
 
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
 
-  const resetForm = () => {
+  const resetForm = (invoiceList = invoices) => {
     setClient(emptyClient());
     setAiText('');
-    setInvoiceNumber(generateInvoiceNumber(invoices));
-    setDate(formatDateForInvoice(new Date()));
+    refreshInvoiceMeta(invoiceList);
     setItems([defaultItem()]);
     setDiscount('0');
     setNotes('');
@@ -129,10 +141,10 @@ export default function NewInvoiceScreen({ navigation }) {
     setSaving(true);
     try {
       const invoice = buildDraftInvoice(validItems);
-      await addInvoice(invoice);
-      await shareInvoicePdf({ company: companyProfile, client, invoice, pdfLabels: t('pdf') });
+      const saved = await addInvoice(invoice);
+      await shareInvoicePdf({ company: companyProfile, client, invoice: saved, pdfLabels: t('pdf') });
       Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
-      resetForm();
+      resetForm([saved, ...invoices]);
       navigation.navigate('Invoices');
     } catch (err) {
       Alert.alert(t('common.error'), err.message);
