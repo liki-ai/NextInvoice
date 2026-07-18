@@ -33,8 +33,5 @@
   "private": true,
   "overrides": {
     "expo-font": "~14.0.12"
-  },
-  "devDependencies": {
-    "eas-cli": "^21.0.2"
   }
 }
