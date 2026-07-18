@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "@expo/vector-icons": "^15.0.2",
+    "@expo/vector-icons": "15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.18.10",
     "@react-navigation/native": "^7.3.10",
@@ -11,6 +11,7 @@
     "expo": "^54.0.36",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.23",
+    "expo-font": "~14.0.12",
     "expo-image-picker": "~17.0.11",
     "expo-print": "~15.0.8",
     "expo-sharing": "~14.0.8",
@@ -26,11 +27,13 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "eas": "eas",
     "build:ios": "eas build --platform ios --profile production",
     "submit:ios": "eas submit --platform ios --profile production --latest"
   },
   "private": true,
+  "overrides": {
+    "expo-font": "~14.0.12"
+  },
   "devDependencies": {
     "eas-cli": "^21.0.2"
   }
