@@ -146,6 +146,7 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
     <div class="top-row">
       <div class="company-block">
         <h1>${escapeHtml(company.companyName)}</h1>
+        ${company.nui ? `<p>${escapeHtml(pdfLabels.nuiLabel)}: ${escapeHtml(company.nui)}</p>` : ''}
         <p>${escapeHtml(company.streetAddress)}</p>
         <p>${escapeHtml(company.state)} ${escapeHtml(company.zipCode)}</p>
         <p>${escapeHtml(company.email)}</p>

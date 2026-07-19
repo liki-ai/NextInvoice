@@ -10,13 +10,17 @@ const COMPANY_SCHEMA = {
   properties: {
     companyName: { type: 'string' },
     contactPerson: { type: 'string', description: 'Name of the person issuing/signing the invoice, if present' },
+    nui: {
+      type: 'string',
+      description: 'Business unique identification number (NUI / Numri Unik Identifikues / fiscal number), if present',
+    },
     streetAddress: { type: 'string' },
     state: { type: 'string', description: 'State, region or country, e.g. Kosove' },
     zipCode: { type: 'string' },
     email: { type: 'string' },
     phone: { type: 'string' },
   },
-  required: ['companyName', 'contactPerson', 'streetAddress', 'state', 'zipCode', 'email', 'phone'],
+  required: ['companyName', 'contactPerson', 'nui', 'streetAddress', 'state', 'zipCode', 'email', 'phone'],
   additionalProperties: false,
 };
 
@@ -42,7 +46,8 @@ router.post('/extract-company', upload.single('file'), async (req, res) => {
           type: 'input_text',
           text:
             'This is a sample invoice. Extract the SELLER / ISSUING COMPANY details (not the client the invoice is billed to): ' +
-            'company name, the contact person who issued/signed it, street address, state/region/country, zip/postal code, email and phone number. ' +
+            'company name, the contact person who issued/signed it, NUI / Numri Unik Identifikues (business unique identification number), ' +
+            'street address, state/region/country, zip/postal code, email and phone number. ' +
             'The document may be in Albanian and/or English. If a field is not present, return an empty string for it. Do not invent data.',
         },
       ],

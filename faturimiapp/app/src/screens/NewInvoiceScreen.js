@@ -1,13 +1,25 @@
-import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { Button, FormField, Section, SegmentedControl } from '../components/ui';
 import { generateInvoiceNumber, formatDateForInvoice } from '../utils/invoiceNumber';
-import { computeTotals } from '../pdf/invoiceTemplate';
+import { buildInvoiceHtml, computeTotals } from '../pdf/invoiceTemplate';
 import { formatMoney, toNumber } from '../utils/money';
 import { generateId } from '../utils/id';
 import { extractClientInfo } from '../api/extract';
@@ -38,6 +50,7 @@ export default function NewInvoiceScreen({ navigation }) {
   const [showDiscount, setShowDiscount] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   const { subtotal, total } = computeTotals(items, discount);
 
@@ -62,7 +75,51 @@ export default function NewInvoiceScreen({ navigation }) {
     setShowDiscount(false);
     setShowNotes(false);
     setMode('manual');
+    setPreviewVisible(false);
   };
+
+  const buildDraftInvoice = () => {
+    if (!client.fullName.trim()) {
+      Alert.alert(t('common.error'), t('newInvoice.validationClient'));
+      return null;
+    }
+    const validItems = items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
+    if (validItems.length === 0) {
+      Alert.alert(t('common.error'), t('newInvoice.validationItems'));
+      return null;
+    }
+    const totals = computeTotals(validItems, discount);
+    return {
+      number: invoiceNumber,
+      date,
+      client,
+      items: validItems,
+      discount,
+      notes,
+      subtotal: totals.subtotal,
+      total: totals.total,
+    };
+  };
+
+  const previewHtml = useMemo(() => {
+    if (!previewVisible) return '';
+    const draft = {
+      number: invoiceNumber,
+      date,
+      client,
+      items: items.filter((it) => it.description.trim()),
+      discount,
+      notes,
+      subtotal,
+      total,
+    };
+    return buildInvoiceHtml({
+      company: companyProfile,
+      client,
+      invoice: draft,
+      pdfLabels: t('pdf'),
+    });
+  }, [previewVisible, invoiceNumber, date, client, items, discount, notes, subtotal, total, companyProfile, t]);
 
   const handleExtract = async () => {
     if (!aiText.trim()) return;
@@ -81,29 +138,18 @@ export default function NewInvoiceScreen({ navigation }) {
     }
   };
 
+  const handlePreview = () => {
+    const draft = buildDraftInvoice();
+    if (!draft) return;
+    setPreviewVisible(true);
+  };
+
   const handleSave = async () => {
-    if (!client.fullName.trim()) {
-      Alert.alert(t('common.error'), t('newInvoice.validationClient'));
-      return;
-    }
-    const validItems = items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
-    if (validItems.length === 0) {
-      Alert.alert(t('common.error'), t('newInvoice.validationItems'));
-      return;
-    }
+    const invoice = buildDraftInvoice();
+    if (!invoice) return;
 
     setSaving(true);
     try {
-      const invoice = {
-        number: invoiceNumber,
-        date,
-        client,
-        items: validItems,
-        discount,
-        notes,
-        subtotal,
-        total,
-      };
       await addInvoice(invoice);
       await shareInvoicePdf({ company: companyProfile, client, invoice, pdfLabels: t('pdf') });
       Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
@@ -121,7 +167,12 @@ export default function NewInvoiceScreen({ navigation }) {
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
+      <ScrollView
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        onScrollBeginDrag={Keyboard.dismiss}
+      >
         <Text style={typography.title}>{t('newInvoice.title')}</Text>
 
         <SegmentedControl
@@ -169,6 +220,9 @@ export default function NewInvoiceScreen({ navigation }) {
             value={client.phone}
             onChangeText={(v) => setClient((c) => ({ ...c, phone: v }))}
             keyboardType="phone-pad"
+            returnKeyType="done"
+            blurOnSubmit
+            onSubmitEditing={Keyboard.dismiss}
           />
         </Section>
 
@@ -270,8 +324,46 @@ export default function NewInvoiceScreen({ navigation }) {
           </View>
         </Section>
 
-        <Button title={t('newInvoice.saveAndShare')} onPress={handleSave} loading={saving} />
+        <View style={styles.actions}>
+          <Pressable style={styles.previewButton} onPress={handlePreview}>
+            <Ionicons name="eye-outline" size={18} color={colors.primary} />
+            <Text style={styles.previewButtonText}>{t('newInvoice.preview')}</Text>
+          </Pressable>
+          <Button title={t('newInvoice.saveAndShare')} onPress={handleSave} loading={saving} style={{ flex: 1 }} />
+        </View>
       </ScrollView>
+
+      <Modal visible={previewVisible} animationType="slide" onRequestClose={() => setPreviewVisible(false)}>
+        <View style={[styles.previewModal, { paddingTop: insets.top }]}>
+          <View style={styles.previewHeader}>
+            <Text style={styles.previewTitle}>{t('newInvoice.previewTitle')}</Text>
+            <Pressable onPress={() => setPreviewVisible(false)} hitSlop={12}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </Pressable>
+          </View>
+          <WebView
+            originWhitelist={['*']}
+            source={{ html: previewHtml }}
+            style={styles.previewWebView}
+            scalesPageToFit
+            startInLoadingState
+          />
+          <View style={[styles.previewFooter, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+            <Button
+              title={t('newInvoice.closePreview')}
+              onPress={() => setPreviewVisible(false)}
+              variant="secondary"
+              style={{ flex: 1 }}
+            />
+            <Button
+              title={t('newInvoice.saveAndShare')}
+              onPress={handleSave}
+              loading={saving}
+              style={{ flex: 1.4 }}
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -314,4 +406,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  previewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: '#fff',
+  },
+  previewButtonText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  previewModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  previewTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  previewWebView: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  previewFooter: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
 });

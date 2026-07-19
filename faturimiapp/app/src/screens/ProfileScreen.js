@@ -36,6 +36,7 @@ export default function ProfileScreen() {
         ...prev,
         companyName: data.companyName || prev.companyName,
         contactPerson: data.contactPerson || prev.contactPerson,
+        nui: data.nui || prev.nui,
         streetAddress: data.streetAddress || prev.streetAddress,
         state: data.state || prev.state,
         zipCode: data.zipCode || prev.zipCode,
@@ -85,8 +86,10 @@ export default function ProfileScreen() {
       </Section>
 
       <Section title={t('profile.companySectionTitle')}>
+        <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.companyHint')}</Text>
         <FormField label={t('profile.companyName')} value={form.companyName} onChangeText={(v) => setField('companyName', v)} />
         <FormField label={t('profile.contactPerson')} value={form.contactPerson} onChangeText={(v) => setField('contactPerson', v)} />
+        <FormField label={t('profile.nui')} value={form.nui} onChangeText={(v) => setField('nui', v)} autoCapitalize="characters" />
         <FormField label={t('profile.streetAddress')} value={form.streetAddress} onChangeText={(v) => setField('streetAddress', v)} />
         <FormField label={t('profile.state')} value={form.state} onChangeText={(v) => setField('state', v)} />
         <FormField label={t('profile.zipCode')} value={form.zipCode} onChangeText={(v) => setField('zipCode', v)} />
@@ -95,16 +98,18 @@ export default function ProfileScreen() {
         <FormField label={t('profile.currency')} value={form.currency} onChangeText={(v) => setField('currency', v.toUpperCase())} autoCapitalize="characters" maxLength={3} />
       </Section>
 
-      <Section title={t('profile.serverSectionTitle')}>
-        <FormField
-          label={t('profile.apiBaseUrl')}
-          value={apiBaseUrlInput}
-          onChangeText={setApiBaseUrlInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <Text style={[typography.muted, { marginTop: 4 }]}>{t('profile.apiBaseUrlHint')}</Text>
-      </Section>
+      {__DEV__ ? (
+        <Section title={t('profile.serverSectionTitle')}>
+          <FormField
+            label={t('profile.apiBaseUrl')}
+            value={apiBaseUrlInput}
+            onChangeText={setApiBaseUrlInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={[typography.muted, { marginTop: 4 }]}>{t('profile.apiBaseUrlHint')}</Text>
+        </Section>
+      ) : null}
 
       <Button title={t('common.save')} onPress={handleSave} />
     </ScrollView>
