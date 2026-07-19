@@ -2,8 +2,8 @@
 export const SUPPORT_EMAIL = 'lirim.sylejmani@tretek.io';
 
 export const LEGAL_URLS = {
-  privacyPolicy: 'https://github.com/liki-ai/NextInvoice/blob/master/docs/privacy-policy.html',
-  termsOfUse: 'https://github.com/liki-ai/NextInvoice/blob/master/docs/terms-of-use.html',
+  privacyPolicy: 'https://liki-ai.github.io/NextInvoice/privacy-policy.html',
+  termsOfUse: 'https://liki-ai.github.io/NextInvoice/terms-of-use.html',
   supportMailto: `mailto:${SUPPORT_EMAIL}?subject=Faturimi%20Support`,
 };
 

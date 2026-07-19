@@ -164,8 +164,8 @@ How to test the main flow (offline):
 
 Optional AI features require a backend URL in Profile (OpenAI key is server-side only). For review, AI is not required to demonstrate the core invoice/PDF flow.
 
-Privacy Policy: https://github.com/liki-ai/NextInvoice/blob/master/docs/privacy-policy.html
-Terms of Use: https://github.com/liki-ai/NextInvoice/blob/master/docs/terms-of-use.html
+Privacy Policy: https://liki-ai.github.io/NextInvoice/privacy-policy.html
+Terms of Use: https://liki-ai.github.io/NextInvoice/terms-of-use.html
 Support: lirim.sylejmani@tretek.io
 
 TODO if AI should be reviewed live — API Base URL: ____________________
