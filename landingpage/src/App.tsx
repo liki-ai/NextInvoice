@@ -457,7 +457,7 @@ function App() {
             
             <div className="flex flex-col gap-6 text-sm md:items-end">
               <div className="flex flex-wrap gap-x-8 gap-y-4 md:justify-end">
-                <a href="https://tretek.github.io/nextinvoice/privacy-policy.html" className="font-medium text-brand-ink/60 transition hover:text-brand" target="_blank" rel="noreferrer">
+                <a href="https://liki-ai.github.io/NextInvoice/privacy-policy.html" className="font-medium text-brand-ink/60 transition hover:text-brand" target="_blank" rel="noreferrer">
                   {t.footer.privacy}
                 </a>
                 <a href="mailto:lirim.sylejmani@tretek.io" className="flex items-center gap-2 font-medium text-brand-ink/60 transition hover:text-brand">
