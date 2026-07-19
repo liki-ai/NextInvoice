@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# local secrets (API tokens per automatizim - never commit)
+.env
+.env.*
+!.env.example

@@ -35,6 +35,8 @@ export default function NewInvoiceScreen({ navigation }) {
   const [items, setItems] = useState([emptyItem()]);
   const [discount, setDiscount] = useState('0');
   const [notes, setNotes] = useState('');
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const { subtotal, total } = computeTotals(items, discount);
@@ -57,6 +59,8 @@ export default function NewInvoiceScreen({ navigation }) {
     setItems([emptyItem()]);
     setDiscount('0');
     setNotes('');
+    setShowDiscount(false);
+    setShowNotes(false);
     setMode('manual');
   };
 
@@ -210,28 +214,56 @@ export default function NewInvoiceScreen({ navigation }) {
               </Text>
             </View>
           ))}
-          <Button title={t('newInvoice.addItem')} onPress={addItem} variant="secondary" />
+
+          <View style={styles.optionLinks}>
+            <Pressable style={styles.optionLink} onPress={addItem}>
+              <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+              <Text style={styles.optionLinkText}>{t('newInvoice.addItem')}</Text>
+            </Pressable>
+            {!showDiscount ? (
+              <Pressable style={styles.optionLink} onPress={() => setShowDiscount(true)}>
+                <Ionicons name="pricetag-outline" size={18} color={colors.primary} />
+                <Text style={styles.optionLinkText}>{t('newInvoice.showDiscount')}</Text>
+              </Pressable>
+            ) : null}
+            {!showNotes ? (
+              <Pressable style={styles.optionLink} onPress={() => setShowNotes(true)}>
+                <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+                <Text style={styles.optionLinkText}>{t('newInvoice.showNotes')}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </Section>
 
         <Section>
-          <FormField
-            label={t('newInvoice.discount')}
-            value={String(discount)}
-            onChangeText={setDiscount}
-            keyboardType="numeric"
-          />
-          <FormField
-            label={t('newInvoice.notes')}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-            style={{ height: 70, textAlignVertical: 'top' }}
-          />
+          {showDiscount ? (
+            <FormField
+              label={t('newInvoice.discount')}
+              value={String(discount)}
+              onChangeText={setDiscount}
+              keyboardType="numeric"
+            />
+          ) : null}
+          {showNotes ? (
+            <FormField
+              label={t('newInvoice.notes')}
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={3}
+              style={{ height: 70, textAlignVertical: 'top' }}
+            />
+          ) : null}
           <View style={styles.totalsRow}>
             <Text style={typography.muted}>{t('newInvoice.subtotal')}</Text>
             <Text style={typography.body}>{formatMoney(subtotal, companyProfile.currency)}</Text>
           </View>
+          {showDiscount && toNumber(discount) > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={typography.muted}>{t('newInvoice.discount')}</Text>
+              <Text style={typography.body}>{formatMoney(toNumber(discount), companyProfile.currency)}</Text>
+            </View>
+          ) : null}
           <View style={styles.totalsRow}>
             <Text style={typography.subtitle}>{t('newInvoice.total')}</Text>
             <Text style={typography.subtitle}>{formatMoney(total, companyProfile.currency)}</Text>
@@ -261,5 +293,25 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   row: { flexDirection: 'row' },
+  optionLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  optionLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+    backgroundColor: '#EEF5F7',
+  },
+  optionLinkText: {
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
 });

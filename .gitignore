@@ -9,6 +9,15 @@ Thumbs.db
 # Logs
 *.log
 
-# local secrets (API tokens per automatizim - never commit)
+# Secrets — never commit
 .env
 .env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies / build
+**/node_modules/
+**/.expo/
+**/dist/
