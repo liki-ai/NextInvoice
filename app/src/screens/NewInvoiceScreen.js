@@ -28,7 +28,7 @@ function defaultItem() {
 }
 
 function emptyItem() {
-  return { id: generateId(), description: '', quantity: '1', unitPrice: '' };
+  return { id: generateId(), description: 'Fustan Solemn / Dress', quantity: '1', unitPrice: '80' };
 }
 
 function emptyClient() {

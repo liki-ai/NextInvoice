@@ -1,0 +1,25 @@
+name: Publish (generic template)
+
+# SI TA PERDORESH per nje klient te ri:
+# 1. Kopjoje kete skedar te projekti i klientit: .eas/workflows/publish.yml
+# 2. Sigurohu qe eas.json e ka profilin "production" (build) dhe "production" (submit).
+# 3. Niseni me: eas workflow:run publish
+#
+# Ky workflow ndertoni build production per NJE platforme (ndrysho "platform" me poshte
+# ose kopjo job-in dy here per ios + android) dhe e dergon automatikisht per submit.
+
+jobs:
+  build:
+    name: Build (production)
+    type: build
+    params:
+      platform: ios # ndrysho ne "android" per Google Play
+      profile: production
+
+  submit:
+    name: Submit to store
+    needs: [build]
+    type: submit
+    params:
+      build_id: ${{ needs.build.outputs.build_id }}
+      profile: production

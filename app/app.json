@@ -21,10 +21,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#2C6E7F",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "package": "com.lirim123.nextinvoice"
     },
