@@ -95,16 +95,18 @@ export default function ProfileScreen() {
         <FormField label={t('profile.currency')} value={form.currency} onChangeText={(v) => setField('currency', v.toUpperCase())} autoCapitalize="characters" maxLength={3} />
       </Section>
 
-      <Section title={t('profile.serverSectionTitle')}>
-        <FormField
-          label={t('profile.apiBaseUrl')}
-          value={apiBaseUrlInput}
-          onChangeText={setApiBaseUrlInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <Text style={[typography.muted, { marginTop: 4 }]}>{t('profile.apiBaseUrlHint')}</Text>
-      </Section>
+      {__DEV__ && (
+        <Section title={t('profile.serverSectionTitle')}>
+          <FormField
+            label={t('profile.apiBaseUrl')}
+            value={apiBaseUrlInput}
+            onChangeText={setApiBaseUrlInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={[typography.muted, { marginTop: 4 }]}>{t('profile.apiBaseUrlHint')}</Text>
+        </Section>
+      )}
 
       <Button title={t('common.save')} onPress={handleSave} />
     </ScrollView>
