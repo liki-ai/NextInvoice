@@ -76,7 +76,7 @@
       <ul>
         <li>Company / seller profile details you enter (name, address, email, phone, currency)</li>
         <li>Invoice data you create (client details, line items, discounts, notes, totals)</li>
-        <li>App settings such as language and your AI server URL</li>
+        <li>App settings such as your selected language</li>
       </ul>
       <p>
         This information stays on your device unless you choose to share an invoice
@@ -85,24 +85,26 @@
 
       <h2>3. Optional AI features</h2>
       <p>
-        If you use AI-assisted fields, the App may send content you provide to the
-        API server URL you configure in Profile:
+        If you use AI-assisted fields (for example “Get data with AI” or “Detect details with AI”),
+        the App sends content you provide to its built-in AI server:
       </p>
       <ul>
         <li>Free-text client details, to help fill name / address / phone fields</li>
-        <li>A sample invoice file (PDF or photo) you select, to help fill company profile fields</li>
+        <li>A photo you take, a photo you choose, or a file (PDF) you choose, to help fill company profile fields</li>
       </ul>
       <p>
         That server may process the content with a third-party AI provider (for example OpenAI)
         solely to return structured form suggestions. Do not use these features with information
-        you are not allowed to share with your configured server or AI provider.
+        you are not allowed to share with the AI provider.
       </p>
 
-      <h2>4. Files you choose</h2>
+      <h2>4. Camera, photo library, and files you choose</h2>
       <p>
-        If you use optional AI import, you may pick a PDF or image through the system
-        document picker. The selected file is sent only to the AI server URL you configured
-        for extraction. The App does not use the device camera and does not request camera permission.
+        The “Get data with AI” feature can request camera access (to take a photo of a document)
+        or photo library access (to choose an existing photo), and lets you choose a PDF file through
+        the system document picker. These permissions are requested only when you tap the
+        corresponding option, never automatically. The photo or file you select is sent only to the
+        App’s AI server for extraction and is not stored by the App beyond that request.
       </p>
 
       <h2>5. Sharing PDFs</h2>

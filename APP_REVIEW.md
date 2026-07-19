@@ -34,9 +34,9 @@
 
 ### B. Company information
 1. Open **Profili / Profile**.
-2. Either:
-   - Tap **Ngarko të dhëna shembull / Load sample company data** (works offline — recommended for App Review), or
-   - Edit company fields manually.
+2. Company fields are pre-filled with sample business data on first launch (works offline — recommended for App Review). Either:
+   - Edit fields manually, or
+   - Tap **Merr të dhënat me AI / Get data with AI** to take a photo, pick a photo, or pick a PDF and auto-fill instead.
 3. Tap **Ruaj / Save**.
 
 ### C. Create a new invoice (manual — no account, no AI required)
@@ -56,10 +56,10 @@
 3. Tap **Zbulo të dhënat me AI**.
 4. After success, review/edit the revealed form and continue as in section C.
 
-### E. AI company import from file (optional — needs configured AI server)
-1. In **Profili**, set **API Base URL** to your deployed Faturimi proxy server.
-2. Tap **Importo faturë me AI / Import invoice with AI**.
-3. Pick a PDF or image via the system document picker.
+### E. AI company import from photo or file (optional — needs network)
+1. In **Profili**, tap **Merr të dhënat me AI / Get data with AI**.
+2. Choose **Bëj foto / Take photo**, **Zgjidh foto / Choose photo**, or **Zgjidh skedar (PDF) / Choose file (PDF)**.
+3. A highlighted banner appears above the company fields once extraction succeeds, showing the values were just filled in.
 4. Review filled company fields and tap **Ruaj**.
 
 ### F. Invoice list / detail
@@ -80,13 +80,12 @@ The full main flow works without any user account.
 ## 5. Sample invoice / sample data instructions
 
 **Primary App Review path (no server):**
-1. Profile → **Load sample company data**.
+1. Profile → company fields are already filled with sample business data by default.
 2. New Invoice (Manual) → use default item `Fustan Solemn/ Dress` at `80` → Preview → Share PDF.
 
 **Optional AI path:**
-1. Deploy `server/` with `OPENAI_API_KEY` (see repo README).
-2. Set API Base URL in Profile.
-3. Use **Load sample client text** then **Detect with AI**, and/or import `docs/sample-invoice.html` exported/printed to PDF if testing file import.
+1. The app calls a hosted AI proxy by default (no user-visible URL field; not user-configurable).
+2. Use **Load sample client text** then **Detect with AI**, and/or **Get data with AI** with a photo or `docs/sample-invoice.html` printed to PDF, if testing photo/file import.
 
 Bundled reference sample markup: `docs/sample-invoice.html`.
 
@@ -96,13 +95,13 @@ Bundled reference sample markup: `docs/sample-invoice.html`.
 
 | Service | Used for | Where key lives | Called from |
 |--------|----------|-----------------|-------------|
-| User-configured Node proxy (`server/`) | `/api/extract-client`, `/api/extract-company` | Server `.env` only | App only when AI features used |
+| Node proxy (`server/`), hosted default URL baked into the app | `/api/extract-client`, `/api/extract-company` | Server `.env` only | App only when AI features used |
 | OpenAI API | Structured extraction via proxy | `OPENAI_API_KEY` on server — **never in the app** | Server only |
 | iOS Share Sheet / Files apps | Sharing generated PDF | N/A | After PDF generate |
 
 **Not used:** analytics SDKs, ads, auth providers, cloud storage SDKs, payments, subscriptions.
 
-**TODO (manual):** Public production API Base URL for reviewers (if AI path should be tested live): `______________________________`
+The AI server URL is no longer user-configurable in the app; it defaults to the developer's hosted proxy.
 
 ---
 
@@ -110,13 +109,13 @@ Bundled reference sample markup: `docs/sample-invoice.html`.
 
 | Permission | Requested? | Why |
 |-----------|------------|-----|
-| Camera (`NSCameraUsageDescription`) | **No** — removed; unused | App does not use camera |
-| Photo Library | **No** explicit usage string — import uses system **document picker** | User picks PDF/image when using optional AI import |
+| Camera (`NSCameraUsageDescription`) | **Yes** | User taps **Bëj foto / Take photo** in **Merr të dhënat me AI / Get data with AI**, to photograph a document for AI extraction |
+| Photo Library (`NSPhotoLibraryUsageDescription`) | **Yes** | User taps **Zgjidh foto / Choose photo** in the same flow, to pick an existing photo for AI extraction |
 | Microphone / Location / Contacts / Tracking | **No** | Not used |
 
-Permissions are not requested at launch. Document picker is only opened when the user taps **Import invoice with AI**.
+Permissions are not requested at launch — only when the user taps **Bëj foto** or **Zgjidh foto** inside **Merr të dhënat me AI**. The system document picker (for PDF) does not require a usage string.
 
-Denied / canceled picker: the app continues without crashing.
+Denied / canceled picker or permission: the app continues without crashing (shows an alert for denied camera/photo permission).
 
 ---
 
@@ -155,20 +154,18 @@ Bundle ID: com.lirim123.nextinvoice
 No login required. No subscriptions or IAP.
 
 How to test the main flow (offline):
-1. Open Profile → tap “Load sample company data” → Save.
+1. Open Profile — company fields are already pre-filled with sample business data. Tap “Save”.
 2. Open New Invoice (Manual).
 3. Enter any client name (e.g. Almedina Sadiku).
 4. Keep/edit the default item (Fustan Solemn/Dress, 80).
 5. Tap “Preview invoice”, then “Save and Share PDF”.
 6. Use the iOS share sheet to Save to Files or dismiss.
 
-Optional AI features require a backend URL in Profile (OpenAI key is server-side only). For review, AI is not required to demonstrate the core invoice/PDF flow.
+Optional AI features ("Get data with AI" in Profile, "Detect details with AI" in New Invoice) call a hosted backend (OpenAI key is server-side only, never in the app). For review, AI is not required to demonstrate the core invoice/PDF flow.
 
 Privacy Policy: https://liki-ai.github.io/NextInvoice/privacy-policy.html
 Terms of Use: https://liki-ai.github.io/NextInvoice/terms-of-use.html
 Support: lirim.sylejmani@tretek.io
-
-TODO if AI should be reviewed live — API Base URL: ____________________
 ```
 
 ---
@@ -184,14 +181,14 @@ TODO if AI should be reviewed live — API Base URL: ____________________
 ### Recording script (speak or on-screen captions)
 1. Show Home Screen → tap **Faturimi** (cold launch).
 2. Open **Profile** → switch language Shqip ↔ English.
-3. Tap **Load sample company data** → show fields filled → **Save**.
+3. Show company fields already pre-filled with sample data → **Save**.
 4. Open **New Invoice** → Manual mode → enter client name/address/phone.
 5. Show invoice number `INV-…` and date.
 6. Show item, quantity, price; optionally open discount/notes link and set a discount.
 7. Show totals.
 8. Tap **Preview invoice** → close preview.
 9. Tap **Save and Share PDF** → show share sheet → Save to Files or Cancel.
-10. (Optional) If testing AI: set API URL → Import with AI / Detect with AI; if a document picker appears, show it. **Camera is not used.**
+10. (Optional) If testing AI: tap **Get data with AI** → **Take photo** (shows camera permission prompt) or **Choose photo** / **Choose file** → show the highlighted banner confirming the import.
 11. Open Profile → tap **Privacy Policy**, **Terms of Use**, **Support**.
 12. End recording.
 
@@ -201,11 +198,10 @@ TODO if AI should be reviewed live — API Base URL: ____________________
 
 - [ ] Set App Store display name to **Faturimi**
 - [ ] Paste Privacy Policy URL (after merging docs to `master` or hosting publicly)
-- [ ] Complete App Privacy nutrition labels (data collected: user-entered invoice/company content; optional AI transmission to developer server/OpenAI)
+- [ ] Complete App Privacy nutrition labels (data collected: user-entered invoice/company content; camera/photo library access for optional AI import; optional AI transmission to developer server/OpenAI)
 - [ ] Confirm encryption export compliance (app sets `ITSAppUsesNonExemptEncryption: false`)
 - [ ] Attach demo video for Guideline 2.1 if requested
 - [ ] Fill physical device table in section 8 above
-- [ ] TODO: Deploy production AI proxy URL if AI features should be live for reviewers
 
 ---
 

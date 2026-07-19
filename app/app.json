@@ -16,7 +16,9 @@
       "bundleIdentifier": "com.lirim123.nextinvoice",
       "infoPlist": {
         "CFBundleDisplayName": "Faturimi",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Faturimi needs camera access so you can take a photo of a document to auto-fill your company profile with AI.",
+        "NSPhotoLibraryUsageDescription": "Faturimi needs photo library access so you can pick a photo of a document to auto-fill your company profile with AI."
       }
     },
     "android": {
@@ -31,7 +33,15 @@
     },
     "plugins": [
       "expo-document-picker",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Faturimi needs camera access so you can take a photo of a document to auto-fill your company profile with AI.",
+          "photosPermission": "Faturimi needs photo library access so you can pick a photo of a document to auto-fill your company profile with AI.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "eas": {
