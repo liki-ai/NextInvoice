@@ -1,17 +1,31 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { Button, FormField, Section, SegmentedControl } from '../components/ui';
+import InvoicePreviewModal from '../components/InvoicePreviewModal';
 import { generateInvoiceNumber, formatDateForInvoice } from '../utils/invoiceNumber';
 import { computeTotals } from '../pdf/invoiceTemplate';
 import { formatMoney, toNumber } from '../utils/money';
 import { generateId } from '../utils/id';
 import { extractClientInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
+import { SAMPLE_CLIENT_TEXT } from '../constants/legal';
+
+const DEFAULT_ITEM_DESCRIPTION = 'Fustan Solemn/ Dress';
+const DEFAULT_ITEM_PRICE = '80';
+
+function defaultItem() {
+  return {
+    id: generateId(),
+    description: DEFAULT_ITEM_DESCRIPTION,
+    quantity: '1',
+    unitPrice: DEFAULT_ITEM_PRICE,
+  };
+}
 
 function emptyItem() {
   return { id: generateId(), description: 'Fustan Solemn / Dress', quantity: '1', unitPrice: '80' };
@@ -24,7 +38,6 @@ function emptyClient() {
 export default function NewInvoiceScreen({ navigation }) {
   const { invoices, companyProfile, settings, addInvoice } = useApp();
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState('manual');
   const [aiText, setAiText] = useState('');
@@ -32,10 +45,34 @@ export default function NewInvoiceScreen({ navigation }) {
   const [client, setClient] = useState(emptyClient());
   const [invoiceNumber, setInvoiceNumber] = useState(() => generateInvoiceNumber(invoices));
   const [date, setDate] = useState(() => formatDateForInvoice(new Date()));
-  const [items, setItems] = useState([emptyItem()]);
+  const [items, setItems] = useState([defaultItem()]);
   const [discount, setDiscount] = useState('0');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [showExtras, setShowExtras] = useState(false);
+  const [aiRevealed, setAiRevealed] = useState(false);
+
+  const refreshInvoiceMeta = useCallback((invoiceList = invoices) => {
+    const now = new Date();
+    setInvoiceNumber(generateInvoiceNumber(invoiceList, now));
+    setDate(formatDateForInvoice(now));
+  }, [invoices]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshInvoiceMeta(invoices);
+    }, [invoices, refreshInvoiceMeta])
+  );
+
+  const showInvoiceForm = mode === 'manual' || aiRevealed;
+
+  const handleModeChange = (nextMode) => {
+    setMode(nextMode);
+    if (nextMode === 'ai') {
+      setAiRevealed(false);
+    }
+  };
 
   const { subtotal, total } = computeTotals(items, discount);
 
@@ -49,16 +86,30 @@ export default function NewInvoiceScreen({ navigation }) {
 
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
 
-  const resetForm = () => {
+  const resetForm = (invoiceList = invoices) => {
     setClient(emptyClient());
     setAiText('');
-    setInvoiceNumber(generateInvoiceNumber(invoices));
-    setDate(formatDateForInvoice(new Date()));
-    setItems([emptyItem()]);
+    refreshInvoiceMeta(invoiceList);
+    setItems([defaultItem()]);
     setDiscount('0');
     setNotes('');
+    setShowExtras(false);
+    setAiRevealed(false);
     setMode('manual');
   };
+
+  const buildDraftInvoice = (validItems) => ({
+    number: invoiceNumber,
+    date,
+    client,
+    items: validItems,
+    discount,
+    notes,
+    subtotal,
+    total,
+  });
+
+  const getValidItems = () => items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
 
   const handleExtract = async () => {
     if (!aiText.trim()) return;
@@ -70,11 +121,25 @@ export default function NewInvoiceScreen({ navigation }) {
         address: result.address || '',
         phone: result.phone || '',
       });
+      setAiRevealed(true);
     } catch (err) {
-      Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
+      Alert.alert(t('common.error'), err?.message || t('newInvoice.aiExtractError'));
     } finally {
       setExtracting(false);
     }
+  };
+
+  const handlePreview = () => {
+    if (!client.fullName.trim()) {
+      Alert.alert(t('common.error'), t('newInvoice.validationClient'));
+      return;
+    }
+    const validItems = getValidItems();
+    if (validItems.length === 0) {
+      Alert.alert(t('common.error'), t('newInvoice.validationItems'));
+      return;
+    }
+    setPreviewVisible(true);
   };
 
   const handleSave = async () => {
@@ -82,7 +147,7 @@ export default function NewInvoiceScreen({ navigation }) {
       Alert.alert(t('common.error'), t('newInvoice.validationClient'));
       return;
     }
-    const validItems = items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
+    const validItems = getValidItems();
     if (validItems.length === 0) {
       Alert.alert(t('common.error'), t('newInvoice.validationItems'));
       return;
@@ -90,20 +155,11 @@ export default function NewInvoiceScreen({ navigation }) {
 
     setSaving(true);
     try {
-      const invoice = {
-        number: invoiceNumber,
-        date,
-        client,
-        items: validItems,
-        discount,
-        notes,
-        subtotal,
-        total,
-      };
-      await addInvoice(invoice);
-      await shareInvoicePdf({ company: companyProfile, client, invoice, pdfLabels: t('pdf') });
+      const invoice = buildDraftInvoice(validItems);
+      const saved = await addInvoice(invoice);
+      await shareInvoicePdf({ company: companyProfile, client, invoice: saved, pdfLabels: t('pdf') });
       Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
-      resetForm();
+      resetForm([saved, ...invoices]);
       navigation.navigate('Invoices');
     } catch (err) {
       Alert.alert(t('common.error'), err.message);
@@ -112,17 +168,22 @@ export default function NewInvoiceScreen({ navigation }) {
     }
   };
 
+  const previewInvoice = buildDraftInvoice(getValidItems());
+
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
-        <Text style={typography.title}>{t('newInvoice.title')}</Text>
-
+      <ScrollView
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl * 2 }}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
         <SegmentedControl
           value={mode}
-          onChange={setMode}
+          onChange={handleModeChange}
           options={[
             { value: 'manual', label: t('newInvoice.modeManual') },
             { value: 'ai', label: t('newInvoice.modeAi') },
@@ -146,9 +207,18 @@ export default function NewInvoiceScreen({ navigation }) {
               loading={extracting}
               disabled={!aiText.trim()}
             />
+            <Button
+              title={t('newInvoice.loadSampleClient')}
+              onPress={() => setAiText(SAMPLE_CLIENT_TEXT)}
+              variant="secondary"
+              style={{ marginTop: spacing.sm }}
+              disabled={extracting}
+            />
           </Section>
         )}
 
+        {showInvoiceForm && (
+          <>
         <Section title={t('newInvoice.clientSectionTitle')}>
           <FormField
             label={t('newInvoice.fullName')}
@@ -210,24 +280,37 @@ export default function NewInvoiceScreen({ navigation }) {
               </Text>
             </View>
           ))}
-          <Button title={t('newInvoice.addItem')} onPress={addItem} variant="secondary" />
+          <Pressable onPress={addItem} style={styles.addItemLink} hitSlop={8}>
+            <Text style={styles.addItemText}>+ {t('newInvoice.addItem')}</Text>
+          </Pressable>
         </Section>
 
         <Section>
-          <FormField
-            label={t('newInvoice.discount')}
-            value={String(discount)}
-            onChangeText={setDiscount}
-            keyboardType="numeric"
-          />
-          <FormField
-            label={t('newInvoice.notes')}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-            style={{ height: 70, textAlignVertical: 'top' }}
-          />
+          {!showExtras ? (
+            <Pressable onPress={() => setShowExtras(true)} style={styles.extrasLink} hitSlop={8}>
+              <Text style={styles.extrasLinkText}>{t('newInvoice.addDiscountNotes')}</Text>
+            </Pressable>
+          ) : (
+            <>
+              <Pressable onPress={() => setShowExtras(false)} style={styles.extrasLink} hitSlop={8}>
+                <Text style={styles.extrasLinkText}>{t('newInvoice.hideDiscountNotes')}</Text>
+              </Pressable>
+              <FormField
+                label={t('newInvoice.discount')}
+                value={String(discount)}
+                onChangeText={setDiscount}
+                keyboardType="numeric"
+              />
+              <FormField
+                label={t('newInvoice.notes')}
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+                style={{ height: 70, textAlignVertical: 'top' }}
+              />
+            </>
+          )}
           <View style={styles.totalsRow}>
             <Text style={typography.muted}>{t('newInvoice.subtotal')}</Text>
             <Text style={typography.body}>{formatMoney(subtotal, companyProfile.currency)}</Text>
@@ -238,8 +321,26 @@ export default function NewInvoiceScreen({ navigation }) {
           </View>
         </Section>
 
+        <Button
+          title={t('newInvoice.previewInvoice')}
+          onPress={handlePreview}
+          variant="secondary"
+          style={{ marginBottom: spacing.sm }}
+        />
         <Button title={t('newInvoice.saveAndShare')} onPress={handleSave} loading={saving} />
+          </>
+        )}
       </ScrollView>
+
+      <InvoicePreviewModal
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+        company={companyProfile}
+        client={client}
+        invoice={previewInvoice}
+        pdfLabels={t('pdf')}
+        title={t('newInvoice.previewInvoice')}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -262,4 +363,24 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row' },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  addItemLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  addItemText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  extrasLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    marginBottom: spacing.sm,
+  },
+  extrasLinkText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });

@@ -22,7 +22,7 @@ export default class ErrorBoundary extends React.Component {
       return (
         <View style={styles.container}>
           <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.title}>NextInvoice hit an error</Text>
+            <Text style={styles.title}>Faturimi hit an error</Text>
             <Text style={styles.message}>{String(this.state.error?.message || this.state.error)}</Text>
             {this.state.error?.stack ? <Text style={styles.stack}>{String(this.state.error.stack)}</Text> : null}
           </ScrollView>

@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, spacing, typography } from '../theme';
 import { Button, Section } from '../components/ui';
+import InvoicePreviewModal from '../components/InvoicePreviewModal';
 import { formatMoney } from '../utils/money';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 
@@ -12,6 +13,7 @@ export default function InvoiceDetailScreen({ route, navigation }) {
   const { invoices, companyProfile, deleteInvoice } = useApp();
   const { t } = useTranslation();
   const [sharing, setSharing] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   const invoice = useMemo(() => invoices.find((inv) => inv.id === invoiceId), [invoices, invoiceId]);
 
@@ -87,8 +89,24 @@ export default function InvoiceDetailScreen({ route, navigation }) {
         </View>
       </Section>
 
+      <Button
+        title={t('invoiceDetail.previewInvoice')}
+        onPress={() => setPreviewVisible(true)}
+        variant="secondary"
+        style={{ marginBottom: spacing.sm }}
+      />
       <Button title={t('invoiceDetail.downloadPdf')} onPress={handleShare} loading={sharing} style={{ marginBottom: spacing.sm }} />
       <Button title={t('invoiceDetail.deleteInvoice')} onPress={handleDelete} variant="secondary" />
+
+      <InvoicePreviewModal
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+        company={companyProfile}
+        client={invoice.client}
+        invoice={invoice}
+        pdfLabels={t('pdf')}
+        title={t('invoiceDetail.previewInvoice')}
+      />
     </ScrollView>
   );
 }

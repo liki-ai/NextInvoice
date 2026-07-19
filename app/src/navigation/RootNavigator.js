@@ -39,7 +39,11 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Tab.Navigator
         screenOptions={({ route }) => ({
-          headerShown: false,
+          headerShown: route.name !== 'Invoices',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+          headerShadowVisible: false,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarIcon: ({ color, size, focused }) => {
@@ -64,9 +68,13 @@ export default function RootNavigator() {
         <Tab.Screen
           name="NewInvoice"
           component={NewInvoiceScreen}
-          options={{ title: t('tabs.newInvoice'), tabBarLabel: t('tabs.newInvoice') }}
+          options={{ title: t('tabs.newInvoice'), tabBarLabel: t('tabs.newInvoice'), headerTitle: t('newInvoice.title') }}
         />
-        <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: t('tabs.profile') }} />
+        <Tab.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ title: t('tabs.profile'), headerTitle: t('profile.title') }}
+        />
       </Tab.Navigator>
     </NavigationContainer>
   );

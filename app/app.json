@@ -1,28 +1,48 @@
 {
   "expo": {
-    "name": "NextInvoice",
+    "name": "Faturimi",
     "slug": "nextinvoice",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2C6E7F"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lirim123.nextinvoice",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import a sample invoice image.",
-        "ITSAppUsesNonExemptEncryption": false
+        "CFBundleDisplayName": "Faturimi",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Faturimi needs camera access so you can take a photo of a document to auto-fill your company profile with AI.",
+        "NSPhotoLibraryUsageDescription": "Faturimi needs photo library access so you can pick a photo of a document to auto-fill your company profile with AI."
       }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#2C6E7F",
         "foregroundImage": "./assets/android-icon-foreground.png"
-      }
+      },
+      "package": "com.lirim123.nextinvoice"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "expo-document-picker",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Faturimi needs camera access so you can take a photo of a document to auto-fill your company profile with AI.",
+          "photosPermission": "Faturimi needs photo library access so you can pick a photo of a document to auto-fill your company profile with AI.",
+          "microphonePermission": false
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "ac954ef6-cf98-46bc-8811-41ae697dc89d"
