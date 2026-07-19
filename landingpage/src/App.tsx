@@ -19,7 +19,7 @@ const translations = {
     },
     hero: {
       badge: "iOS · TestFlight & App Store",
-      title: "Faturimi",
+      title: "Next Invoice",
       subtitle: "Fatura profesionale, direkt nga telefoni.",
       description: "Krijoni, ndani dhe menaxhoni fatura elegante në sekonda — të projektuara për studio mode, freelancer dhe biznese të vogla.",
       ctaPrimary: "Shkarko në App Store",
@@ -60,7 +60,7 @@ const translations = {
     },
     ctaSection: {
       title: "Faturoni si një studio, jo si një spreadsheet.",
-      subtitle: "Faturimi është falas për tu provuar në TestFlight.",
+      subtitle: "Next Invoice është falas për tu provuar në TestFlight.",
       btn1: "Merr në TestFlight",
       btn2: "Shkarko në App Store",
     },
@@ -80,7 +80,7 @@ const translations = {
     },
     hero: {
       badge: "iOS · TestFlight & App Store",
-      title: "Faturimi",
+      title: "Next Invoice",
       subtitle: "Professional invoices, straight from your phone.",
       description: "Create, share and manage elegant invoices in seconds — designed for fashion studios, freelancers and small businesses.",
       ctaPrimary: "Download on the App Store",
@@ -121,7 +121,7 @@ const translations = {
     },
     ctaSection: {
       title: "Invoice like a studio, not like a spreadsheet.",
-      subtitle: "Faturimi is free to try on TestFlight.",
+      subtitle: "Next Invoice is free to try on TestFlight.",
       btn1: "Get on TestFlight",
       btn2: "Download on the App Store",
     },
@@ -156,7 +156,7 @@ function App() {
               transition={{ duration: 2, repeat: Infinity }}
               className="inline-block h-3 w-3 rounded-full bg-brand-accent shadow-[0_0_10px_rgba(232,163,61,0.5)]"
             />
-            <span className="font-display text-xl font-bold tracking-tight text-brand-ink">Faturimi</span>
+            <span className="font-display text-xl font-bold tracking-tight text-brand-ink">Next Invoice</span>
           </a>
           
           <div className="hidden items-center gap-10 md:flex">
@@ -261,7 +261,7 @@ function App() {
             <div className="animate-float-slow overflow-hidden rounded-[2rem] ring-1 ring-brand-ink/10 shadow-2xl shadow-brand-dark/20">
               <img
                 src={heroPhone}
-                alt="Faturimi në iPhone duke shfaqur faturën INV-JUL-001"
+                alt="Next Invoice në iPhone duke shfaqur faturën INV-JUL-001"
                 width={1024}
                 height={900}
                 className="h-auto w-full object-cover"
@@ -448,7 +448,7 @@ function App() {
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <div className="h-3 w-3 rounded-full bg-brand-accent" />
-                <span className="font-display text-xl font-bold">Faturimi</span>
+                <span className="font-display text-xl font-bold">Next Invoice</span>
               </div>
               <p className="max-w-xs text-sm text-brand-ink/60 leading-relaxed italic">
                 {t.footer.tagline}
@@ -457,7 +457,7 @@ function App() {
             
             <div className="flex flex-col gap-6 text-sm md:items-end">
               <div className="flex flex-wrap gap-x-8 gap-y-4 md:justify-end">
-                <a href="https://liki-ai.github.io/NextInvoice/privacy-policy.html" className="font-medium text-brand-ink/60 transition hover:text-brand" target="_blank" rel="noreferrer">
+                <a href="https://mynextinvoice.com/privacy-policy.html" className="font-medium text-brand-ink/60 transition hover:text-brand" target="_blank" rel="noreferrer">
                   {t.footer.privacy}
                 </a>
                 <a href="mailto:lirim.sylejmani@tretek.io" className="flex items-center gap-2 font-medium text-brand-ink/60 transition hover:text-brand">
