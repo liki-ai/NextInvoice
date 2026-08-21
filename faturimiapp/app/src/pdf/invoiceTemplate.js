@@ -140,6 +140,13 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
         color: #2C6E7F;
         font-weight: 600;
       }
+      .export-law {
+        text-align: center;
+        margin-top: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #1D2B2E;
+      }
     </style>
   </head>
   <body>
@@ -162,9 +169,9 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
     <div class="blocks">
       <div class="client-block">
         <div class="block-title">${escapeHtml(pdfLabels.clientLabel)}</div>
-        <p><strong>${escapeHtml(client.fullName)}</strong></p>
-        <p>${escapeHtml(client.address)}</p>
-        <p>${escapeHtml(client.phone)}</p>
+        <p><strong>Full Name:</strong> ${escapeHtml(client.fullName)}</p>
+        <p><strong>Address:</strong> ${escapeHtml(client.address)}</p>
+        <p><strong>Phone No:</strong> ${escapeHtml(client.phone)}</p>
       </div>
     </div>
 
@@ -191,6 +198,7 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
     ${invoice.notes ? `<div class="notes">${escapeHtml(invoice.notes)}</div>` : ''}
 
     <div class="thank-you">${escapeHtml(pdfLabels.thankYou)}</div>
+    <div class="export-law">Eksport ne bazë te Ligjit (05-L-037 Neni 33)</div>
 
     <div class="signatures">
       <div class="signature">${escapeHtml(company.contactPerson)}<br/>${escapeHtml(pdfLabels.issuedBy)}</div>
