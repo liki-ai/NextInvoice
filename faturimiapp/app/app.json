@@ -2,7 +2,7 @@
   "expo": {
     "name": "NextInvoice",
     "slug": "nextinvoice",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
         "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import a sample invoice image.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "20"
+      "buildNumber": "21"
     },
     "android": {
       "adaptiveIcon": {
