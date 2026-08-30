@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronRight, Mail, Download, Smartphone, CheckCircle2, ShieldCheck, FileText, Cpu, Languages, Layers, MousePointer2 } from 'lucide-react'
+import { ChevronRight, Mail, Smartphone, CheckCircle2, ShieldCheck, FileText, Cpu, Languages, Layers, MousePointer2 } from 'lucide-react'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import heroPhone from './assets/hero-phone.png'
+
+const APP_STORE_URL = 'https://apps.apple.com/xk/app/nextinvoice/id6792242040'
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -18,7 +20,7 @@ const translations = {
       getApp: "Merr aplikacionin",
     },
     hero: {
-      badge: "iOS · TestFlight & App Store",
+      badge: "iOS · App Store",
       title: "Next Invoice",
       subtitle: "Fatura profesionale, direkt nga telefoni.",
       description: "Krijoni, ndani dhe menaxhoni fatura elegante në sekonda — të projektuara për studio mode, freelancer dhe biznese të vogla.",
@@ -60,9 +62,8 @@ const translations = {
     },
     ctaSection: {
       title: "Faturoni si një studio, jo si një spreadsheet.",
-      subtitle: "Next Invoice është falas për tu provuar në TestFlight.",
-      btn1: "Merr në TestFlight",
-      btn2: "Shkarko në App Store",
+      subtitle: "Next Invoice tani në App Store.",
+      cta: "Shkarko në App Store",
     },
     footer: {
       tagline: "Fatura që duken si punë e mirëmenduar.",
@@ -79,7 +80,7 @@ const translations = {
       getApp: "Get the app",
     },
     hero: {
-      badge: "iOS · TestFlight & App Store",
+      badge: "iOS · App Store",
       title: "Next Invoice",
       subtitle: "Professional invoices, straight from your phone.",
       description: "Create, share and manage elegant invoices in seconds — designed for fashion studios, freelancers and small businesses.",
@@ -121,9 +122,8 @@ const translations = {
     },
     ctaSection: {
       title: "Invoice like a studio, not like a spreadsheet.",
-      subtitle: "Next Invoice is free to try on TestFlight.",
-      btn1: "Get on TestFlight",
-      btn2: "Download on the App Store",
+      subtitle: "Next Invoice is on the App Store.",
+      cta: "Download on the App Store",
     },
     footer: {
       tagline: "Invoices that look like thoughtful work.",
@@ -192,7 +192,7 @@ function App() {
                 EN
               </button>
             </div>
-            <a href="#" className="hidden md:inline-flex items-center rounded-full bg-brand-ink px-5 py-2.5 text-xs font-bold text-white transition hover:bg-brand-dark hover:scale-105 active:scale-95">
+            <a href={APP_STORE_URL} target="_blank" rel="noreferrer" className="hidden md:inline-flex items-center rounded-full bg-brand-ink px-5 py-2.5 text-xs font-bold text-white transition hover:bg-brand-dark hover:scale-105 active:scale-95">
               {t.nav.getApp}
             </a>
           </div>
@@ -240,7 +240,7 @@ function App() {
               transition={{ delay: 0.4, duration: 0.8 }}
               className="mt-12 flex flex-wrap items-center gap-4"
             >
-              <a href="#" className="group inline-flex items-center gap-3 rounded-full bg-brand-ink px-8 py-4 text-sm font-bold text-white shadow-xl shadow-brand-dark/20 transition-all hover:bg-brand-dark hover:-translate-y-1">
+              <a href={APP_STORE_URL} target="_blank" rel="noreferrer" className="group inline-flex items-center gap-3 rounded-full bg-brand-ink px-8 py-4 text-sm font-bold text-white shadow-xl shadow-brand-dark/20 transition-all hover:bg-brand-dark hover:-translate-y-1">
                 <Smartphone className="h-5 w-5" />
                 <span>{t.hero.ctaPrimary}</span>
               </a>
@@ -429,13 +429,9 @@ function App() {
             transition={{ delay: 0.3 }}
             className="mt-14 flex flex-wrap items-center justify-center gap-4"
           >
-            <a href="#" className="inline-flex items-center gap-3 rounded-full bg-brand-accent px-10 py-5 text-sm font-bold text-brand-ink transition-all hover:scale-105 active:scale-95 shadow-xl shadow-black/20">
-              <Download className="h-5 w-5" />
-              {t.ctaSection.btn1}
-            </a>
-            <a href="#" className="inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-10 py-5 text-sm font-bold text-white backdrop-blur-md transition-all hover:bg-white/20">
+            <a href={APP_STORE_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 rounded-full bg-brand-accent px-10 py-5 text-sm font-bold text-brand-ink transition-all hover:scale-105 active:scale-95 shadow-xl shadow-black/20">
               <Smartphone className="h-5 w-5" />
-              {t.ctaSection.btn2}
+              {t.ctaSection.cta}
             </a>
           </motion.div>
         </div>
