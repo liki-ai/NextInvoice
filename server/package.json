@@ -2,10 +2,11 @@
   "name": "nextinvoice-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Render entrypoint. The API lives in faturimiapp/server; this folder exists because the Render service Root Directory is server/.",
-  "main": "../faturimiapp/server/src/index.js",
+  "description": "Production API (Render Root Directory is server/). Keep in sync with faturimiapp/server.",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node ../faturimiapp/server/src/index.js"
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
