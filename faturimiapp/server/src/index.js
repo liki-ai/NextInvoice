@@ -14,6 +14,15 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: '2mb' }));
 
+app.get('/', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'nextinvoice-api',
+    website: 'https://mynextinvoice.com',
+    health: '/health',
+  });
+});
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRouter);
