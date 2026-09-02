@@ -2,7 +2,7 @@
 
 **Fatura profesionale, direkt nga telefoni.**
 
-Create, preview, and share invoices from your phone — built for freelancers, studios, and small businesses. The UI is Albanian by default, with English one tap away.
+Create, preview, and share invoices from your phone or the web — built for freelancers, studios, and small businesses. The UI is Albanian by default, with English one tap away.
 
 Live site: [mynextinvoice.com](https://mynextinvoice.com)
 
@@ -35,7 +35,7 @@ cp .env.example .env   # then set OPENAI_API_KEY
 npm start
 ```
 
-Listens on `http://localhost:4000` (`/health`, `/api/extract-client`, `/api/extract-company`).
+Listens on `http://localhost:4000` (`/health`, `/api/auth/*`, `/api/invoices`, `/api/profile`, `/api/extract-client`, `/api/extract-company`). Set `JWT_SECRET` in `.env` for web accounts.
 
 ### Mobile app
 

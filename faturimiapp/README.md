@@ -22,9 +22,9 @@ cp .env.example .env   # then edit .env and set OPENAI_API_KEY
 npm start
 ```
 
-The server listens on `http://localhost:4000` by default (`/health`, `/api/extract-client`, `/api/extract-company`).
+The server listens on `http://localhost:4000` by default (`/health`, `/api/auth/*`, `/api/invoices`, `/api/profile`, `/api/extract-client`, `/api/extract-company`).
 
-`OPENAI_MODEL` defaults to `gpt-5-mini` in `.env.example` - change it if that model isn't available to your key.
+`JWT_SECRET` is required in production so web signup/login can issue tokens. `OPENAI_MODEL` defaults to `gpt-5-mini` in `.env.example`.
 
 Your API key stays only in `server/.env`, which is git-ignored. Never put it inside the `app/` folder or commit it.
 

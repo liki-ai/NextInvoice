@@ -5,14 +5,20 @@ const cors = require('cors');
 
 const extractClientRouter = require('./routes/extractClient');
 const extractCompanyRouter = require('./routes/extractCompany');
+const authRouter = require('./routes/auth');
+const invoicesRouter = require('./routes/invoices');
+const profileRouter = require('./routes/profile');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: true }));
 app.use(express.json({ limit: '2mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+app.use('/api/auth', authRouter);
+app.use('/api/invoices', invoicesRouter);
+app.use('/api/profile', profileRouter);
 app.use('/api', extractClientRouter);
 app.use('/api', extractCompanyRouter);
 
