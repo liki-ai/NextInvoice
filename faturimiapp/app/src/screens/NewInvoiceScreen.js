@@ -33,22 +33,44 @@ function emptyClient() {
   return { fullName: '', address: '', phone: '' };
 }
 
-export default function NewInvoiceScreen({ navigation }) {
-  const { invoices, companyProfile, settings, addInvoice } = useApp();
+function clientFromInvoice(invoice) {
+  return {
+    fullName: invoice?.client?.fullName || '',
+    address: invoice?.client?.address || '',
+    phone: invoice?.client?.phone || '',
+  };
+}
+
+function itemsFromInvoice(invoice) {
+  if (!invoice?.items?.length) return [emptyItem()];
+  return invoice.items.map((it) => ({
+    id: it.id || generateId(),
+    description: it.description || '',
+    quantity: String(it.quantity ?? '1'),
+    unitPrice: String(it.unitPrice ?? ''),
+  }));
+}
+
+export default function NewInvoiceScreen({ navigation, route }) {
+  const invoiceId = route?.params?.invoiceId;
+  const { invoices, companyProfile, settings, addInvoice, updateInvoice } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+
+  const existing = invoiceId ? invoices.find((inv) => inv.id === invoiceId) : null;
+  const isEditing = Boolean(invoiceId);
 
   const [mode, setMode] = useState('manual');
   const [aiText, setAiText] = useState('');
   const [extracting, setExtracting] = useState(false);
-  const [client, setClient] = useState(emptyClient());
-  const [invoiceNumber, setInvoiceNumber] = useState(() => generateInvoiceNumber(invoices));
-  const [date, setDate] = useState(() => formatDateForInvoice(new Date()));
-  const [items, setItems] = useState([emptyItem()]);
-  const [discount, setDiscount] = useState('0');
-  const [notes, setNotes] = useState('');
-  const [showDiscount, setShowDiscount] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+  const [client, setClient] = useState(() => (existing ? clientFromInvoice(existing) : emptyClient()));
+  const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices));
+  const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()));
+  const [items, setItems] = useState(() => (existing ? itemsFromInvoice(existing) : [emptyItem()]));
+  const [discount, setDiscount] = useState(() => String(existing?.discount ?? '0'));
+  const [notes, setNotes] = useState(() => existing?.notes || '');
+  const [showDiscount, setShowDiscount] = useState(() => Number(existing?.discount) > 0);
+  const [showNotes, setShowNotes] = useState(() => Boolean(existing?.notes));
   const [saving, setSaving] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
 
@@ -150,11 +172,20 @@ export default function NewInvoiceScreen({ navigation }) {
 
     setSaving(true);
     try {
-      await addInvoice(invoice);
-      await shareInvoicePdf({ company: companyProfile, client, invoice, pdfLabels: t('pdf') });
-      Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
-      resetForm();
-      navigation.navigate('Invoices');
+      if (isEditing) {
+        await updateInvoice(invoiceId, {
+          ...invoice,
+          updatedAt: new Date().toISOString(),
+        });
+        Alert.alert(t('common.success'), t('newInvoice.updatedSuccess'));
+        navigation.goBack();
+      } else {
+        await addInvoice(invoice);
+        await shareInvoicePdf({ company: companyProfile, client, invoice, pdfLabels: t('pdf') });
+        Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
+        resetForm();
+        navigation.navigate('Invoices');
+      }
     } catch (err) {
       Alert.alert(t('common.error'), err.message);
     } finally {
@@ -162,9 +193,19 @@ export default function NewInvoiceScreen({ navigation }) {
     }
   };
 
+  const saveLabel = isEditing ? t('newInvoice.saveChanges') : t('newInvoice.saveAndShare');
+
+  if (isEditing && !existing) {
+    return (
+      <View style={styles.container}>
+        <Text style={typography.body}>Invoice not found.</Text>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, !isEditing && { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
@@ -173,7 +214,7 @@ export default function NewInvoiceScreen({ navigation }) {
         keyboardDismissMode="on-drag"
         onScrollBeginDrag={Keyboard.dismiss}
       >
-        <Text style={typography.title}>{t('newInvoice.title')}</Text>
+        {!isEditing ? <Text style={typography.title}>{t('newInvoice.title')}</Text> : null}
 
         <SegmentedControl
           value={mode}
@@ -329,7 +370,7 @@ export default function NewInvoiceScreen({ navigation }) {
             <Ionicons name="eye-outline" size={18} color={colors.primary} />
             <Text style={styles.previewButtonText}>{t('newInvoice.preview')}</Text>
           </Pressable>
-          <Button title={t('newInvoice.saveAndShare')} onPress={handleSave} loading={saving} style={{ flex: 1 }} />
+          <Button title={saveLabel} onPress={handleSave} loading={saving} style={{ flex: 1 }} />
         </View>
       </ScrollView>
 
@@ -356,7 +397,7 @@ export default function NewInvoiceScreen({ navigation }) {
               style={{ flex: 1 }}
             />
             <Button
-              title={t('newInvoice.saveAndShare')}
+              title={saveLabel}
               onPress={handleSave}
               loading={saving}
               style={{ flex: 1.4 }}

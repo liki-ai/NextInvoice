@@ -28,6 +28,11 @@ function InvoicesStackNavigator() {
         component={InvoiceDetailScreen}
         options={{ title: t('invoiceDetail.title') }}
       />
+      <InvoicesStack.Screen
+        name="EditInvoice"
+        component={NewInvoiceScreen}
+        options={{ title: t('invoiceDetail.editTitle') }}
+      />
     </InvoicesStack.Navigator>
   );
 }

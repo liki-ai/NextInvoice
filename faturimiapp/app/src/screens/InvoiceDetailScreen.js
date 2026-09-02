@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +31,21 @@ export default function InvoiceDetailScreen({ route, navigation }) {
     });
   }, [previewVisible, invoice, companyProfile, t]);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={() => navigation.navigate('EditInvoice', { invoiceId })}
+          hitSlop={12}
+          style={styles.headerEdit}
+        >
+          <Ionicons name="create-outline" size={20} color={colors.primary} />
+          <Text style={styles.headerEditText}>{t('invoiceDetail.editInvoice')}</Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, invoiceId, t]);
+
   if (!invoice) {
     return (
       <View style={styles.container}>
@@ -53,6 +68,10 @@ export default function InvoiceDetailScreen({ route, navigation }) {
     } finally {
       setSharing(false);
     }
+  };
+
+  const handleEdit = () => {
+    navigation.navigate('EditInvoice', { invoiceId: invoice.id });
   };
 
   const handleDelete = () => {
@@ -105,17 +124,21 @@ export default function InvoiceDetailScreen({ route, navigation }) {
         </Section>
 
         <View style={styles.actions}>
+          <Pressable style={styles.previewButton} onPress={handleEdit}>
+            <Ionicons name="create-outline" size={18} color={colors.primary} />
+            <Text style={styles.previewButtonText}>{t('invoiceDetail.editInvoice')}</Text>
+          </Pressable>
           <Pressable style={styles.previewButton} onPress={() => setPreviewVisible(true)}>
             <Ionicons name="eye-outline" size={18} color={colors.primary} />
             <Text style={styles.previewButtonText}>{t('newInvoice.preview')}</Text>
           </Pressable>
-          <Button
-            title={t('invoiceDetail.downloadPdf')}
-            onPress={handleShare}
-            loading={sharing}
-            style={{ flex: 1 }}
-          />
         </View>
+        <Button
+          title={t('invoiceDetail.downloadPdf')}
+          onPress={handleShare}
+          loading={sharing}
+          style={{ marginTop: spacing.sm }}
+        />
         <Pressable style={styles.deleteLink} onPress={handleDelete}>
           <Ionicons name="trash-outline" size={16} color={colors.danger} />
           <Text style={styles.deleteLinkText}>{t('invoiceDetail.deleteInvoice')}</Text>
@@ -162,6 +185,18 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+  headerEdit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  headerEditText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 15,
+  },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -182,8 +217,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   previewButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingVertical: 12,
     paddingHorizontal: 14,
