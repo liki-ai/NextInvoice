@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { spacing, typography, colors } from '../theme';
-import { Button, FormField, Section, SegmentedControl } from '../components/ui';
+import { Button, FormField, Section } from '../components/ui';
 import { extractCompanyInfo } from '../api/extract';
 
 export default function ProfileScreen() {
@@ -65,14 +65,23 @@ export default function ProfileScreen() {
       <Text style={typography.title}>{t('profile.title')}</Text>
 
       <Section title={t('profile.languageSectionTitle')} style={{ marginTop: spacing.md }}>
-        <SegmentedControl
-          value={settings.language}
-          onChange={setLanguage}
-          options={[
-            { value: 'sq', label: t('profile.languageSq') },
-            { value: 'en', label: t('profile.languageEn') },
-          ]}
-        />
+        <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.languageHint')}</Text>
+        {[
+          { value: 'sq', label: t('profile.languageSq') },
+          { value: 'en', label: t('profile.languageEn') },
+          { value: 'it', label: t('profile.languageIt') },
+        ].map((opt) => {
+          const active = settings.language === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => setLanguage(opt.value)}
+              style={[styles.langRow, active && styles.langRowActive]}
+            >
+              <Text style={active ? styles.langTextActive : styles.langText}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
       </Section>
 
       <Section title={t('profile.importSectionTitle')}>
@@ -118,4 +127,27 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  langRow: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  langRowActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  langText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  langTextActive: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
 });

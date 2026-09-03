@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Eye, Plus, Tag, FileText, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { Button, Card, Field, TextArea } from '../../components/ui'
+import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
 import {
   buildInvoiceHtml,
   computeTotals,
@@ -18,7 +18,7 @@ import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 
 function emptyItem(): InvoiceItem {
-  return { id: generateId(), description: 'Fustan Solemn / Dress', quantity: '1', unitPrice: '80' }
+  return { id: generateId(), description: '', quantity: '1', unitPrice: '' }
 }
 
 export function InvoiceFormPage() {
@@ -32,28 +32,21 @@ export function InvoiceFormPage() {
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [aiText, setAiText] = useState('')
   const [extracting, setExtracting] = useState(false)
-  const [client, setClient] = useState(
-    existing?.client || { fullName: '', address: '', phone: '' },
-  )
-  const [invoiceNumber, setInvoiceNumber] = useState(
-    () => existing?.number || generateInvoiceNumber(invoices),
-  )
+  const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '' })
+  const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()))
-  const [items, setItems] = useState<InvoiceItem[]>(
-    () =>
-      existing?.items?.length
-        ? existing.items.map((it) => ({
-            id: it.id || generateId(),
-            description: it.description || '',
-            quantity: String(it.quantity ?? '1'),
-            unitPrice: String(it.unitPrice ?? ''),
-          }))
-        : [emptyItem()],
+  const [items, setItems] = useState<InvoiceItem[]>(() =>
+    existing?.items?.length
+      ? existing.items.map((it) => ({
+          id: it.id || generateId(),
+          description: it.description || '',
+          quantity: String(it.quantity ?? '1'),
+          unitPrice: String(it.unitPrice ?? ''),
+        }))
+      : [emptyItem()],
   )
   const [discount, setDiscount] = useState(String(existing?.discount ?? '0'))
   const [notes, setNotes] = useState(existing?.notes || '')
-  const [showDiscount, setShowDiscount] = useState(Number(existing?.discount) > 0)
-  const [showNotes, setShowNotes] = useState(Boolean(existing?.notes))
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState(false)
   const [error, setError] = useState('')
@@ -75,8 +68,6 @@ export function InvoiceFormPage() {
     )
     setDiscount(String(existing.discount ?? '0'))
     setNotes(existing.notes || '')
-    setShowDiscount(Number(existing.discount) > 0)
-    setShowNotes(Boolean(existing.notes))
   }, [existing?.id])
 
   const currency = profile?.currency || 'EUR'
@@ -175,33 +166,40 @@ export function InvoiceFormPage() {
     }
   }
 
+  const inputClass =
+    'w-full rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
+
   return (
     <div>
-      <h1 className="font-display text-3xl font-medium">
-        {isEditing ? t('newInvoice.editTitle') : t('newInvoice.title')}
-      </h1>
-
-      <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-full bg-white p-1 ring-1 ring-brand-ink/10">
-        {(['manual', 'ai'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setMode(value)}
-            className={cn(
-              'rounded-full py-2 text-sm font-bold',
-              mode === value ? 'bg-brand text-white' : 'text-brand-ink/60',
-            )}
-          >
-            {value === 'manual' ? t('newInvoice.modeManual') : t('newInvoice.modeAi')}
-          </button>
-        ))}
+      <Link to="/app" className="text-sm font-semibold text-brand-ink/50 hover:text-brand">
+        ← {t('nav.invoices')}
+      </Link>
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <h1 className="font-display text-4xl font-medium tracking-tight">
+          {isEditing ? t('newInvoice.editTitle') : t('newInvoice.title')}
+        </h1>
+        <div className="inline-flex rounded-xl bg-white p-1 ring-1 ring-brand-ink/10">
+          {(['manual', 'ai'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              className={cn(
+                'rounded-lg px-4 py-2 text-sm font-semibold',
+                mode === value ? 'bg-brand text-white' : 'text-brand-ink/55 hover:text-brand-ink',
+              )}
+            >
+              {value === 'manual' ? t('newInvoice.modeManual') : t('newInvoice.modeAi')}
+            </button>
+          ))}
+        </div>
       </div>
 
       {mode === 'ai' ? (
-        <Card className="mt-4">
+        <Card className="mt-6">
           <TextArea
             label={t('newInvoice.aiInputLabel')}
-            rows={4}
+            rows={3}
             placeholder={t('newInvoice.aiInputPlaceholder')}
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
@@ -212,113 +210,127 @@ export function InvoiceFormPage() {
         </Card>
       ) : null}
 
-      <Card className="mt-4">
-        <h2 className="mb-3 font-semibold">{t('newInvoice.clientSectionTitle')}</h2>
-        <Field label={t('newInvoice.fullName')} value={client.fullName} onChange={(e) => setClient((c) => ({ ...c, fullName: e.target.value }))} />
-        <Field label={t('newInvoice.address')} value={client.address} onChange={(e) => setClient((c) => ({ ...c, address: e.target.value }))} />
-        <Field label={t('newInvoice.phone')} value={client.phone} onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))} />
-      </Card>
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="space-y-6">
+          <Card>
+            <h2 className="mb-4 font-semibold">{t('newInvoice.clientSectionTitle')}</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Field label={t('newInvoice.fullName')} value={client.fullName} onChange={(e) => setClient((c) => ({ ...c, fullName: e.target.value }))} />
+              </div>
+              <Field label={t('newInvoice.address')} value={client.address} onChange={(e) => setClient((c) => ({ ...c, address: e.target.value }))} />
+              <Field label={t('newInvoice.phone')} value={client.phone} onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))} />
+            </div>
+          </Card>
 
-      <Card className="mt-4">
-        <h2 className="mb-3 font-semibold">{t('newInvoice.invoiceDetailsSectionTitle')}</h2>
-        <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
-        <Field label={t('newInvoice.date')} value={date} onChange={(e) => setDate(e.target.value)} />
-      </Card>
+          <Card className="overflow-hidden p-0">
+            <div className="flex items-center justify-between border-b border-brand-ink/8 px-6 py-4">
+              <h2 className="font-semibold">{t('newInvoice.itemsSectionTitle')}</h2>
+              <button
+                type="button"
+                onClick={() => setItems((prev) => [...prev, emptyItem()])}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline"
+              >
+                <Plus className="h-4 w-4" /> {t('newInvoice.addItem')}
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead className="bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">{t('newInvoice.itemDescription')}</th>
+                    <th className="w-24 px-3 py-3 text-left font-semibold">{t('newInvoice.itemQuantity')}</th>
+                    <th className="w-32 px-3 py-3 text-left font-semibold">{t('newInvoice.itemUnitPrice')}</th>
+                    <th className="w-28 px-3 py-3 text-right font-semibold">{t('newInvoice.itemTotal')}</th>
+                    <th className="w-12 px-3 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-t border-brand-ink/5">
+                      <td className="px-4 py-2">
+                        <input className={inputClass} value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input className={inputClass} value={String(item.quantity)} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input className={inputClass} value={String(item.unitPrice)} onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value)} />
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium">
+                        {formatMoney(toNumber(item.quantity) * toNumber(item.unitPrice), currency)}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {items.length > 1 ? (
+                          <button type="button" onClick={() => setItems((prev) => prev.filter((it) => it.id !== item.id))}>
+                            <Trash2 className="h-4 w-4 text-[#C0503A]" />
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
 
-      <Card className="mt-4">
-        <h2 className="mb-3 font-semibold">{t('newInvoice.itemsSectionTitle')}</h2>
-        {items.map((item, idx) => (
-          <div key={item.id} className="mb-3 rounded-xl border border-brand-ink/10 bg-brand-bg/60 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-brand-ink/50">#{idx + 1}</span>
-              {items.length > 1 ? (
-                <button type="button" onClick={() => setItems((prev) => prev.filter((it) => it.id !== item.id))}>
-                  <Trash2 className="h-4 w-4 text-[#C0503A]" />
-                </button>
+        <div className="space-y-6 lg:sticky lg:top-8">
+          <Card>
+            <h2 className="mb-4 font-semibold">{t('newInvoice.invoiceDetailsSectionTitle')}</h2>
+            <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
+            <Field label={t('newInvoice.date')} value={date} onChange={(e) => setDate(e.target.value)} />
+            <Field label={t('newInvoice.discount')} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </Card>
+          <Card>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-brand-ink/55">
+                <span>{t('newInvoice.subtotal')}</span>
+                <span>{formatMoney(subtotal, currency)}</span>
+              </div>
+              {toNumber(discount) > 0 ? (
+                <div className="flex justify-between text-brand-ink/55">
+                  <span>{t('newInvoice.discount')}</span>
+                  <span>{formatMoney(toNumber(discount), currency)}</span>
+                </div>
               ) : null}
+              <div className="flex justify-between border-t border-brand-ink/10 pt-3 font-display text-2xl font-medium">
+                <span>{t('newInvoice.total')}</span>
+                <span>{formatMoney(total, currency)}</span>
+              </div>
             </div>
-            <Field label={t('newInvoice.itemDescription')} value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={t('newInvoice.itemQuantity')} value={String(item.quantity)} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} />
-              <Field label={t('newInvoice.itemUnitPrice')} value={String(item.unitPrice)} onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value)} />
+            {error ? <p className="mt-4 text-sm text-[#C0503A]">{error}</p> : null}
+            <div className="mt-5 flex flex-col gap-2">
+              <Button type="button" variant="secondary" onClick={() => (validate() ? setPreview(true) : null)}>
+                <Eye className="h-4 w-4" />
+                {t('newInvoice.preview')}
+              </Button>
+              <Button type="button" disabled={saving} onClick={onSave}>
+                {saving ? t('common.loading') : saveLabel}
+              </Button>
             </div>
-            <p className="text-xs text-brand-ink/50">
-              {t('newInvoice.itemTotal')}: {formatMoney(toNumber(item.quantity) * toNumber(item.unitPrice), currency)}
-            </p>
-          </div>
-        ))}
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setItems((prev) => [...prev, emptyItem()])} className="inline-flex items-center gap-1 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand">
-            <Plus className="h-4 w-4" /> {t('newInvoice.addItem')}
-          </button>
-          {!showDiscount ? (
-            <button type="button" onClick={() => setShowDiscount(true)} className="inline-flex items-center gap-1 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand">
-              <Tag className="h-4 w-4" /> {t('newInvoice.showDiscount')}
-            </button>
-          ) : null}
-          {!showNotes ? (
-            <button type="button" onClick={() => setShowNotes(true)} className="inline-flex items-center gap-1 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand">
-              <FileText className="h-4 w-4" /> {t('newInvoice.showNotes')}
-            </button>
-          ) : null}
+          </Card>
         </div>
-      </Card>
-
-      <Card className="mt-4">
-        {showDiscount ? (
-          <Field label={t('newInvoice.discount')} value={discount} onChange={(e) => setDiscount(e.target.value)} />
-        ) : null}
-        {showNotes ? (
-          <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        ) : null}
-        <div className="space-y-1 text-sm">
-          <div className="flex justify-between text-brand-ink/60">
-            <span>{t('newInvoice.subtotal')}</span>
-            <span>{formatMoney(subtotal, currency)}</span>
-          </div>
-          {showDiscount && toNumber(discount) > 0 ? (
-            <div className="flex justify-between text-brand-ink/60">
-              <span>{t('newInvoice.discount')}</span>
-              <span>{formatMoney(toNumber(discount), currency)}</span>
-            </div>
-          ) : null}
-          <div className="flex justify-between font-bold">
-            <span>{t('newInvoice.total')}</span>
-            <span>{formatMoney(total, currency)}</span>
-          </div>
-        </div>
-      </Card>
-
-      {error ? <p className="mt-3 text-sm text-[#C0503A]">{error}</p> : null}
-
-      <div className="mt-5 mb-10 flex gap-3">
-        <Button type="button" variant="secondary" onClick={() => (validate() ? setPreview(true) : null)}>
-          <Eye className="h-4 w-4" />
-          {t('newInvoice.preview')}
-        </Button>
-        <Button type="button" className="flex-1" disabled={saving} onClick={onSave}>
-          {saving ? t('common.loading') : saveLabel}
-        </Button>
       </div>
 
       {preview ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          <div className="flex items-center justify-between border-b border-brand-ink/10 px-4 py-3">
-            <h2 className="font-bold">{t('newInvoice.previewTitle')}</h2>
-            <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
-              {t('common.close')}
-            </Button>
-          </div>
-          <iframe title="preview" className="min-h-0 flex-1" srcDoc={previewHtml} />
-          <div className="flex gap-3 border-t border-brand-ink/10 p-4">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setPreview(false)}>
-              {t('common.close')}
-            </Button>
-            <Button type="button" className="flex-[1.4]" disabled={saving} onClick={onSave}>
-              {saveLabel}
-            </Button>
-          </div>
-        </div>
+        <Modal
+          title={t('newInvoice.previewTitle')}
+          onClose={() => setPreview(false)}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
+                {t('common.close')}
+              </Button>
+              <Button type="button" disabled={saving} onClick={onSave}>
+                {saveLabel}
+              </Button>
+            </>
+          }
+        >
+          <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
+        </Modal>
       ) : null}
     </div>
   )

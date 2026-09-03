@@ -1,77 +1,112 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { FileText, Plus, UserRound } from 'lucide-react'
+import { useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { FileText, LogOut, Menu, Plus, UserRound, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { LangSwitch } from '../../components/LangSwitch'
+import { LanguagePicker } from '../../components/LangSwitch'
 import { cn } from '../../lib/cn'
 
-function ShellInner() {
+const NAV = [
+  { to: '/app', end: true, icon: FileText, key: 'nav.invoices' },
+  { to: '/app/new', end: true, icon: Plus, key: 'nav.newInvoice' },
+  { to: '/app/profile', end: true, icon: UserRound, key: 'nav.profile' },
+] as const
+
+function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useI18n()
   const { logout, user } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const invoicesActive = pathname === '/app' || pathname.startsWith('/app/invoices')
 
   return (
-    <div className="min-h-screen bg-brand-bg pb-32">
-      <header className="sticky top-0 z-40 border-b border-brand-ink/5 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <button type="button" onClick={() => navigate('/app')} className="font-display text-lg font-bold">
-            Next Invoice
+    <div className="flex h-full flex-col">
+      <div className="px-6 pb-8 pt-7">
+        <button type="button" onClick={() => { navigate('/app'); onNavigate?.() }} className="text-left">
+          <span className="font-display text-xl font-semibold tracking-tight text-white">Next Invoice</span>
+          <span className="mt-1 block text-[11px] font-medium uppercase tracking-[0.14em] text-white/45">{t('nav.workspace')}</span>
+        </button>
+      </div>
+      <nav className="flex-1 space-y-1 px-3">
+        {NAV.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            onClick={onNavigate}
+            className={({ isActive }) => {
+              const active = item.to === '/app' ? invoicesActive : isActive
+              return cn(
+                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition',
+                active ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/6 hover:text-white',
+              )
+            }}
+          >
+            <item.icon className="h-4 w-4 shrink-0" />
+            {t(item.key)}
+          </NavLink>
+        ))}
+      </nav>
+      <div className="mt-auto border-t border-white/10 px-4 py-4">
+        <p className="truncate px-2 text-xs text-white/50">{user?.email}</p>
+        <div className="mt-3 flex items-center justify-between gap-2 px-1">
+          <LanguagePicker variant="dark" />
+          <button
+            type="button"
+            onClick={() => {
+              logout()
+              navigate('/')
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-white/55 hover:bg-white/8 hover:text-white"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            {t('nav.logout')}
           </button>
-          <div className="flex items-center gap-3">
-            <LangSwitch />
-            <button
-              type="button"
-              onClick={() => {
-                logout()
-                navigate('/')
-              }}
-              className="text-xs font-bold text-brand-ink/60 hover:text-brand"
-            >
-              {t('nav.logout')}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ShellInner() {
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="min-h-screen bg-brand-bg lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
+      <aside className="hidden lg:block">
+        <div className="fixed inset-y-0 left-0 w-[260px] bg-brand-dark">
+          <Sidebar />
+        </div>
+      </aside>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button type="button" className="absolute inset-0 bg-brand-ink/40" onClick={() => setOpen(false)} />
+          <div className="relative h-full w-[280px] bg-brand-dark shadow-2xl">
+            <button type="button" className="absolute right-3 top-4 rounded-lg p-2 text-white/70" onClick={() => setOpen(false)}>
+              <X className="h-5 w-5" />
             </button>
+            <Sidebar onNavigate={() => setOpen(false)} />
           </div>
         </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-4 py-6 pb-16">
-        <Outlet />
-      </main>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-brand-ink/10 bg-white">
-        <div className="mx-auto grid max-w-5xl grid-cols-3 items-end px-6 pb-3 pt-2">
-          <NavLink
-            to="/app"
-            end
-            className={({ isActive }) =>
-              cn('flex flex-col items-center gap-1 text-[11px] font-bold', isActive ? 'text-brand' : 'text-brand-ink/45')
-            }
-          >
-            <FileText className="h-5 w-5" />
-            {t('nav.invoices')}
-          </NavLink>
-          <NavLink to="/app/new" className="flex flex-col items-center">
-            {({ isActive }) => (
-              <span
-                className={cn(
-                  '-mt-7 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white shadow-lg',
-                  isActive ? 'bg-brand text-white' : 'bg-[#EEF5F7] text-brand',
-                )}
-              >
-                <Plus className="h-8 w-8" />
-              </span>
-            )}
-          </NavLink>
-          <NavLink
-            to="/app/profile"
-            className={({ isActive }) =>
-              cn('flex flex-col items-center gap-1 text-[11px] font-bold', isActive ? 'text-brand' : 'text-brand-ink/45')
-            }
-          >
-            <UserRound className="h-5 w-5" />
-            {t('nav.profile')}
-          </NavLink>
-        </div>
-        {user?.email ? <p className="sr-only">{user.email}</p> : null}
-      </nav>
+      ) : null}
+
+      <div className="min-w-0">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-brand-ink/8 bg-brand-bg/90 px-4 py-3 backdrop-blur lg:hidden">
+          <button type="button" onClick={() => setOpen(true)} className="rounded-lg p-2 text-brand-ink hover:bg-white" aria-label={t('nav.menu')}>
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="font-display text-lg font-semibold">Next Invoice</span>
+          <div className="ml-auto">
+            <LanguagePicker />
+          </div>
+        </header>
+        <main className="w-full px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

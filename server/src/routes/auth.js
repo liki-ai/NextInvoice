@@ -20,7 +20,7 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters.' });
     }
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = createUser({ email, passwordHash });
+    const user = createUser({ email, passwordHash, language: req.body?.language });
     const token = signToken(user);
     return res.status(201).json({ token, user: publicUser(user) });
   } catch (err) {

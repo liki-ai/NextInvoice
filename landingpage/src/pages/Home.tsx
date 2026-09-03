@@ -47,7 +47,7 @@ const translations = {
       tag: "Veçoritë",
       title: "Ndërtuar për ritmin e një studioje moderne.",
       f1: { title: "Plotësim me AI", desc: "Ngjit një email ose kontratë — AI nxjerr klientin, artikujt dhe totalet." },
-      f2: { title: "Shqip & Anglisht", desc: "Ndryshim gjuhe me një prekje. Fatura mbetet gjithmonë profesionale." },
+      f2: { title: "Shqip, English, Italiano", desc: "Ndrysho gjuhën me një prekje. Fatura mbetet gjithmonë profesionale." },
       f3: { title: "Ndarje PDF", desc: "PDF me hierarki tipografike të pastër, i gatshëm për email, WhatsApp ose printim." },
       f4: { title: "Profil kompanie", desc: "Nxirret automatikisht nga një faturë ekzistuese — logoja dhe të dhënat vetëm një herë." },
       f5: { title: "Numërim mujor", desc: "Numra fature konsistentë si INV-JUL-001, të organizuar sipas muajit." },
@@ -110,7 +110,7 @@ const translations = {
       tag: "Features",
       title: "Built for the pace of a modern studio.",
       f1: { title: "AI Fill", desc: "Paste an email or contract — AI extracts client, items and totals." },
-      f2: { title: "Bilingual SQ/EN", desc: "Switch language with one tap. Invoices stay professional." },
+      f2: { title: "Albanian, English, Italian", desc: "Switch language with one tap. Invoices stay professional." },
       f3: { title: "PDF Sharing", desc: "PDFs with clean typographic hierarchy, ready for email or WhatsApp." },
       f4: { title: "Company Profile", desc: "Extracted automatically from an existing invoice — logo and details once." },
       f5: { title: "Monthly Numbering", desc: "Consistent invoice numbers like INV-JUL-001, organized by month." },
@@ -134,13 +134,76 @@ const translations = {
       contact: "Contact",
       copyright: "© 2026 · Built with care by Tretek.",
     }
+  },
+  it: {
+    nav: {
+      howItWorks: "Come funziona",
+      features: "Funzionalità",
+      audience: "A chi è rivolto",
+      signup: "Registrati",
+      login: "Accedi",
+      openApp: "Apri l’app",
+    },
+    hero: {
+      badge: "iOS · App Store",
+      title: "Next Invoice",
+      subtitle: "Fatture professionali, direttamente dal telefono.",
+      description: "Crea, condividi e gestisci fatture eleganti in pochi secondi — pensate per studi di moda, freelance e piccole imprese.",
+      ctaPrimary: "Inizia gratis sul web",
+      ctaSecondary: "Scopri come funziona",
+      ctaAppStore: "Scarica su App Store",
+    },
+    howItWorks: {
+      tag: "Flusso",
+      title: "Dall’idea alla fattura condivisa — in tre passaggi.",
+      step1: {
+        title: "Aggiungi il cliente",
+        desc: "Scrivi o incolla i dati — l’AI completa nome, indirizzo e contatto automaticamente.",
+      },
+      step2: {
+        title: "Aggiungi le voci",
+        desc: "Voci, sconti, note e numeri automatici come INV-JUL-001.",
+      },
+      step3: {
+        title: "Anteprima e condivisione PDF",
+        desc: "Anteprima PDF pulita: scarica o condividi direttamente con il cliente.",
+      }
+    },
+    features: {
+      tag: "Funzionalità",
+      title: "Pensato per il ritmo di uno studio moderno.",
+      f1: { title: "Compilazione AI", desc: "Incolla un’email o un contratto — l’AI estrae cliente, voci e totali." },
+      f2: { title: "Shqip, English, Italiano", desc: "Cambia lingua con un tocco. Le fatture restano professionali." },
+      f3: { title: "Condivisione PDF", desc: "PDF con gerarchia tipografica pulita, pronti per email o WhatsApp." },
+      f4: { title: "Profilo aziendale", desc: "Estratto automaticamente da una fattura esistente — dati una sola volta." },
+      f5: { title: "Numerazione mensile", desc: "Numeri fattura coerenti come INV-JUL-001, organizzati per mese." },
+      f6: { title: "Sconti e note", desc: "Sconti per voce o sul totale, più note per te e per il cliente." },
+    },
+    audience: {
+      tag: "A chi è rivolto",
+      title: "Per chi fattura il proprio lavoro.",
+      a1: { title: "Freelance", desc: "Designer, fotografi, consulenti — una fattura in un attimo." },
+      a2: { title: "Boutique e studi", desc: "Dalle piccole collezioni agli ordini privati, la fatturazione resta elegante." },
+      a3: { title: "Piccole imprese", desc: "Numerazione mensile, PDF per il commercialista, tutto in tasca." },
+    },
+    ctaSection: {
+      title: "Fattura come uno studio, non come un foglio di calcolo.",
+      subtitle: "Crea un account web o scarica l’app iOS.",
+      cta: "Inizia gratis",
+    },
+    footer: {
+      tagline: "Fatture che sembrano un lavoro pensato.",
+      privacy: "Informativa sulla privacy",
+      contact: "Contatti",
+      copyright: "© 2026 · Realizzato con cura da Tretek.",
+    }
   }
 }
 
 export function Home() {
   const { lang } = useI18n()
   const { user } = useAuth()
-  const t = translations[lang]
+  const t = translations[lang] ?? translations.sq
 
   const fadeIn = {
     initial: { opacity: 0, y: 20 },

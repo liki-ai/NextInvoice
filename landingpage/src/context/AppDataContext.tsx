@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api } from '../lib/api'
 import { useAuth } from './AuthContext'
 import type { CompanyProfile, Invoice } from '../lib/invoice'
-import { useI18n, type Lang } from '../i18n'
+import { useI18n, isLang } from '../i18n'
 
 type DataValue = {
   invoices: Invoice[]
@@ -38,7 +38,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       ])
       setInvoices(invRes.invoices || [])
       setProfile(profRes.profile)
-      if (profRes.profile?.language === 'en' || profRes.profile?.language === 'sq') {
+      if (isLang(profRes.profile?.language)) {
         setLang(profRes.profile.language)
       }
     } finally {
@@ -70,7 +70,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const saveProfile = useCallback(async (next: CompanyProfile) => {
     const res = await api<{ profile: CompanyProfile }>('/api/profile', { method: 'PUT', body: next })
     setProfile(res.profile)
-    if (res.profile.language) setLang(res.profile.language as Lang)
+    if (isLang(res.profile.language)) setLang(res.profile.language)
     return res.profile
   }, [setLang])
 

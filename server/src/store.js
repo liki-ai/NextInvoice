@@ -38,7 +38,11 @@ function publicUser(user) {
   return { id: user.id, email: user.email, createdAt: user.createdAt };
 }
 
-function createUser({ email, passwordHash }) {
+function normalizeLang(value) {
+  return value === 'en' || value === 'it' ? value : 'sq';
+}
+
+function createUser({ email, passwordHash, language }) {
   const db = readDb();
   const normalized = email.trim().toLowerCase();
   if (db.users.some((u) => u.email === normalized)) {
@@ -52,7 +56,7 @@ function createUser({ email, passwordHash }) {
     createdAt: new Date().toISOString(),
   };
   db.users.push(user);
-  db.profiles[user.id] = { ...DEFAULT_COMPANY_PROFILE, language: 'sq' };
+  db.profiles[user.id] = { ...DEFAULT_COMPANY_PROFILE, language: normalizeLang(language) };
   db.invoices[user.id] = [];
   writeDb(db);
   return user;

@@ -31,7 +31,7 @@ export type CompanyProfile = {
   email: string
   phone: string
   currency: string
-  language?: 'sq' | 'en'
+  language?: 'sq' | 'en' | 'it'
 }
 
 const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
