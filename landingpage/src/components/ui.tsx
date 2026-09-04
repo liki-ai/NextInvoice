@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes, useEffect } from 'react'
+import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '../lib/cn'
 
@@ -25,6 +25,28 @@ export function Field({
           className,
         )}
       />
+    </label>
+  )
+}
+
+export function Select({
+  label,
+  className,
+  children,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
+  return (
+    <label className="mb-5 flex flex-col gap-2.5 last:mb-0">
+      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
+      <select
+        {...props}
+        className={cn(
+          'w-full rounded-xl border border-brand-ink/10 bg-white px-3.5 py-2.5 text-sm text-brand-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15',
+          className,
+        )}
+      >
+        {children}
+      </select>
     </label>
   )
 }

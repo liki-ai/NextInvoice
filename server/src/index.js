@@ -7,6 +7,7 @@ const extractClientRouter = require('./routes/extractClient');
 const extractCompanyRouter = require('./routes/extractCompany');
 const authRouter = require('./routes/auth');
 const invoicesRouter = require('./routes/invoices');
+const obligationsRouter = require('./routes/obligations');
 const profileRouter = require('./routes/profile');
 const billingRouter = require('./routes/billing');
 const { handleStripeWebhook } = require('./routes/billing');
@@ -33,6 +34,7 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRouter);
 app.use('/api/invoices', invoicesRouter);
+app.use('/api/obligations', obligationsRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api', extractClientRouter);

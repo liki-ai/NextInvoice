@@ -20,8 +20,10 @@ const DEFAULT_COMPANY_PROFILE = {
   exportNote: 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)',
 };
 
+const OBLIGATION_CATEGORIES = ['shipping', 'supplies', 'rent', 'tax', 'other'];
+
 function emptyDb() {
-  return { users: [], profiles: {}, invoices: {} };
+  return { users: [], profiles: {}, invoices: {}, obligations: {} };
 }
 
 function readDb() {
@@ -81,6 +83,8 @@ function createUser({ email, passwordHash, language }) {
   db.users.push(user);
   db.profiles[user.id] = { ...DEFAULT_COMPANY_PROFILE, language: normalizeLang(language) };
   db.invoices[user.id] = [];
+  if (!db.obligations) db.obligations = {};
+  db.obligations[user.id] = [];
   writeDb(db);
   return user;
 }
@@ -226,6 +230,74 @@ function deleteInvoice(userId, invoiceId) {
   return true;
 }
 
+function listObligations(userId) {
+  const db = readDb();
+  return [...(db.obligations?.[userId] || [])];
+}
+
+function getObligation(userId, obligationId) {
+  return listObligations(userId).find((item) => item.id === obligationId) || null;
+}
+
+function normalizeObligation(raw) {
+  const amount = Number(raw.amount);
+  return {
+    vendor: String(raw.vendor || '').trim(),
+    description: String(raw.description || '').trim(),
+    amount: Number.isFinite(amount) ? amount : 0,
+    date: String(raw.date || ''),
+    dueDate: String(raw.dueDate || ''),
+    status: raw.status === 'paid' ? 'paid' : 'unpaid',
+    category: OBLIGATION_CATEGORIES.includes(raw.category) ? raw.category : 'other',
+    notes: String(raw.notes || ''),
+    relatedInvoiceId: String(raw.relatedInvoiceId || ''),
+  };
+}
+
+function addObligation(userId, obligation) {
+  const db = readDb();
+  if (!db.obligations) db.obligations = {};
+  if (!db.obligations[userId]) db.obligations[userId] = [];
+  const saved = {
+    ...normalizeObligation(obligation),
+    id: obligation.id || crypto.randomUUID(),
+    createdAt: obligation.createdAt || new Date().toISOString(),
+  };
+  db.obligations[userId] = [saved, ...db.obligations[userId]];
+  writeDb(db);
+  return saved;
+}
+
+function updateObligation(userId, obligationId, partial) {
+  const db = readDb();
+  if (!db.obligations) db.obligations = {};
+  const list = db.obligations[userId] || [];
+  const idx = list.findIndex((item) => item.id === obligationId);
+  if (idx === -1) return null;
+  const merged = { ...list[idx], ...partial, id: obligationId };
+  list[idx] = {
+    ...list[idx],
+    ...normalizeObligation(merged),
+    id: obligationId,
+    createdAt: list[idx].createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+  db.obligations[userId] = list;
+  writeDb(db);
+  return list[idx];
+}
+
+function deleteObligation(userId, obligationId) {
+  const db = readDb();
+  if (!db.obligations) db.obligations = {};
+  const list = db.obligations[userId] || [];
+  const next = list.filter((item) => item.id !== obligationId);
+  if (next.length === list.length) return false;
+  db.obligations[userId] = next;
+  writeDb(db);
+  return true;
+}
+
 module.exports = {
   DEFAULT_COMPANY_PROFILE,
   FREE_MONTHLY_LIMIT,
@@ -243,6 +315,11 @@ module.exports = {
   addInvoice,
   updateInvoice,
   deleteInvoice,
+  listObligations,
+  getObligation,
+  addObligation,
+  updateObligation,
+  deleteObligation,
   canCreateInvoice,
   setUserPlan,
   updateUserBilling,

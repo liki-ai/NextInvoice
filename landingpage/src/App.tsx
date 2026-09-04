@@ -7,6 +7,8 @@ import { AppShell } from './pages/app/AppShell'
 import { InvoiceListPage } from './pages/app/InvoiceListPage'
 import { InvoiceDetailPage } from './pages/app/InvoiceDetailPage'
 import { InvoiceFormPage } from './pages/app/InvoiceFormPage'
+import { ObligationListPage } from './pages/app/ObligationListPage'
+import { ObligationFormPage } from './pages/app/ObligationFormPage'
 import { ProfilePage } from './pages/app/ProfilePage'
 import { UpgradePage } from './pages/app/UpgradePage'
 
@@ -35,6 +37,9 @@ export default function App() {
               <Route path="upgrade" element={<UpgradePage />} />
               <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
               <Route path="invoices/:invoiceId/edit" element={<InvoiceFormPage />} />
+              <Route path="obligations" element={<ObligationListPage />} />
+              <Route path="obligations/new" element={<ObligationFormPage />} />
+              <Route path="obligations/:obligationId/edit" element={<ObligationFormPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

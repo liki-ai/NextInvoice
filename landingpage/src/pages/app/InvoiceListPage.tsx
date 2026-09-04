@@ -5,9 +5,10 @@ import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { formatMoney, invoiceStatus } from '../../lib/invoice'
+import { obligationStatus } from '../../lib/obligation'
 
 export function InvoiceListPage() {
-  const { invoices, loading, profile } = useAppData()
+  const { invoices, obligations, loading, profile } = useAppData()
   const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
@@ -39,6 +40,9 @@ export function InvoiceListPage() {
   }, [invoices, query, statusFilter])
 
   const billed = invoices.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
+  const unpaidObligations = obligations
+    .filter((item) => obligationStatus(item) === 'unpaid')
+    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
 
   return (
     <div>
@@ -79,6 +83,19 @@ export function InvoiceListPage() {
             <p className="text-sm text-brand-ink/55">{t('invoiceList.usageBanner', { used: usage.used, limit: usage.limit })}</p>
           )}
         </div>
+      ) : null}
+
+      {unpaidObligations > 0 ? (
+        <Link
+          to="/app/obligations"
+          className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-brand-ink/8 bg-white px-5 py-4 hover:border-brand/30"
+        >
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('nav.obligations')}</p>
+            <p className="mt-1 text-sm text-brand-ink/70">{t('obligations.invoiceBanner')}</p>
+          </div>
+          <p className="font-display text-xl font-medium">{formatMoney(unpaidObligations, currency)}</p>
+        </Link>
       ) : null}
 
       {invoices.length > 0 ? (

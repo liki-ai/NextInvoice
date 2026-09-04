@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LogOut, Menu, Plus, UserRound, X } from 'lucide-react'
+import { FileText, LogOut, Menu, Plus, UserRound, Wallet, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -9,6 +9,7 @@ import { cn } from '../../lib/cn'
 
 const NAV = [
   { to: '/app', end: true, icon: FileText, key: 'nav.invoices' },
+  { to: '/app/obligations', end: false, icon: Wallet, key: 'nav.obligations' },
   { to: '/app/new', end: true, icon: Plus, key: 'nav.newInvoice' },
   { to: '/app/profile', end: true, icon: UserRound, key: 'nav.profile' },
 ] as const
@@ -19,6 +20,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const invoicesActive = pathname === '/app' || pathname.startsWith('/app/invoices')
+  const obligationsActive = pathname.startsWith('/app/obligations')
 
   return (
     <div className="flex h-full flex-col">
@@ -36,7 +38,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             end={item.end}
             onClick={onNavigate}
             className={({ isActive }) => {
-              const active = item.to === '/app' ? invoicesActive : isActive
+              const active =
+                item.to === '/app' ? invoicesActive : item.to === '/app/obligations' ? obligationsActive : isActive
               return cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition',
                 active ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/6 hover:text-white',
