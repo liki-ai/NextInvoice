@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { I18nProvider, useI18n } from './i18n'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { Home } from './pages/Home'
-import { LoginPage, SignupPage } from './pages/AuthPages'
+import { LoginPage, SignupPage, ForgotPage, ResetPage } from './pages/AuthPages'
 import { AppShell } from './pages/app/AppShell'
 import { InvoiceListPage } from './pages/app/InvoiceListPage'
 import { InvoiceDetailPage } from './pages/app/InvoiceDetailPage'
@@ -31,6 +31,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/forgot" element={<ForgotPage />} />
+            <Route path="/reset" element={<ResetPage />} />
             <Route path="/app" element={<RequireAuth />}>
               <Route index element={<InvoiceListPage />} />
               <Route path="new" element={<InvoiceFormPage />} />

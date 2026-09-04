@@ -1,9 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
-
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DATA_DIR, 'db.json');
+const { initPersist, loadDb, saveDb } = require('./persist');
 
 const DEFAULT_COMPANY_PROFILE = {
   companyName: 'Kompania juaj (shembull)',
@@ -22,21 +18,56 @@ const DEFAULT_COMPANY_PROFILE = {
 
 const OBLIGATION_CATEGORIES = ['shipping', 'supplies', 'rent', 'tax', 'other'];
 
-function emptyDb() {
-  return { users: [], profiles: {}, invoices: {}, obligations: {} };
+let cache = null;
+let persistChain = Promise.resolve();
+let writeLock = Promise.resolve();
+
+function withWriteLock(fn) {
+  const run = writeLock.then(fn, fn);
+  writeLock = run.then(
+    () => {},
+    () => {},
+  );
+  return run;
+}
+
+async function initStore() {
+  await initPersist();
+  cache = await loadDb();
+  if (!Array.isArray(cache.users)) cache.users = [];
+  if (!cache.profiles) cache.profiles = {};
+  if (!cache.invoices) cache.invoices = {};
+  if (!cache.obligations) cache.obligations = {};
+  if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
+  return cache;
 }
 
 function readDb() {
-  try {
-    return { ...emptyDb(), ...JSON.parse(fs.readFileSync(DB_PATH, 'utf8')) };
-  } catch {
-    return emptyDb();
+  if (!cache) {
+    throw new Error('Store is not initialized.');
   }
+  return cache;
 }
 
 function writeDb(db) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+  cache = db;
+  const snapshot = JSON.parse(JSON.stringify(db));
+  persistChain = persistChain.then(() => saveDb(snapshot)).catch((err) => {
+    console.error('[store] failed to persist', err);
+  });
+  return persistChain;
+}
+
+function flushStore() {
+  return persistChain;
+}
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
 }
 
 const FREE_MONTHLY_LIMIT = 10;
@@ -66,32 +97,37 @@ function normalizeLang(value) {
   return value === 'en' || value === 'it' ? value : 'sq';
 }
 
-function createUser({ email, passwordHash, language }) {
-  const db = readDb();
-  const normalized = email.trim().toLowerCase();
-  if (db.users.some((u) => u.email === normalized)) {
-    const err = new Error('EMAIL_TAKEN');
-    throw err;
-  }
-  const user = {
-    id: crypto.randomUUID(),
-    email: normalized,
-    passwordHash,
-    createdAt: new Date().toISOString(),
-    plan: 'free',
-  };
-  db.users.push(user);
-  db.profiles[user.id] = { ...DEFAULT_COMPANY_PROFILE, language: normalizeLang(language) };
-  db.invoices[user.id] = [];
-  if (!db.obligations) db.obligations = {};
-  db.obligations[user.id] = [];
-  writeDb(db);
-  return user;
+async function createUser({ email, passwordHash, language }) {
+  return withWriteLock(async () => {
+    const db = readDb();
+    const normalized = normalizeEmail(email);
+    if (db.users.some((u) => u.email === normalized)) {
+      const err = new Error('EMAIL_TAKEN');
+      throw err;
+    }
+    const user = {
+      id: crypto.randomUUID(),
+      email: normalized,
+      passwordHash,
+      createdAt: new Date().toISOString(),
+      plan: 'free',
+    };
+    db.users.push(user);
+    db.profiles[user.id] = { ...DEFAULT_COMPANY_PROFILE, language: normalizeLang(language) };
+    db.invoices[user.id] = [];
+    if (!db.obligations) db.obligations = {};
+    db.obligations[user.id] = [];
+    await writeDb(db);
+    return user;
+  });
 }
 
 function findUserByEmail(email) {
   const db = readDb();
-  return db.users.find((u) => u.email === String(email || '').trim().toLowerCase()) || null;
+  const normalized = normalizeEmail(email);
+  const matches = db.users.filter((u) => u.email === normalized);
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
 }
 
 function findUserById(id) {
@@ -298,11 +334,51 @@ function deleteObligation(userId, obligationId) {
   return true;
 }
 
+async function createPasswordReset(email) {
+  return withWriteLock(async () => {
+    const user = findUserByEmail(email);
+    if (!user) return { user: null, token: null };
+    const token = crypto.randomBytes(32).toString('hex');
+    const db = readDb();
+    const now = Date.now();
+    db.passwordResets = (db.passwordResets || []).filter(
+      (item) => new Date(item.expiresAt).getTime() > now && item.userId !== user.id,
+    );
+    db.passwordResets.push({
+      tokenHash: hashToken(token),
+      userId: user.id,
+      expiresAt: new Date(now + 60 * 60 * 1000).toISOString(),
+    });
+    await writeDb(db);
+    return { user, token };
+  });
+}
+
+async function resetPasswordWithToken(token, passwordHash) {
+  return withWriteLock(async () => {
+    const db = readDb();
+    const tokenHash = hashToken(token);
+    const now = Date.now();
+    const reset = (db.passwordResets || []).find(
+      (item) => item.tokenHash === tokenHash && new Date(item.expiresAt).getTime() > now,
+    );
+    if (!reset) return null;
+    const user = db.users.find((item) => item.id === reset.userId);
+    if (!user) return null;
+    user.passwordHash = passwordHash;
+    db.passwordResets = (db.passwordResets || []).filter((item) => item.userId !== user.id);
+    await writeDb(db);
+    return user;
+  });
+}
+
 module.exports = {
   DEFAULT_COMPANY_PROFILE,
   FREE_MONTHLY_LIMIT,
   publicUser,
   isPremiumUser,
+  initStore,
+  flushStore,
   createUser,
   findUserByEmail,
   findUserById,
@@ -323,4 +399,6 @@ module.exports = {
   canCreateInvoice,
   setUserPlan,
   updateUserBilling,
+  createPasswordReset,
+  resetPasswordWithToken,
 };

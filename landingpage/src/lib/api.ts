@@ -34,9 +34,11 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     headers,
     body: options.form ? options.form : options.body ? JSON.stringify(options.body) : undefined,
   })
-  const data = (await response.json().catch(() => null)) as T & { error?: string }
+  const data = (await response.json().catch(() => null)) as T & { error?: string; code?: string; resetUrl?: string }
   if (!response.ok) {
-    throw new Error(data?.error || `Request failed (${response.status})`)
+    const err = new Error(data?.error || `Request failed (${response.status})`) as Error & { code?: string }
+    err.code = data?.code
+    throw err
   }
   return data
 }

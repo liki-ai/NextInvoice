@@ -1,9 +1,20 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n'
 import { Button, Field } from '../components/ui'
 import { LanguagePicker } from '../components/LangSwitch'
+import { api, setToken } from '../lib/api'
+
+function authErrorMessage(err: unknown, t: (key: string) => string) {
+  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: string }).code || '') : ''
+  if (code === 'UNKNOWN_EMAIL') return t('auth.unknownEmail')
+  if (code === 'WRONG_PASSWORD') return t('auth.wrongPassword')
+  if (code === 'EMAIL_TAKEN') return t('auth.emailTaken')
+  if (code === 'RESET_INVALID') return t('auth.resetInvalid')
+  if (code === 'MAIL_NOT_CONFIGURED') return t('auth.mailNotConfigured')
+  return err instanceof Error ? err.message : t('common.error')
+}
 
 function AuthLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n()
@@ -51,7 +62,7 @@ export function LoginPage() {
       await login(email, password)
       navigate('/app', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('common.error'))
+      setError(authErrorMessage(err, t))
     } finally {
       setSubmitting(false)
     }
@@ -70,7 +81,12 @@ export function LoginPage() {
         <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? t('common.loading') : t('auth.loginCta')}
         </Button>
-        <p className="mt-6 text-center text-sm text-brand-ink/55">
+        <p className="mt-4 text-center text-sm">
+          <Link to="/forgot" className="font-semibold text-brand">
+            {t('auth.forgotLink')}
+          </Link>
+        </p>
+        <p className="mt-4 text-center text-sm text-brand-ink/55">
           {t('auth.noAccount')}{' '}
           <Link to="/signup" className="font-semibold text-brand">
             {t('auth.signupCta')}
@@ -105,7 +121,7 @@ export function SignupPage() {
       await signup(email, password, lang)
       navigate('/app', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('common.error'))
+      setError(authErrorMessage(err, t))
     } finally {
       setSubmitting(false)
     }
@@ -130,6 +146,130 @@ export function SignupPage() {
           {t('auth.hasAccount')}{' '}
           <Link to="/login" className="font-semibold text-brand">
             {t('auth.loginCta')}
+          </Link>
+          {' · '}
+          <Link to="/forgot" className="font-semibold text-brand">
+            {t('auth.forgotLink')}
+          </Link>
+        </p>
+      </form>
+    </AuthLayout>
+  )
+}
+
+export function ForgotPage() {
+  const { user, loading } = useAuth()
+  const { t } = useI18n()
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
+  const [sent, setSent] = useState(false)
+  const [devUrl, setDevUrl] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  if (!loading && user) return <Navigate to="/app" replace />
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const res = await api<{ ok: boolean; resetUrl?: string }>('/api/auth/forgot', {
+        method: 'POST',
+        body: { email },
+        token: null,
+      })
+      setSent(true)
+      if (res.resetUrl) setDevUrl(res.resetUrl)
+    } catch (err) {
+      setError(authErrorMessage(err, t))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthLayout>
+      <form onSubmit={onSubmit} className="rounded-2xl border border-brand-ink/8 bg-white p-8 shadow-sm">
+        <LanguagePicker variant="full" className="mb-6" />
+        <h1 className="font-display text-3xl font-medium">{t('auth.forgotTitle')}</h1>
+        <p className="mt-2 text-sm text-brand-ink/55">{t('auth.forgotHint')}</p>
+        <div className="mt-6">
+          <Field label={t('auth.email')} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        {error ? <p className="mb-4 text-sm text-[#C0503A]">{error}</p> : null}
+        {sent ? <p className="mb-4 text-sm text-brand-ink/70">{t('auth.forgotSent')}</p> : null}
+        {devUrl ? (
+          <p className="mb-4 break-all text-sm">
+            <Link to={devUrl.replace(/^https?:\/\/[^/]+/, '')} className="font-semibold text-brand">
+              {devUrl}
+            </Link>
+          </p>
+        ) : null}
+        <Button type="submit" disabled={submitting || sent} className="w-full">
+          {submitting ? t('common.loading') : t('auth.forgotCta')}
+        </Button>
+        <p className="mt-6 text-center text-sm">
+          <Link to="/login" className="font-semibold text-brand">
+            {t('auth.backToLogin')}
+          </Link>
+        </p>
+      </form>
+    </AuthLayout>
+  )
+}
+
+export function ResetPage() {
+  const { user, loading } = useAuth()
+  const { t } = useI18n()
+  const [params] = useSearchParams()
+  const token = params.get('token') || ''
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState(token ? '' : t('auth.resetInvalid'))
+  const [submitting, setSubmitting] = useState(false)
+
+  if (!loading && user) return <Navigate to="/app" replace />
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (password !== confirm) {
+      setError(t('auth.mismatch'))
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await api<{ token: string }>('/api/auth/reset', {
+        method: 'POST',
+        body: { token, password },
+        token: null,
+      })
+      setToken(res.token)
+      window.location.assign('/app')
+    } catch (err) {
+      setError(authErrorMessage(err, t))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthLayout>
+      <form onSubmit={onSubmit} className="rounded-2xl border border-brand-ink/8 bg-white p-8 shadow-sm">
+        <LanguagePicker variant="full" className="mb-6" />
+        <h1 className="font-display text-3xl font-medium">{t('auth.resetTitle')}</h1>
+        <p className="mt-2 text-sm text-brand-ink/55">{t('auth.passwordHint')}</p>
+        <div className="mt-6">
+          <Field label={t('auth.newPassword')} type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Field label={t('auth.confirmPassword')} type="password" autoComplete="new-password" required minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </div>
+        {error ? <p className="mb-4 text-sm text-[#C0503A]">{error}</p> : null}
+        <Button type="submit" disabled={submitting || !token} className="w-full">
+          {submitting ? t('common.loading') : t('auth.resetCta')}
+        </Button>
+        <p className="mt-6 text-center text-sm">
+          <Link to="/login" className="font-semibold text-brand">
+            {t('auth.backToLogin')}
           </Link>
         </p>
       </form>

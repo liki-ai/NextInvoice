@@ -11,6 +11,8 @@ const obligationsRouter = require('./routes/obligations');
 const profileRouter = require('./routes/profile');
 const billingRouter = require('./routes/billing');
 const { handleStripeWebhook } = require('./routes/billing');
+const { initStore } = require('./store');
+const { hasPostgres } = require('./persist');
 
 const app = express();
 
@@ -30,7 +32,7 @@ app.get('/', (_req, res) => {
   });
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/health', (_req, res) => res.json({ ok: true, persist: hasPostgres() ? 'postgres' : 'file' }));
 
 app.use('/api/auth', authRouter);
 app.use('/api/invoices', invoicesRouter);
@@ -46,6 +48,14 @@ app.use((err, _req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`[nextinvoice-server] listening on http://0.0.0.0:${PORT}`);
-});
+
+initStore()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`[nextinvoice-server] listening on http://0.0.0.0:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('[nextinvoice-server] failed to start', err);
+    process.exit(1);
+  });
