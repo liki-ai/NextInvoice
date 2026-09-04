@@ -15,6 +15,9 @@ const DEFAULT_COMPANY_PROFILE = {
   email: 'email@shembull.com',
   phone: '+383 00 000 000',
   currency: 'EUR',
+  bankName: '',
+  iban: '',
+  exportNote: 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)',
 };
 
 function emptyDb() {
@@ -34,8 +37,27 @@ function writeDb(db) {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
+const FREE_MONTHLY_LIMIT = 10;
+
+function isPremiumUser(user) {
+  if (!user || user.plan !== 'premium') return false;
+  if (user.planExpiresAt) {
+    const expires = new Date(user.planExpiresAt).getTime();
+    if (Number.isFinite(expires) && expires <= Date.now()) return false;
+  }
+  return true;
+}
+
 function publicUser(user) {
-  return { id: user.id, email: user.email, createdAt: user.createdAt };
+  const premium = isPremiumUser(user);
+  return {
+    id: user.id,
+    email: user.email,
+    createdAt: user.createdAt,
+    plan: premium ? 'premium' : 'free',
+    billingSource: user.billingSource || null,
+    planExpiresAt: user.planExpiresAt || null,
+  };
 }
 
 function normalizeLang(value) {
@@ -54,6 +76,7 @@ function createUser({ email, passwordHash, language }) {
     email: normalized,
     passwordHash,
     createdAt: new Date().toISOString(),
+    plan: 'free',
   };
   db.users.push(user);
   db.profiles[user.id] = { ...DEFAULT_COMPANY_PROFILE, language: normalizeLang(language) };
@@ -94,7 +117,82 @@ function getInvoice(userId, invoiceId) {
   return listInvoices(userId).find((inv) => inv.id === invoiceId) || null;
 }
 
+function monthKey(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function invoicesCreatedThisMonth(userId, now = new Date()) {
+  const key = monthKey(now);
+  return listInvoices(userId).filter((item) => monthKey(item.createdAt || item.date) === key).length;
+}
+
+function canCreateInvoice(userId) {
+  const user = findUserById(userId);
+  if (isPremiumUser(user)) {
+    return {
+      ok: true,
+      plan: 'premium',
+      used: invoicesCreatedThisMonth(userId),
+      limit: null,
+      billingSource: user.billingSource || null,
+      planExpiresAt: user.planExpiresAt || null,
+    };
+  }
+  const used = invoicesCreatedThisMonth(userId);
+  return {
+    ok: used < FREE_MONTHLY_LIMIT,
+    plan: 'free',
+    used,
+    limit: FREE_MONTHLY_LIMIT,
+    billingSource: user?.billingSource || null,
+    planExpiresAt: user?.planExpiresAt || null,
+  };
+}
+
+function updateUserBilling(userId, patch) {
+  const db = readDb();
+  const user = db.users.find((item) => item.id === userId);
+  if (!user) return null;
+  Object.assign(user, patch);
+  writeDb(db);
+  return publicUser(user);
+}
+
+function setUserPlan(userId, plan, extra = {}) {
+  const patch = {
+    plan: plan === 'premium' ? 'premium' : 'free',
+    ...extra,
+  };
+  if (plan === 'premium' && !patch.premiumSince) {
+    patch.premiumSince = new Date().toISOString();
+  }
+  if (plan !== 'premium') {
+    patch.planExpiresAt = null;
+  }
+  return updateUserBilling(userId, patch);
+}
+
+function findUserByStripeCustomerId(customerId) {
+  if (!customerId) return null;
+  const db = readDb();
+  return db.users.find((u) => u.stripeCustomerId === customerId) || null;
+}
+
+function findUserByIapOriginalId(originalTransactionId) {
+  if (!originalTransactionId) return null;
+  const db = readDb();
+  return db.users.find((u) => u.iapOriginalTransactionId === originalTransactionId) || null;
+}
+
 function addInvoice(userId, invoice) {
+  const allowed = canCreateInvoice(userId);
+  if (!allowed.ok) {
+    const err = new Error('PLAN_LIMIT');
+    err.usage = allowed;
+    throw err;
+  }
   const db = readDb();
   if (!db.invoices[userId]) db.invoices[userId] = [];
   const saved = {
@@ -130,10 +228,14 @@ function deleteInvoice(userId, invoiceId) {
 
 module.exports = {
   DEFAULT_COMPANY_PROFILE,
+  FREE_MONTHLY_LIMIT,
   publicUser,
+  isPremiumUser,
   createUser,
   findUserByEmail,
   findUserById,
+  findUserByStripeCustomerId,
+  findUserByIapOriginalId,
   getProfile,
   updateProfile,
   listInvoices,
@@ -141,4 +243,7 @@ module.exports = {
   addInvoice,
   updateInvoice,
   deleteInvoice,
+  canCreateInvoice,
+  setUserPlan,
+  updateUserBilling,
 };

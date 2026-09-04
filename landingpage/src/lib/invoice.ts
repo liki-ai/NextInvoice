@@ -7,10 +7,14 @@ export type InvoiceItem = {
   unitPrice: string | number
 }
 
+export type InvoiceStatus = 'paid' | 'unpaid'
+
 export type Invoice = {
   id: string
   number: string
   date: string
+  dueDate?: string
+  status?: InvoiceStatus
   client: Client
   items: InvoiceItem[]
   discount: string | number
@@ -31,7 +35,20 @@ export type CompanyProfile = {
   email: string
   phone: string
   currency: string
+  bankName?: string
+  iban?: string
+  /** Legal footer on PDF. Empty string = hidden. Missing = use default. */
+  exportNote?: string
   language?: 'sq' | 'en' | 'it'
+}
+
+export const DEFAULT_EXPORT_NOTE = 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'
+
+export function resolveExportNote(company: Pick<CompanyProfile, 'exportNote'> | null | undefined) {
+  if (!company || company.exportNote === undefined || company.exportNote === null) {
+    return DEFAULT_EXPORT_NOTE
+  }
+  return String(company.exportNote).trim()
 }
 
 const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -76,6 +93,36 @@ export function computeTotals(items: InvoiceItem[], discount: unknown) {
   return { subtotal, total }
 }
 
+export function invoiceStatus(invoice: Pick<Invoice, 'status'> | null | undefined): InvoiceStatus {
+  return invoice?.status === 'paid' ? 'paid' : 'unpaid'
+}
+
+export function uniqueClients(invoices: Invoice[]): Client[] {
+  const seen = new Map<string, Client>()
+  for (const item of invoices) {
+    const name = item.client?.fullName?.trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (!seen.has(key)) seen.set(key, item.client)
+  }
+  return [...seen.values()]
+}
+
+export function draftFromInvoice(source: Invoice, existing: Invoice[]): Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> {
+  return {
+    number: generateInvoiceNumber(existing),
+    date: formatDateForInvoice(new Date()),
+    dueDate: source.dueDate || '',
+    status: 'unpaid',
+    client: { ...source.client },
+    items: (source.items || []).map((item) => ({ ...item, id: generateId() })),
+    discount: source.discount,
+    notes: source.notes || '',
+    subtotal: source.subtotal,
+    total: source.total,
+  }
+}
+
 function escapeHtml(value: unknown) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -91,12 +138,13 @@ export function buildInvoiceHtml({
 }: {
   company: CompanyProfile
   client: Client
-  invoice: Pick<Invoice, 'number' | 'date' | 'items' | 'discount' | 'notes'>
+  invoice: Pick<Invoice, 'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'notes'>
   pdfLabels: Record<string, string>
 }) {
   const items = invoice.items || []
   const { subtotal, total } = computeTotals(items, invoice.discount)
   const symbol = currencySymbol(company.currency)
+  const exportNote = resolveExportNote(company)
   const rows = items
     .map(
       (item) => `
@@ -133,9 +181,11 @@ export function buildInvoiceHtml({
       .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
       .totals .total-row { font-weight: 700; font-size: 16px; border-top: 2px solid #2C6E7F; margin-top: 4px; padding-top: 8px; color: #1F4E5A; }
       .notes { margin-top: 20px; font-size: 12px; color: #555; white-space: pre-wrap; }
+      .payment { margin-top: 20px; font-size: 12px; color: #444; }
       .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
       .signature { width: 45%; text-align: center; border-top: 1px solid #999; padding-top: 6px; font-size: 12px; color: #555; }
       .thank-you { text-align: center; margin-top: 30px; font-size: 13px; color: #2C6E7F; font-weight: 600; }
+      .export-law { text-align: center; margin-top: 8px; font-size: 13px; font-weight: 700; color: #1D2B2E; }
     </style>
   </head>
   <body>
@@ -152,14 +202,15 @@ export function buildInvoiceHtml({
         <h2>INVOICE</h2>
         <p>${escapeHtml(pdfLabels.invoiceLabel)}: ${escapeHtml(invoice.number)}</p>
         <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(invoice.date)}</p>
+        <p>${escapeHtml(pdfLabels.dueDateLabel)}: ${escapeHtml(invoice.dueDate || pdfLabels.onReceipt)}</p>
       </div>
     </div>
     <div class="blocks">
       <div class="client-block">
         <div class="block-title">${escapeHtml(pdfLabels.clientLabel)}</div>
-        <p><strong>${escapeHtml(client.fullName)}</strong></p>
-        <p>${escapeHtml(client.address)}</p>
-        <p>${escapeHtml(client.phone)}</p>
+        <p><strong>${escapeHtml(pdfLabels.fullNameLabel)}:</strong> ${escapeHtml(client.fullName)}</p>
+        <p><strong>${escapeHtml(pdfLabels.addressLabel)}:</strong> ${escapeHtml(client.address)}</p>
+        <p><strong>${escapeHtml(pdfLabels.phoneLabel)}:</strong> ${escapeHtml(client.phone)}</p>
       </div>
     </div>
     <table>
@@ -179,7 +230,9 @@ export function buildInvoiceHtml({
       <div class="total-row"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, company.currency)}</span></div>
     </div>
     ${invoice.notes ? `<div class="notes">${escapeHtml(invoice.notes)}</div>` : ''}
+    ${company.bankName || company.iban ? `<div class="payment"><div class="block-title">${escapeHtml(pdfLabels.paymentInfo)}</div>${company.bankName ? `<p>${escapeHtml(pdfLabels.bankName)}: ${escapeHtml(company.bankName)}</p>` : ''}${company.iban ? `<p>${escapeHtml(pdfLabels.ibanLabel)}: ${escapeHtml(company.iban)}</p>` : ''}</div>` : ''}
     <div class="thank-you">${escapeHtml(pdfLabels.thankYou)}</div>
+    ${exportNote ? `<div class="export-law">${escapeHtml(exportNote)}</div>` : ''}
     <div class="signatures">
       <div class="signature">${escapeHtml(company.contactPerson)}<br/>${escapeHtml(pdfLabels.issuedBy)}</div>
       <div class="signature">${escapeHtml(client.fullName)}<br/>${escapeHtml(pdfLabels.receivedBy)}</div>

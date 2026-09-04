@@ -17,8 +17,18 @@ router.post('/', (req, res) => {
   if (!Array.isArray(invoice.items) || invoice.items.length === 0) {
     return res.status(400).json({ error: 'Add at least one item.' });
   }
-  const saved = addInvoice(req.user.id, invoice);
-  res.status(201).json({ invoice: saved });
+  try {
+    const saved = addInvoice(req.user.id, invoice);
+    res.status(201).json({ invoice: saved });
+  } catch (err) {
+    if (err.message === 'PLAN_LIMIT') {
+      return res.status(402).json({
+        error: 'Free plan includes 10 invoices per month. Upgrade to Premium for unlimited invoices.',
+        usage: err.usage,
+      });
+    }
+    throw err;
+  }
 });
 
 router.get('/:id', (req, res) => {

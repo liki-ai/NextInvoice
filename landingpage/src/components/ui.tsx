@@ -16,12 +16,12 @@ export function Field({
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
-    <label className="mb-4 block last:mb-0">
-      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
+    <label className="mb-5 flex flex-col gap-2.5 last:mb-0">
+      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
       <input
         {...props}
         className={cn(
-          'w-full rounded-xl border border-brand-ink/10 bg-white px-3.5 py-2.5 text-sm text-brand-ink outline-none transition placeholder:text-brand-ink/30 focus:border-brand focus:ring-2 focus:ring-brand/15',
+          'w-full rounded-xl border border-brand-ink/10 bg-white px-3.5 py-2.5 text-sm text-brand-ink outline-none transition placeholder:text-brand-ink/40 focus:border-brand focus:ring-2 focus:ring-brand/15',
           className,
         )}
       />
@@ -35,12 +35,12 @@ export function TextArea({
   ...props
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
   return (
-    <label className="mb-4 block last:mb-0">
-      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
+    <label className="mb-5 flex flex-col gap-2.5 last:mb-0">
+      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
       <textarea
         {...props}
         className={cn(
-          'w-full resize-y rounded-xl border border-brand-ink/10 bg-white px-3.5 py-2.5 text-sm text-brand-ink outline-none transition placeholder:text-brand-ink/30 focus:border-brand focus:ring-2 focus:ring-brand/15',
+          'w-full resize-y rounded-xl border border-brand-ink/10 bg-white px-3.5 py-2.5 text-sm text-brand-ink outline-none transition placeholder:text-brand-ink/40 focus:border-brand focus:ring-2 focus:ring-brand/15',
           className,
         )}
       />

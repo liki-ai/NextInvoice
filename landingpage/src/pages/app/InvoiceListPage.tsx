@@ -1,24 +1,42 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { FileText, Plus, Search } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { formatMoney } from '../../lib/invoice'
+import { api } from '../../lib/api'
+import { formatMoney, invoiceStatus } from '../../lib/invoice'
 
 export function InvoiceListPage() {
   const { invoices, loading, profile } = useAppData()
   const { t } = useI18n()
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
+  const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
+  const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
+
+  useEffect(() => {
+    void api<{ plan: 'free' | 'premium'; used: number; limit: number | null }>('/api/billing/usage')
+      .then((res) => setUsage(res))
+      .catch(() => {
+        // If usage can't be loaded, we still allow browsing existing invoices.
+      })
+  }, [])
+
+  const limitReached = usage?.plan === 'free' && usage.limit !== null && usage.used >= usage.limit
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return invoices
-    return invoices.filter((item) => {
-      const hay = `${item.number} ${item.client?.fullName || ''} ${item.date}`.toLowerCase()
-      return hay.includes(q)
-    })
-  }, [invoices, query])
+    const list = !q
+      ? invoices
+      : invoices.filter((item) => {
+          const hay = `${item.number} ${item.client?.fullName || ''} ${item.date}`.toLowerCase()
+          return hay.includes(q)
+        })
+
+    if (statusFilter === 'all') return list
+    return list.filter((item) => invoiceStatus(item) === statusFilter)
+  }, [invoices, query, statusFilter])
 
   const billed = invoices.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
 
@@ -31,12 +49,37 @@ export function InvoiceListPage() {
         </div>
         <Link
           to="/app/new"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"
+          onClick={(e) => {
+            if (limitReached) {
+              e.preventDefault()
+              navigate('/app/upgrade')
+            }
+          }}
+          className={`inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark ${limitReached ? 'opacity-60' : ''}`}
         >
           <Plus className="h-4 w-4" />
           {t('nav.newInvoice')}
         </Link>
       </div>
+
+      {usage && usage.plan === 'free' && usage.limit !== null ? (
+        <div className={`mt-5 rounded-2xl border border-brand-ink/8 bg-white px-5 py-4`}>
+          {limitReached ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-[#C0503A]">{t('invoiceList.limitReached')}</p>
+              <button
+                type="button"
+                onClick={() => navigate('/app/upgrade')}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"
+              >
+                {t('invoiceList.upgrade')}
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-brand-ink/55">{t('invoiceList.usageBanner', { used: usage.used, limit: usage.limit })}</p>
+          )}
+        </div>
+      ) : null}
 
       {invoices.length > 0 ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -66,7 +109,13 @@ export function InvoiceListPage() {
               <p className="mt-3 max-w-md text-sm leading-6 text-brand-ink/55">{t('invoiceList.empty')}</p>
               <Link
                 to="/app/new"
-                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
+                onClick={(e) => {
+                  if (limitReached) {
+                    e.preventDefault()
+                    navigate('/app/upgrade')
+                  }
+                }}
+                className={`mt-8 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark ${limitReached ? 'opacity-60' : ''}`}
               >
                 <Plus className="h-4 w-4" />
                 {t('nav.newInvoice')}
@@ -88,6 +137,31 @@ export function InvoiceListPage() {
               className="w-full bg-transparent text-sm outline-none placeholder:text-brand-ink/35"
             />
           </div>
+
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${statusFilter === 'all' ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink'}`}
+            >
+              {t('invoiceList.filterAll')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('unpaid')}
+              className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${statusFilter === 'unpaid' ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink'}`}
+            >
+              {t('invoiceList.filterUnpaid')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('paid')}
+              className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${statusFilter === 'paid' ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink'}`}
+            >
+              {t('invoiceList.filterPaid')}
+            </button>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-brand-ink/8 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
@@ -108,7 +182,19 @@ export function InvoiceListPage() {
                       </Link>
                     </td>
                     <td className="px-5 py-4">{item.client?.fullName}</td>
-                    <td className="px-5 py-4 text-brand-ink/60">{item.date}</td>
+                    <td className="px-5 py-4 text-brand-ink/60">
+                      <div className="font-semibold">{item.date}</div>
+                      <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
+                      <div
+                        className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          invoiceStatus(item) === 'paid'
+                            ? 'bg-success/10 text-[#2E7D32]'
+                            : 'bg-brand/10 text-brand-ink/70'
+                        }`}
+                      >
+                        {invoiceStatus(item) === 'paid' ? t('invoiceList.statusPaid') : t('invoiceList.statusUnpaid')}
+                      </div>
+                    </td>
                     <td className="px-5 py-4 text-brand-ink/60">{t('invoiceList.itemsCount', { count: item.items?.length || 0 })}</td>
                     <td className="px-5 py-4 text-right font-semibold">{formatMoney(item.total, currency)}</td>
                   </tr>

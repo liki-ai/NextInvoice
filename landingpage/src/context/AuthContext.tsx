@@ -1,7 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, setToken } from '../lib/api'
 
-export type User = { id: string; email: string; createdAt?: string }
+export type User = {
+  id: string
+  email: string
+  createdAt?: string
+  plan?: 'free' | 'premium'
+  billingSource?: string | null
+  planExpiresAt?: string | null
+}
 
 type AuthValue = {
   user: User | null
@@ -10,6 +17,7 @@ type AuthValue = {
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string, language?: string) => Promise<void>
   logout: () => void
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
@@ -66,9 +74,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    const current = getToken()
+    if (!current) {
+      setUser(null)
+      return
+    }
+    const res = await api<{ user: User }>('/api/auth/me', { token: current })
+    setUser(res.user)
+  }, [])
+
   const value = useMemo(
-    () => ({ user, token, loading, login, signup, logout }),
-    [user, token, loading, login, signup, logout],
+    () => ({ user, token, loading, login, signup, logout, refreshUser }),
+    [user, token, loading, login, signup, logout, refreshUser],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { Button, Card, Field } from '../../components/ui'
+import { Button, Card, Field, TextArea } from '../../components/ui'
 import { LanguagePicker } from '../../components/LangSwitch'
 import { api } from '../../lib/api'
 import type { CompanyProfile } from '../../lib/invoice'
+import { stripSampleCompanyFields } from '../../lib/companySamples'
 
 export function ProfilePage() {
   const { user } = useAuth()
   const { profile, saveProfile } = useAppData()
   const { t, lang } = useI18n()
-  const [form, setForm] = useState<CompanyProfile | null>(profile)
+  const [form, setForm] = useState<CompanyProfile | null>(() => (profile ? stripSampleCompanyFields(profile) : null))
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
 
   useEffect(() => {
-    if (profile) setForm(profile)
+    if (profile) setForm(stripSampleCompanyFields(profile))
   }, [profile])
 
   function setField<K extends keyof CompanyProfile>(key: K, value: CompanyProfile[K]) {
@@ -62,7 +64,7 @@ export function ProfilePage() {
     setSaving(true)
     setError('')
     try {
-      await saveProfile({ ...form, language: lang })
+      await saveProfile({ ...stripSampleCompanyFields(form), language: lang })
       setMessage(t('profile.saveSuccess'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.error'))
@@ -88,13 +90,25 @@ export function ProfilePage() {
               showLabel={false}
               className="mt-4"
               onChange={(code) => {
-                if (form) void saveProfile({ ...form, language: code })
+                if (form) void saveProfile({ ...stripSampleCompanyFields(form), language: code })
               }}
             />
           </Card>
           <Card>
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('profile.account')}</h2>
             <p className="mt-3 text-sm font-medium">{user?.email}</p>
+            <p className="mt-2 text-sm text-brand-ink/55">
+              {t('billing.current')}:{' '}
+              <span className="font-semibold text-brand-ink">
+                {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
+              </span>
+            </p>
+            <Link
+              to="/app/upgrade"
+              className="mt-4 inline-flex text-sm font-semibold text-brand hover:underline"
+            >
+              {user?.plan === 'premium' ? t('billing.manage') : t('billing.cta')}
+            </Link>
           </Card>
           <Card>
             <h2 className="font-semibold">{t('profile.importSectionTitle')}</h2>
@@ -111,18 +125,86 @@ export function ProfilePage() {
           <p className="mb-6 mt-2 text-sm text-brand-ink/55">{t('profile.companyHint')}</p>
           <div className="grid gap-x-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Field label={t('profile.companyName')} value={form.companyName} onChange={(e) => setField('companyName', e.target.value)} />
+              <Field
+                label={t('profile.companyName')}
+                value={form.companyName}
+                placeholder={t('profile.phCompanyName')}
+                onChange={(e) => setField('companyName', e.target.value)}
+              />
             </div>
-            <Field label={t('profile.contactPerson')} value={form.contactPerson} onChange={(e) => setField('contactPerson', e.target.value)} />
-            <Field label={t('profile.nui')} value={form.nui} onChange={(e) => setField('nui', e.target.value)} />
+            <Field
+              label={t('profile.contactPerson')}
+              value={form.contactPerson}
+              placeholder={t('profile.phContactPerson')}
+              onChange={(e) => setField('contactPerson', e.target.value)}
+            />
+            <Field
+              label={t('profile.nui')}
+              value={form.nui}
+              placeholder={t('profile.phNui')}
+              onChange={(e) => setField('nui', e.target.value)}
+            />
             <div className="sm:col-span-2">
-              <Field label={t('profile.streetAddress')} value={form.streetAddress} onChange={(e) => setField('streetAddress', e.target.value)} />
+              <Field
+                label={t('profile.streetAddress')}
+                value={form.streetAddress}
+                placeholder={t('profile.phStreetAddress')}
+                onChange={(e) => setField('streetAddress', e.target.value)}
+              />
             </div>
-            <Field label={t('profile.state')} value={form.state} onChange={(e) => setField('state', e.target.value)} />
-            <Field label={t('profile.zipCode')} value={form.zipCode} onChange={(e) => setField('zipCode', e.target.value)} />
-            <Field label={t('profile.email')} value={form.email} onChange={(e) => setField('email', e.target.value)} />
-            <Field label={t('profile.phone')} value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
-            <Field label={t('profile.currency')} value={form.currency} maxLength={3} onChange={(e) => setField('currency', e.target.value.toUpperCase())} />
+            <Field
+              label={t('profile.state')}
+              value={form.state}
+              placeholder={t('profile.phState')}
+              onChange={(e) => setField('state', e.target.value)}
+            />
+            <Field
+              label={t('profile.zipCode')}
+              value={form.zipCode}
+              placeholder={t('profile.phZipCode')}
+              onChange={(e) => setField('zipCode', e.target.value)}
+            />
+            <Field
+              label={t('profile.email')}
+              value={form.email}
+              placeholder={t('profile.phEmail')}
+              onChange={(e) => setField('email', e.target.value)}
+            />
+            <Field
+              label={t('profile.phone')}
+              value={form.phone}
+              placeholder={t('profile.phPhone')}
+              onChange={(e) => setField('phone', e.target.value)}
+            />
+            <Field
+              label={t('profile.currency')}
+              value={form.currency}
+              placeholder={t('profile.phCurrency')}
+              maxLength={3}
+              onChange={(e) => setField('currency', e.target.value.toUpperCase())}
+            />
+            <Field
+              label={t('profile.bankName')}
+              value={form.bankName || ''}
+              placeholder={t('profile.phBankName')}
+              onChange={(e) => setField('bankName', e.target.value)}
+            />
+            <Field
+              label={t('profile.iban')}
+              value={form.iban || ''}
+              placeholder={t('profile.phIban')}
+              onChange={(e) => setField('iban', e.target.value)}
+            />
+            <div className="sm:col-span-2">
+              <TextArea
+                label={t('profile.exportNote')}
+                rows={2}
+                value={form.exportNote ?? 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'}
+                placeholder={t('profile.phExportNote')}
+                onChange={(e) => setField('exportNote', e.target.value)}
+              />
+              <p className="mb-4 -mt-2 text-xs text-brand-ink/45">{t('profile.exportNoteHint')}</p>
+            </div>
           </div>
           {message ? <p className="mt-2 text-sm text-brand">{message}</p> : null}
           {error ? <p className="mt-2 text-sm text-[#C0503A]">{error}</p> : null}

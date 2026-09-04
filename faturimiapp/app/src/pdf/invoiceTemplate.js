@@ -21,6 +21,11 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
   const items = invoice.items || [];
   const { subtotal, total } = computeTotals(items, invoice.discount);
   const symbol = currencySymbol(company.currency);
+  const DEFAULT_EXPORT_NOTE = 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)';
+  const exportNote =
+    company.exportNote === undefined || company.exportNote === null
+      ? DEFAULT_EXPORT_NOTE
+      : String(company.exportNote).trim();
 
   const rows = items
     .map(
@@ -140,6 +145,13 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
         color: #2C6E7F;
         font-weight: 600;
       }
+      .export-law {
+        text-align: center;
+        margin-top: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #1D2B2E;
+      }
     </style>
   </head>
   <body>
@@ -156,15 +168,16 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
         <h2>INVOICE</h2>
         <p>${escapeHtml(pdfLabels.invoiceLabel)}: ${escapeHtml(invoice.number)}</p>
         <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(invoice.date)}</p>
+        <p>${escapeHtml(pdfLabels.dueDateLabel)}: ${escapeHtml(invoice.dueDate || pdfLabels.onReceipt)}</p>
       </div>
     </div>
 
     <div class="blocks">
       <div class="client-block">
         <div class="block-title">${escapeHtml(pdfLabels.clientLabel)}</div>
-        <p><strong>${escapeHtml(client.fullName)}</strong></p>
-        <p>${escapeHtml(client.address)}</p>
-        <p>${escapeHtml(client.phone)}</p>
+        <p><strong>${escapeHtml(pdfLabels.fullNameLabel)}:</strong> ${escapeHtml(client.fullName)}</p>
+        <p><strong>${escapeHtml(pdfLabels.addressLabel)}:</strong> ${escapeHtml(client.address)}</p>
+        <p><strong>${escapeHtml(pdfLabels.phoneLabel)}:</strong> ${escapeHtml(client.phone)}</p>
       </div>
     </div>
 
@@ -189,8 +202,10 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
     </div>
 
     ${invoice.notes ? `<div class="notes">${escapeHtml(invoice.notes)}</div>` : ''}
+    ${company.bankName || company.iban ? `<div class="payment" style="margin-top:20px;font-size:12px;color:#444"><div class="block-title">${escapeHtml(pdfLabels.paymentInfo)}</div>${company.bankName ? `<p>${escapeHtml(pdfLabels.bankName)}: ${escapeHtml(company.bankName)}</p>` : ''}${company.iban ? `<p>${escapeHtml(pdfLabels.ibanLabel)}: ${escapeHtml(company.iban)}</p>` : ''}</div>` : ''}
 
     <div class="thank-you">${escapeHtml(pdfLabels.thankYou)}</div>
+    ${exportNote ? `<div class="export-law">${escapeHtml(exportNote)}</div>` : ''}
 
     <div class="signatures">
       <div class="signature">${escapeHtml(company.contactPerson)}<br/>${escapeHtml(pdfLabels.issuedBy)}</div>

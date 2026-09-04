@@ -8,10 +8,16 @@ const extractCompanyRouter = require('./routes/extractCompany');
 const authRouter = require('./routes/auth');
 const invoicesRouter = require('./routes/invoices');
 const profileRouter = require('./routes/profile');
+const billingRouter = require('./routes/billing');
+const { handleStripeWebhook } = require('./routes/billing');
 
 const app = express();
 
 app.use(cors({ origin: true }));
+
+// Stripe needs the raw body for signature verification.
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+
 app.use(express.json({ limit: '2mb' }));
 
 app.get('/', (_req, res) => {
@@ -28,6 +34,7 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRouter);
 app.use('/api/invoices', invoicesRouter);
 app.use('/api/profile', profileRouter);
+app.use('/api/billing', billingRouter);
 app.use('/api', extractClientRouter);
 app.use('/api', extractCompanyRouter);
 

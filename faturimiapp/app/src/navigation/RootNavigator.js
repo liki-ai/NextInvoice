@@ -8,11 +8,13 @@ import InvoiceListScreen from '../screens/InvoiceListScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import NewInvoiceScreen from '../screens/NewInvoiceScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SubscribeScreen from '../screens/SubscribeScreen';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors } from '../theme';
 
 const Tab = createBottomTabNavigator();
 const InvoicesStack = createNativeStackNavigator();
+const ProfileStack = createNativeStackNavigator();
 
 function InvoicesStackNavigator() {
   const { t } = useTranslation();
@@ -33,7 +35,30 @@ function InvoicesStackNavigator() {
         component={NewInvoiceScreen}
         options={{ title: t('invoiceDetail.editTitle') }}
       />
+      <InvoicesStack.Screen
+        name="Subscribe"
+        component={SubscribeScreen}
+        options={{ title: t('billing.title'), presentation: 'modal' }}
+      />
     </InvoicesStack.Navigator>
+  );
+}
+
+function ProfileStackNavigator() {
+  const { t } = useTranslation();
+  return (
+    <ProfileStack.Navigator>
+      <ProfileStack.Screen
+        name="ProfileHome"
+        component={ProfileScreen}
+        options={{ title: t('profile.title'), headerShown: false }}
+      />
+      <ProfileStack.Screen
+        name="Subscribe"
+        component={SubscribeScreen}
+        options={{ title: t('billing.title'), presentation: 'modal' }}
+      />
+    </ProfileStack.Navigator>
   );
 }
 
@@ -94,7 +119,7 @@ export default function RootNavigator() {
         />
         <Tab.Screen
           name="Profile"
-          component={ProfileScreen}
+          component={ProfileStackNavigator}
           options={{ title: t('tabs.profile'), tabBarLabel: t('tabs.profile') }}
         />
       </Tab.Navigator>

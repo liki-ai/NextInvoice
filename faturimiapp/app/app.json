@@ -6,6 +6,9 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-iap"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lirim123.nextinvoice",
@@ -16,6 +19,7 @@
       "buildNumber": "24"
     },
     "android": {
+      "package": "com.lirim123.nextinvoice",
       "adaptiveIcon": {
         "backgroundColor": "#2C6E7F",
         "foregroundImage": "./assets/android-icon-foreground.png"
@@ -27,7 +31,8 @@
     "extra": {
       "eas": {
         "projectId": "ac954ef6-cf98-46bc-8811-41ae697dc89d"
-      }
+      },
+      "iapProductId": "nextinvoice_premium_monthly"
     },
     "owner": "lirim123"
   }

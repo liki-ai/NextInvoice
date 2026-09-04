@@ -15,6 +15,9 @@ const ALLOWED = [
   'email',
   'phone',
   'currency',
+  'bankName',
+  'iban',
+  'exportNote',
   'language',
 ];
 

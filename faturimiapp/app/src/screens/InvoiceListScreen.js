@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
@@ -7,16 +7,53 @@ import { colors, radius, spacing, typography } from '../theme';
 import { formatMoney } from '../utils/money';
 
 export default function InvoiceListScreen({ navigation }) {
-  const { invoices, companyProfile } = useApp();
+  const { invoices, companyProfile, usage } = useApp();
   const { t } = useTranslation();
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const filtered = useMemo(() => {
+    if (statusFilter === 'all') return invoices;
+    if (statusFilter === 'paid') return invoices.filter((inv) => inv.status === 'paid');
+    return invoices.filter((inv) => inv.status !== 'paid');
+  }, [invoices, statusFilter]);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={typography.title}>{t('invoiceList.title')}</Text>
       </View>
+      {usage?.plan === 'free' && usage.limit != null ? (
+        <Pressable style={styles.usageBanner} onPress={() => navigation.navigate('Subscribe')}>
+          <Text style={styles.usageText}>
+            {!usage.canCreate
+              ? t('newInvoice.limitReached')
+              : t('billing.usageBanner', { used: usage.used, limit: usage.limit })}
+          </Text>
+          <Text style={styles.usageCta}>{t('billing.upgrade')}</Text>
+        </Pressable>
+      ) : null}
+      <View style={styles.filterRow}>
+        <Pressable
+          style={[styles.filterItem, statusFilter === 'all' && styles.filterItemActive]}
+          onPress={() => setStatusFilter('all')}
+        >
+          <Text style={[styles.filterText, statusFilter === 'all' && styles.filterTextActive]}>All</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.filterItem, statusFilter === 'unpaid' && styles.filterItemActive]}
+          onPress={() => setStatusFilter('unpaid')}
+        >
+          <Text style={[styles.filterText, statusFilter === 'unpaid' && styles.filterTextActive]}>{t('invoiceDetail.statusUnpaid')}</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.filterItem, statusFilter === 'paid' && styles.filterItemActive]}
+          onPress={() => setStatusFilter('paid')}
+        >
+          <Text style={[styles.filterText, statusFilter === 'paid' && styles.filterTextActive]}>{t('invoiceDetail.statusPaid')}</Text>
+        </Pressable>
+      </View>
       <FlatList
-        data={invoices}
+        data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
@@ -39,6 +76,12 @@ export default function InvoiceListScreen({ navigation }) {
               <Text style={typography.muted}>{item.date}</Text>
               <Text style={typography.muted}>{t('invoiceList.itemsCount', { count: item.items?.length || 0 })}</Text>
             </View>
+            <View style={styles.subRow}>
+              <Text style={typography.muted}>{item.dueDate || t('pdf.onReceipt')}</Text>
+              <Text style={{ color: item.status === 'paid' ? '#2E7D32' : '#C0503A', fontWeight: '600' }}>
+                {item.status === 'paid' ? t('invoiceDetail.statusPaid') : t('invoiceDetail.statusUnpaid')}
+              </Text>
+            </View>
           </Pressable>
         )}
       />
@@ -49,7 +92,45 @@ export default function InvoiceListScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  usageBanner: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#EEF5F7',
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  usageText: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '600' },
+  usageCta: { color: colors.primary, fontWeight: '800', fontSize: 13 },
   listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  filterItem: {
+    flex: 1,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  filterItemActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterText: { color: colors.textMuted, fontWeight: '700', fontSize: 12 },
+  filterTextActive: { color: '#fff' },
+  subRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -11,11 +11,15 @@ import {
   formatMoney,
   generateId,
   generateInvoiceNumber,
+  uniqueClients,
+  draftFromInvoice,
   toNumber,
   type InvoiceItem,
+  type InvoiceStatus,
 } from '../../lib/invoice'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
+import { localizeCompanyProfile } from '../../lib/companySamples'
 
 function emptyItem(): InvoiceItem {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' }
@@ -28,6 +32,7 @@ export function InvoiceFormPage() {
   const navigate = useNavigate()
   const existing = invoiceId ? invoices.find((inv) => inv.id === invoiceId) : null
   const isEditing = Boolean(invoiceId)
+  const location = useLocation()
 
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [aiText, setAiText] = useState('')
@@ -35,6 +40,8 @@ export function InvoiceFormPage() {
   const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '' })
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()))
+  const [dueDate, setDueDate] = useState(() => existing?.dueDate || '')
+  const [status, setStatus] = useState<InvoiceStatus>(() => existing?.status || 'unpaid')
   const [items, setItems] = useState<InvoiceItem[]>(() =>
     existing?.items?.length
       ? existing.items.map((it) => ({
@@ -56,6 +63,8 @@ export function InvoiceFormPage() {
     setClient(existing.client || { fullName: '', address: '', phone: '' })
     setInvoiceNumber(existing.number)
     setDate(existing.date)
+    setDueDate(existing.dueDate || '')
+    setStatus(existing.status || 'unpaid')
     setItems(
       existing.items?.length
         ? existing.items.map((it) => ({
@@ -70,14 +79,42 @@ export function InvoiceFormPage() {
     setNotes(existing.notes || '')
   }, [existing?.id])
 
+  useEffect(() => {
+    if (isEditing) return
+    const duplicateFromId = ((location as any).state as { duplicateFromId?: string } | undefined)?.duplicateFromId
+    if (!duplicateFromId) return
+    const source = invoices.find((inv) => inv.id === duplicateFromId)
+    if (!source) return
+
+    const draftCopy = draftFromInvoice(source, invoices)
+    setClient({ ...draftCopy.client })
+    setInvoiceNumber(draftCopy.number)
+    setDate(draftCopy.date)
+    setDueDate(draftCopy.dueDate || '')
+    setStatus(draftCopy.status || 'unpaid')
+    setItems(
+      (source.items || []).map((it) => ({
+        id: generateId(),
+        description: it.description || '',
+        quantity: String(it.quantity ?? '1'),
+        unitPrice: String(it.unitPrice ?? ''),
+      })),
+    )
+    setDiscount(String(source.discount ?? '0'))
+    setNotes(source.notes || '')
+  }, [isEditing, (location as any).state, invoices])
+
   const currency = profile?.currency || 'EUR'
   const { subtotal, total } = computeTotals(items, discount)
   const saveLabel = isEditing ? t('newInvoice.saveChanges') : t('newInvoice.saveAndShare')
+  const recentClients = useMemo(() => uniqueClients(invoices), [invoices])
 
   const draft = useMemo(
     () => ({
       number: invoiceNumber,
       date,
+      dueDate,
+      status,
       client,
       items,
       discount,
@@ -85,18 +122,18 @@ export function InvoiceFormPage() {
       subtotal,
       total,
     }),
-    [invoiceNumber, date, client, items, discount, notes, subtotal, total],
+    [invoiceNumber, date, dueDate, status, client, items, discount, notes, subtotal, total],
   )
 
   const previewHtml = useMemo(() => {
     if (!preview || !profile) return ''
     return buildInvoiceHtml({
-      company: profile,
+      company: localizeCompanyProfile(profile, t),
       client,
       invoice: draft,
       pdfLabels: dict.pdf,
     })
-  }, [preview, profile, client, draft, dict.pdf])
+  }, [preview, profile, client, draft, dict.pdf, t])
 
   function updateItem(id: string, field: keyof InvoiceItem, value: string) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)))
@@ -137,6 +174,8 @@ export function InvoiceFormPage() {
     return {
       number: invoiceNumber,
       date,
+      dueDate,
+      status,
       client,
       items: validItems,
       discount,
@@ -160,14 +199,18 @@ export function InvoiceFormPage() {
         navigate(`/app/invoices/${saved.id}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('common.error'))
+      const message = err instanceof Error ? err.message : t('common.error')
+      setError(message)
+      if (message.toLowerCase().includes('free plan') || message.toLowerCase().includes('upgrade')) {
+        navigate('/app/upgrade')
+      }
     } finally {
       setSaving(false)
     }
   }
 
   const inputClass =
-    'w-full rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
+    'w-full rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm outline-none placeholder:text-brand-ink/40 focus:border-brand focus:ring-2 focus:ring-brand/15'
 
   return (
     <div>
@@ -216,10 +259,29 @@ export function InvoiceFormPage() {
             <h2 className="mb-4 font-semibold">{t('newInvoice.clientSectionTitle')}</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <Field label={t('newInvoice.fullName')} value={client.fullName} onChange={(e) => setClient((c) => ({ ...c, fullName: e.target.value }))} />
+                <Field
+                  label={t('newInvoice.fullName')}
+                  value={client.fullName}
+                  placeholder={t('newInvoice.phFullName')}
+                  list="recentClientNames"
+                  onChange={(e) => {
+                    const value = e.target.value
+                    const match = recentClients.find((c) => c.fullName.trim().toLowerCase() === value.trim().toLowerCase())
+                    setClient((c) => ({
+                      ...c,
+                      fullName: value,
+                      ...(match ? { address: match.address, phone: match.phone } : {}),
+                    }))
+                  }}
+                />
+                <datalist id="recentClientNames">
+                  {recentClients.map((c) => (
+                    <option key={c.fullName} value={c.fullName} />
+                  ))}
+                </datalist>
               </div>
-              <Field label={t('newInvoice.address')} value={client.address} onChange={(e) => setClient((c) => ({ ...c, address: e.target.value }))} />
-              <Field label={t('newInvoice.phone')} value={client.phone} onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))} />
+              <Field label={t('newInvoice.address')} value={client.address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setClient((c) => ({ ...c, address: e.target.value }))} />
+              <Field label={t('newInvoice.phone')} value={client.phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))} />
             </div>
           </Card>
 
@@ -249,7 +311,7 @@ export function InvoiceFormPage() {
                   {items.map((item) => (
                     <tr key={item.id} className="border-t border-brand-ink/5">
                       <td className="px-4 py-2">
-                        <input className={inputClass} value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)} />
+                        <input className={inputClass} value={item.description} placeholder={t('newInvoice.phItemDescription')} onChange={(e) => updateItem(item.id, 'description', e.target.value)} />
                       </td>
                       <td className="px-3 py-2">
                         <input className={inputClass} value={String(item.quantity)} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} />
@@ -280,6 +342,7 @@ export function InvoiceFormPage() {
             <h2 className="mb-4 font-semibold">{t('newInvoice.invoiceDetailsSectionTitle')}</h2>
             <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
             <Field label={t('newInvoice.date')} value={date} onChange={(e) => setDate(e.target.value)} />
+            <Field label={t('newInvoice.dueDate')} value={dueDate} placeholder={t('newInvoice.phDueDate')} onChange={(e) => setDueDate(e.target.value)} />
             <Field label={t('newInvoice.discount')} value={discount} onChange={(e) => setDiscount(e.target.value)} />
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Card>

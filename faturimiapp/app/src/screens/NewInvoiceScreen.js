@@ -24,9 +24,10 @@ import { formatMoney, toNumber } from '../utils/money';
 import { generateId } from '../utils/id';
 import { extractClientInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
+import { localizeCompanyProfile } from '../storage/companySamples';
 
 function emptyItem() {
-  return { id: generateId(), description: 'Fustan Solemn / Dress', quantity: '1', unitPrice: '80' };
+  return { id: generateId(), description: '', quantity: '1', unitPrice: '' };
 }
 
 function emptyClient() {
@@ -66,6 +67,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
   const [client, setClient] = useState(() => (existing ? clientFromInvoice(existing) : emptyClient()));
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices));
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()));
+  const [dueDate, setDueDate] = useState(() => existing?.dueDate || '');
+  const [status, setStatus] = useState(() => existing?.status || 'unpaid');
   const [items, setItems] = useState(() => (existing ? itemsFromInvoice(existing) : [emptyItem()]));
   const [discount, setDiscount] = useState(() => String(existing?.discount ?? '0'));
   const [notes, setNotes] = useState(() => existing?.notes || '');
@@ -91,6 +94,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setAiText('');
     setInvoiceNumber(generateInvoiceNumber(invoices));
     setDate(formatDateForInvoice(new Date()));
+    setDueDate('');
+    setStatus('unpaid');
     setItems([emptyItem()]);
     setDiscount('0');
     setNotes('');
@@ -114,6 +119,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
     return {
       number: invoiceNumber,
       date,
+      dueDate,
+      status,
       client,
       items: validItems,
       discount,
@@ -128,6 +135,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
     const draft = {
       number: invoiceNumber,
       date,
+      dueDate,
+      status,
       client,
       items: items.filter((it) => it.description.trim()),
       discount,
@@ -136,7 +145,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       total,
     };
     return buildInvoiceHtml({
-      company: companyProfile,
+      company: localizeCompanyProfile(companyProfile, t),
       client,
       invoice: draft,
       pdfLabels: t('pdf'),
@@ -181,13 +190,23 @@ export default function NewInvoiceScreen({ navigation, route }) {
         navigation.goBack();
       } else {
         await addInvoice(invoice);
-        await shareInvoicePdf({ company: companyProfile, client, invoice, pdfLabels: t('pdf') });
+        await shareInvoicePdf({ company: localizeCompanyProfile(companyProfile, t), client, invoice, pdfLabels: t('pdf') });
         Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
         resetForm();
         navigation.navigate('Invoices');
       }
     } catch (err) {
-      Alert.alert(t('common.error'), err.message);
+      if (err?.code === 'PLAN_LIMIT' || err?.message === 'PLAN_LIMIT') {
+        Alert.alert(t('billing.limitTitle'), t('newInvoice.limitReached'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('billing.ctaIap'),
+            onPress: () => navigation.navigate('Invoices', { screen: 'Subscribe' }),
+          },
+        ]);
+      } else {
+        Alert.alert(t('common.error'), err.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -249,16 +268,19 @@ export default function NewInvoiceScreen({ navigation, route }) {
           <FormField
             label={t('newInvoice.fullName')}
             value={client.fullName}
+            placeholder={t('newInvoice.phFullName')}
             onChangeText={(v) => setClient((c) => ({ ...c, fullName: v }))}
           />
           <FormField
             label={t('newInvoice.address')}
             value={client.address}
+            placeholder={t('newInvoice.phAddress')}
             onChangeText={(v) => setClient((c) => ({ ...c, address: v }))}
           />
           <FormField
             label={t('newInvoice.phone')}
             value={client.phone}
+            placeholder={t('newInvoice.phPhone')}
             onChangeText={(v) => setClient((c) => ({ ...c, phone: v }))}
             keyboardType="phone-pad"
             returnKeyType="done"
@@ -270,6 +292,15 @@ export default function NewInvoiceScreen({ navigation, route }) {
         <Section title={t('newInvoice.invoiceDetailsSectionTitle')}>
           <FormField label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChangeText={setInvoiceNumber} />
           <FormField label={t('newInvoice.date')} value={date} onChangeText={setDate} />
+          <FormField label={t('pdf.dueDateLabel')} value={dueDate} placeholder={t('pdf.onReceipt')} onChangeText={setDueDate} />
+          <SegmentedControl
+            options={[
+              { value: 'unpaid', label: t('invoiceDetail.statusUnpaid') },
+              { value: 'paid', label: t('invoiceDetail.statusPaid') },
+            ]}
+            value={status}
+            onChange={(v) => setStatus(v)}
+          />
         </Section>
 
         <Section title={t('newInvoice.itemsSectionTitle')}>
@@ -286,6 +317,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
               <FormField
                 label={t('newInvoice.itemDescription')}
                 value={item.description}
+                placeholder={t('newInvoice.phItemDescription')}
                 onChangeText={(v) => updateItem(item.id, 'description', v)}
               />
               <View style={styles.row}>

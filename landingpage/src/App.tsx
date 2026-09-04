@@ -8,6 +8,7 @@ import { InvoiceListPage } from './pages/app/InvoiceListPage'
 import { InvoiceDetailPage } from './pages/app/InvoiceDetailPage'
 import { InvoiceFormPage } from './pages/app/InvoiceFormPage'
 import { ProfilePage } from './pages/app/ProfilePage'
+import { UpgradePage } from './pages/app/UpgradePage'
 
 function RequireAuth() {
   const { user, loading } = useAuth()
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/app" element={<RequireAuth />}>
               <Route index element={<InvoiceListPage />} />
               <Route path="new" element={<InvoiceFormPage />} />
+              <Route path="upgrade" element={<UpgradePage />} />
               <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
               <Route path="invoices/:invoiceId/edit" element={<InvoiceFormPage />} />
               <Route path="profile" element={<ProfilePage />} />

@@ -9,22 +9,24 @@ import { colors, radius, spacing, typography } from '../theme';
 import { Button, Section } from '../components/ui';
 import { formatMoney } from '../utils/money';
 import { buildInvoiceHtml } from '../pdf/invoiceTemplate';
+import { localizeCompanyProfile } from '../storage/companySamples';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 
 export default function InvoiceDetailScreen({ route, navigation }) {
   const { invoiceId } = route.params;
-  const { invoices, companyProfile, deleteInvoice } = useApp();
+  const { invoices, companyProfile, deleteInvoice, updateInvoice } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [sharing, setSharing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
 
   const invoice = useMemo(() => invoices.find((inv) => inv.id === invoiceId), [invoices, invoiceId]);
+  const status = invoice?.status === 'paid' ? 'paid' : 'unpaid';
 
   const previewHtml = useMemo(() => {
     if (!previewVisible || !invoice) return '';
     return buildInvoiceHtml({
-      company: companyProfile,
+      company: localizeCompanyProfile(companyProfile, t),
       client: invoice.client,
       invoice,
       pdfLabels: t('pdf'),
@@ -58,7 +60,7 @@ export default function InvoiceDetailScreen({ route, navigation }) {
     setSharing(true);
     try {
       await shareInvoicePdf({
-        company: companyProfile,
+        company: localizeCompanyProfile(companyProfile, t),
         client: invoice.client,
         invoice,
         pdfLabels: t('pdf'),
@@ -88,11 +90,16 @@ export default function InvoiceDetailScreen({ route, navigation }) {
     ]);
   };
 
+  const handleTogglePaid = async () => {
+    await updateInvoice(invoice.id, { status: status === 'paid' ? 'unpaid' : 'paid' });
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: spacing.md }}>
         <Section title={`${t('newInvoice.invoiceNumber')}: ${invoice.number}`}>
           <Text style={typography.muted}>{t('newInvoice.date')}: {invoice.date}</Text>
+          <Text style={typography.muted}>{t('pdf.dueDateLabel')}: {invoice.dueDate || t('pdf.onReceipt')}</Text>
         </Section>
 
         <Section title={t('newInvoice.clientSectionTitle')}>
@@ -137,6 +144,12 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           title={t('invoiceDetail.downloadPdf')}
           onPress={handleShare}
           loading={sharing}
+          style={{ marginTop: spacing.sm }}
+        />
+        <Button
+          title={status === 'paid' ? t('invoiceDetail.statusUnpaid') : t('invoiceDetail.statusPaid')}
+          variant="secondary"
+          onPress={handleTogglePaid}
           style={{ marginTop: spacing.sm }}
         />
         <Pressable style={styles.deleteLink} onPress={handleDelete}>

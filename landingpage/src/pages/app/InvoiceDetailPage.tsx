@@ -4,11 +4,12 @@ import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Modal } from '../../components/ui'
-import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney } from '../../lib/invoice'
+import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, invoiceStatus } from '../../lib/invoice'
+import { localizeCompanyProfile } from '../../lib/companySamples'
 
 export function InvoiceDetailPage() {
   const { invoiceId } = useParams()
-  const { invoices, profile, loading, removeInvoice } = useAppData()
+  const { invoices, profile, loading, removeInvoice, updateInvoice } = useAppData()
   const { t, dict } = useI18n()
   const navigate = useNavigate()
   const [preview, setPreview] = useState(false)
@@ -19,18 +20,19 @@ export function InvoiceDetailPage() {
   const html = useMemo(() => {
     if (!invoice || !profile || !preview) return ''
     return buildInvoiceHtml({
-      company: profile,
+      company: localizeCompanyProfile(profile, t),
       client: invoice.client,
       invoice,
       pdfLabels: dict.pdf,
     })
-  }, [invoice, profile, preview, dict.pdf])
+  }, [invoice, profile, preview, dict.pdf, t])
 
   if (!invoice) {
     return <p className="text-brand-ink/60">{loading ? t('common.loading') : t('invoiceList.empty')}</p>
   }
 
   const current = invoice
+  const status = invoiceStatus(current)
 
   async function onDelete() {
     if (!confirm(t('invoiceList.deleteConfirm'))) return
@@ -43,10 +45,24 @@ export function InvoiceDetailPage() {
     }
   }
 
+  async function onTogglePaid() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await updateInvoice(current.id, { status: status === 'paid' ? 'unpaid' : 'paid' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function onDuplicate() {
+    navigate('/app/new', { state: { duplicateFromId: current.id } })
+  }
+
   function onDownload() {
     if (!profile) return
     const doc = buildInvoiceHtml({
-      company: profile,
+      company: localizeCompanyProfile(profile, t),
       client: current.client,
       invoice: current,
       pdfLabels: dict.pdf,
@@ -65,6 +81,9 @@ export function InvoiceDetailPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.1em] text-brand-ink/40">{t('invoiceDetail.title')}</p>
           <h1 className="mt-1 font-display text-4xl font-medium tracking-tight">{invoice.number}</h1>
           <p className="mt-2 text-sm text-brand-ink/55">{invoice.date}</p>
+          <p className="mt-1 text-sm text-brand-ink/55">
+            {t('newInvoice.dueDate')}: {invoice.dueDate || dict.pdf.onReceipt}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -77,6 +96,9 @@ export function InvoiceDetailPage() {
           <Button type="button" variant="secondary" onClick={() => setPreview(true)}>
             <Eye className="h-4 w-4" />
             {t('newInvoice.preview')}
+          </Button>
+          <Button type="button" variant="secondary" onClick={onDuplicate}>
+            {t('invoiceDetail.duplicate')}
           </Button>
           <Button type="button" onClick={onDownload}>
             {t('invoiceDetail.downloadPdf')}
@@ -135,6 +157,11 @@ export function InvoiceDetailPage() {
             </div>
           </div>
           {invoice.notes ? <p className="mt-5 text-sm text-brand-ink/55">{invoice.notes}</p> : null}
+          <div className="mt-5">
+            <Button type="button" variant="secondary" disabled={busy} onClick={onTogglePaid}>
+              {status === 'paid' ? t('invoiceDetail.markUnpaid') : t('invoiceDetail.markPaid')}
+            </Button>
+          </div>
           <button
             type="button"
             disabled={busy}

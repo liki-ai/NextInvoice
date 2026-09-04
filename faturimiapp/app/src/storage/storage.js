@@ -4,6 +4,7 @@ const KEYS = {
   COMPANY_PROFILE: '@nextinvoice/companyProfile',
   SETTINGS: '@nextinvoice/settings',
   INVOICES: '@nextinvoice/invoices',
+  PLAN: '@nextinvoice/plan',
 };
 
 async function getJson(key, fallback) {
