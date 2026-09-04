@@ -4,6 +4,7 @@ const KEYS = {
   COMPANY_PROFILE: '@nextinvoice/companyProfile',
   SETTINGS: '@nextinvoice/settings',
   INVOICES: '@nextinvoice/invoices',
+  OBLIGATIONS: '@nextinvoice/obligations',
   PLAN: '@nextinvoice/plan',
 };
 

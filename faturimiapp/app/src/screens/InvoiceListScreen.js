@@ -7,7 +7,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { formatMoney } from '../utils/money';
 
 export default function InvoiceListScreen({ navigation }) {
-  const { invoices, companyProfile, usage } = useApp();
+  const { invoices, obligations, companyProfile, usage } = useApp();
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -16,6 +16,10 @@ export default function InvoiceListScreen({ navigation }) {
     if (statusFilter === 'paid') return invoices.filter((inv) => inv.status === 'paid');
     return invoices.filter((inv) => inv.status !== 'paid');
   }, [invoices, statusFilter]);
+
+  const unpaidObligations = obligations
+    .filter((item) => item.status !== 'paid')
+    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   return (
     <View style={styles.container}>
@@ -30,6 +34,14 @@ export default function InvoiceListScreen({ navigation }) {
               : t('billing.usageBanner', { used: usage.used, limit: usage.limit })}
           </Text>
           <Text style={styles.usageCta}>{t('billing.upgrade')}</Text>
+        </Pressable>
+      ) : null}
+      {unpaidObligations > 0 ? (
+        <Pressable style={styles.usageBanner} onPress={() => navigation.getParent()?.navigate('Obligations')}>
+          <Text style={styles.usageText}>
+            {t('invoiceList.unpaidObligations', { amount: formatMoney(unpaidObligations, companyProfile.currency) })}
+          </Text>
+          <Text style={styles.usageCta}>{t('tabs.obligations')}</Text>
         </Pressable>
       ) : null}
       <View style={styles.filterRow}>

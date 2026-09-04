@@ -23,19 +23,22 @@ export function AppProvider({ children }) {
   const [companyProfile, setCompanyProfile] = useState(DEFAULT_COMPANY_PROFILE);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [invoices, setInvoices] = useState([]);
+  const [obligations, setObligations] = useState([]);
   const [plan, setPlan] = useState(DEFAULT_PLAN);
 
   useEffect(() => {
     (async () => {
-      const [profile, storedSettings, storedInvoices, storedPlan] = await Promise.all([
+      const [profile, storedSettings, storedInvoices, storedObligations, storedPlan] = await Promise.all([
         getJson(KEYS.COMPANY_PROFILE, DEFAULT_COMPANY_PROFILE),
         getJson(KEYS.SETTINGS, DEFAULT_SETTINGS),
         getJson(KEYS.INVOICES, []),
+        getJson(KEYS.OBLIGATIONS, []),
         getJson(KEYS.PLAN, DEFAULT_PLAN),
       ]);
       setCompanyProfile({ ...DEFAULT_COMPANY_PROFILE, ...profile });
       setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
       setInvoices(storedInvoices);
+      setObligations(Array.isArray(storedObligations) ? storedObligations : []);
       setPlan(normalizePlan(storedPlan));
       setLoading(false);
     })();
@@ -117,6 +120,37 @@ export function AppProvider({ children }) {
       setJson(KEYS.INVOICES, next);
       return next;
     });
+    setObligations((prev) => {
+      const next = prev.map((item) => (item.relatedInvoiceId === id ? { ...item, relatedInvoiceId: '' } : item));
+      setJson(KEYS.OBLIGATIONS, next);
+      return next;
+    });
+  }, []);
+
+  const addObligation = useCallback(async (obligation) => {
+    const withId = { ...obligation, id: obligation.id || generateId(), createdAt: new Date().toISOString() };
+    setObligations((prev) => {
+      const next = [withId, ...prev];
+      setJson(KEYS.OBLIGATIONS, next);
+      return next;
+    });
+    return withId;
+  }, []);
+
+  const updateObligation = useCallback(async (id, partial) => {
+    setObligations((prev) => {
+      const next = prev.map((item) => (item.id === id ? { ...item, ...partial, updatedAt: new Date().toISOString() } : item));
+      setJson(KEYS.OBLIGATIONS, next);
+      return next;
+    });
+  }, []);
+
+  const deleteObligation = useCallback(async (id) => {
+    setObligations((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      setJson(KEYS.OBLIGATIONS, next);
+      return next;
+    });
   }, []);
 
   const value = useMemo(
@@ -132,6 +166,10 @@ export function AppProvider({ children }) {
       addInvoice,
       updateInvoice,
       deleteInvoice,
+      obligations,
+      addObligation,
+      updateObligation,
+      deleteObligation,
       plan,
       usage,
       setPlanFromPurchase,
@@ -149,6 +187,10 @@ export function AppProvider({ children }) {
       addInvoice,
       updateInvoice,
       deleteInvoice,
+      obligations,
+      addObligation,
+      updateObligation,
+      deleteObligation,
       plan,
       usage,
       setPlanFromPurchase,

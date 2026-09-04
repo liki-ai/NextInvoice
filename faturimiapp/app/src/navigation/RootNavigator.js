@@ -7,6 +7,8 @@ import { Platform, StyleSheet, View } from 'react-native';
 import InvoiceListScreen from '../screens/InvoiceListScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import NewInvoiceScreen from '../screens/NewInvoiceScreen';
+import ObligationListScreen from '../screens/ObligationListScreen';
+import ObligationFormScreen from '../screens/ObligationFormScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SubscribeScreen from '../screens/SubscribeScreen';
 import { useTranslation } from '../i18n/I18nContext';
@@ -14,6 +16,7 @@ import { colors } from '../theme';
 
 const Tab = createBottomTabNavigator();
 const InvoicesStack = createNativeStackNavigator();
+const ObligationsStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 
 function InvoicesStackNavigator() {
@@ -41,6 +44,26 @@ function InvoicesStackNavigator() {
         options={{ title: t('billing.title'), presentation: 'modal' }}
       />
     </InvoicesStack.Navigator>
+  );
+}
+
+function ObligationsStackNavigator() {
+  const { t } = useTranslation();
+  return (
+    <ObligationsStack.Navigator>
+      <ObligationsStack.Screen
+        name="ObligationsList"
+        component={ObligationListScreen}
+        options={{ title: t('obligations.title') }}
+      />
+      <ObligationsStack.Screen
+        name="ObligationForm"
+        component={ObligationFormScreen}
+        options={({ route }) => ({
+          title: route?.params?.obligationId ? t('obligations.editTitle') : t('obligations.newTitle'),
+        })}
+      />
+    </ObligationsStack.Navigator>
   );
 }
 
@@ -93,6 +116,13 @@ export default function RootNavigator() {
                 </View>
               );
             }
+            if (route.name === 'Obligations') {
+              return (
+                <View style={[styles.sideIcon, focused && styles.sideIconActive]}>
+                  <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
+                </View>
+              );
+            }
             if (route.name === 'NewInvoice') {
               return <PlusTabIcon focused={focused} />;
             }
@@ -111,6 +141,11 @@ export default function RootNavigator() {
           name="Invoices"
           component={InvoicesStackNavigator}
           options={{ title: t('tabs.invoices'), tabBarLabel: t('tabs.invoices') }}
+        />
+        <Tab.Screen
+          name="Obligations"
+          component={ObligationsStackNavigator}
+          options={{ title: t('tabs.obligations'), tabBarLabel: t('tabs.obligations') }}
         />
         <Tab.Screen
           name="NewInvoice"
@@ -144,7 +179,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   tabBarLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     marginTop: 2,
   },
