@@ -10,7 +10,7 @@ import { extractCompanyInfo } from '../api/extract';
 import { stripSampleCompanyFields } from '../storage/companySamples';
 
 export default function ProfileScreen({ navigation }) {
-  const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl, plan, usage } = useApp();
+  const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl, plan } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
@@ -73,11 +73,11 @@ export default function ProfileScreen({ navigation }) {
         <Text style={typography.body}>
           {t('billing.current')}: {plan?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
         </Text>
-        {usage?.plan === 'free' ? (
-          <Text style={[typography.muted, { marginTop: 6 }]}>
-            {t('billing.usageBanner', { used: usage.used, limit: usage.limit })}
-          </Text>
-        ) : null}
+        {plan?.plan === 'premium' ? (
+          <Text style={[typography.muted, { marginTop: 6 }]}>{t('billing.alreadyPremium')}</Text>
+        ) : (
+          <Text style={[typography.muted, { marginTop: 6, lineHeight: 20 }]}>{t('billing.settingsHint')}</Text>
+        )}
         <Button
           title={plan?.plan === 'premium' ? t('billing.manageStore') : t('billing.ctaIap')}
           onPress={() => navigation.navigate('Subscribe')}

@@ -103,6 +103,9 @@ export function ProfilePage() {
                 {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
               </span>
             </p>
+            {user?.plan !== 'premium' ? (
+              <p className="mt-2 text-sm leading-6 text-brand-ink/55">{t('billing.freeHint')}</p>
+            ) : null}
             <Link
               to="/app/upgrade"
               className="mt-4 inline-flex text-sm font-semibold text-brand hover:underline"

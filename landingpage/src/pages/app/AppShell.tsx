@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LogOut, Menu, UserRound, Wallet, X } from 'lucide-react'
+import { FileText, LogOut, Menu, Plus, UserRound, Wallet, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -75,6 +75,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 function ShellInner() {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
+  const composeTo = pathname.startsWith('/app/obligations') ? '/app/obligations/new' : '/app/new'
+  const showCompose =
+    pathname === '/app' ||
+    (pathname.startsWith('/app/obligations') && !pathname.includes('/new') && !pathname.includes('/edit'))
 
   return (
     <div className="min-h-screen bg-brand-bg lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -102,7 +107,16 @@ function ShellInner() {
             <Menu className="h-5 w-5" />
           </button>
           <span className="font-display text-lg font-semibold">Next Invoice</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {showCompose ? (
+              <NavLink
+                to={composeTo}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C9A227] text-white shadow-sm"
+                aria-label={pathname.startsWith('/app/obligations') ? t('nav.newObligation') : t('nav.newInvoice')}
+              >
+                <Plus className="h-5 w-5" />
+              </NavLink>
+            ) : null}
             <LanguagePicker />
           </div>
         </header>

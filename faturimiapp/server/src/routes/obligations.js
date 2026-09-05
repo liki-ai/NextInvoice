@@ -6,7 +6,11 @@ const router = express.Router();
 router.use(authRequired);
 
 router.get('/', (req, res) => {
-  res.json({ obligations: listObligations(req.user.id) });
+  const obligations = listObligations(req.user.id).map((item) => {
+    const { proofData, ...rest } = item;
+    return rest;
+  });
+  res.json({ obligations });
 });
 
 router.post('/', (req, res) => {

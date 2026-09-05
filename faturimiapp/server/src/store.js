@@ -287,6 +287,10 @@ function normalizeObligation(raw) {
     category: OBLIGATION_CATEGORIES.includes(raw.category) ? raw.category : 'other',
     notes: String(raw.notes || ''),
     relatedInvoiceId: String(raw.relatedInvoiceId || ''),
+    proofName: String(raw.proofName || ''),
+    proofMime: String(raw.proofMime || ''),
+    proofData: String(raw.proofData || ''),
+    proofUri: String(raw.proofUri || ''),
   };
 }
 

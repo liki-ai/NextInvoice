@@ -402,3 +402,75 @@ export function buildStatementHtml({ company, client, invoices, paidTotal, issue
   </body>
   </html>`;
 }
+
+export function paidObligationsFileName(date = new Date()) {
+  return `detyrimet-paguara-${formatStatementFileDate(date)}.pdf`;
+}
+
+export function buildPaidObligationsHtml({ company, obligations, issuedDate, pdfLabels }) {
+  const currency = company.currency || 'EUR';
+  const dateLabel = issuedDate || formatStatementFileDate(new Date());
+  const cityLine = [company.zipCode, company.state].filter(Boolean).join(' ');
+  const nuiLabel = pdfLabels.pivaLabel || pdfLabels.nuiLabel;
+  const total = (obligations || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const rows = (obligations || [])
+    .map(
+      (item) => `<tr>
+        <td>${escapeHtml(item.vendor)}</td>
+        <td>${escapeHtml(item.notes || item.description || '')}</td>
+        <td>${escapeHtml(item.date || '')}</td>
+        <td class="center">${item.proofName || item.proofUri ? escapeHtml(pdfLabels.proofYes || 'Yes') : escapeHtml(pdfLabels.proofNo || '—')}</td>
+        <td class="right">${formatMoney(Number(item.amount) || 0, currency)}</td>
+      </tr>`,
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+  <html lang="sq">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1D2B2E; padding: 20px; font-size: 12px; }
+      .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 3px solid #2C6E7F; padding-bottom: 16px; margin-bottom: 18px; }
+      .company-block h1 { margin: 0 0 6px 0; font-size: 20px; color: #1F4E5A; text-transform: uppercase; }
+      .company-block p { margin: 2px 0; color: #444; }
+      .invoice-meta { text-align: right; }
+      .invoice-meta h2 { margin: 0 0 8px 0; font-size: 18px; color: #2C6E7F; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      thead tr { background: #2C6E7F; color: #fff; }
+      th, td { padding: 6px 7px; border-bottom: 1px solid #E1E6E7; text-align: left; font-size: 11px; }
+      th.right, td.right { text-align: right; }
+      th.center, td.center { text-align: center; }
+      .totals { width: 240px; margin-left: auto; font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; border-top: 2px solid #2C6E7F; padding-top: 8px; color: #1F4E5A; }
+    </style>
+  </head>
+  <body>
+    <div class="top-row">
+      <div class="company-block">
+        <h1>${escapeHtml(company.companyName)}</h1>
+        ${company.streetAddress ? `<p>${escapeHtml(company.streetAddress)}</p>` : ''}
+        ${cityLine ? `<p>${escapeHtml(cityLine)}</p>` : ''}
+        ${company.nui ? `<p>${escapeHtml(nuiLabel)} ${escapeHtml(company.nui)}</p>` : ''}
+      </div>
+      <div class="invoice-meta">
+        <h2>${escapeHtml(pdfLabels.paidObligationsTitle || 'Paid')}</h2>
+        <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(dateLabel)}</p>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>${escapeHtml(pdfLabels.vendor || 'Vendor')}</th>
+          <th>${escapeHtml(pdfLabels.description)}</th>
+          <th>${escapeHtml(pdfLabels.dateLabel)}</th>
+          <th class="center">${escapeHtml(pdfLabels.proofLabel || 'Proof')}</th>
+          <th class="right">${escapeHtml(pdfLabels.sum)}</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="totals"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, currency)}</span></div>
+  </body>
+  </html>`;
+}

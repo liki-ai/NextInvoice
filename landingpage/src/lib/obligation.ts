@@ -16,6 +16,10 @@ export type Obligation = {
   category?: ObligationCategory
   notes?: string
   relatedInvoiceId?: string
+  proofName?: string
+  proofMime?: string
+  proofData?: string
+  proofUri?: string
   createdAt?: string
   updatedAt?: string
 }
