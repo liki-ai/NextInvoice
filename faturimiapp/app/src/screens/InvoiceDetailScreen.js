@@ -48,9 +48,10 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           onPress={() => navigation.navigate('EditInvoice', { invoiceId })}
           hitSlop={12}
           style={styles.headerEdit}
+          accessibilityRole="button"
+          accessibilityLabel={t('invoiceDetail.editInvoice')}
         >
-          <Ionicons name="create-outline" size={20} color={colors.primary} />
-          <Text style={styles.headerEditText}>{t('invoiceDetail.editInvoice')}</Text>
+          <Ionicons name="create-outline" size={22} color={colors.primary} />
         </Pressable>
       ),
     });
@@ -262,16 +263,10 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   headerEdit: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
     paddingVertical: 4,
-    paddingHorizontal: 4,
-  },
-  headerEditText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 15,
+    paddingHorizontal: 8,
   },
   actions: {
     flexDirection: 'row',

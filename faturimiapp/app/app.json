@@ -2,7 +2,7 @@
   "expo": {
     "name": "NextInvoice",
     "slug": "nextinvoice",
-    "version": "1.2.8",
+    "version": "1.2.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -16,7 +16,7 @@
         "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import invoices and payment proof.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "33"
+      "buildNumber": "35"
     },
     "android": {
       "package": "com.lirim123.nextinvoice",
