@@ -16,7 +16,7 @@
         "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import invoices and payment proof.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "29"
+      "buildNumber": "30"
     },
     "android": {
       "package": "com.lirim123.nextinvoice",
