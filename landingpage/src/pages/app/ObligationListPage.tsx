@@ -15,6 +15,8 @@ import { localizeCompanyProfile } from '../../lib/companySamples'
 import { obligationStatus, uniqueVendors, vendorSummaries } from '../../lib/obligation'
 import type { Obligation } from '../../lib/obligation'
 import { Button, Modal } from '../../components/ui'
+import { PaymentModal } from '../../components/PaymentModal'
+import { daysOverdue, isOverdue, remainingOf } from '../../lib/document'
 
 const MAX_PROOF_BYTES = 4 * 1024 * 1024
 
@@ -53,16 +55,17 @@ async function openProof(item: Obligation) {
 }
 
 export function ObligationListPage() {
-  const { obligations, invoices, loading, profile, updateObligation, removeObligation } = useAppData()
+  const { obligations, invoices, loading, profile, updateObligation, removeObligation, addObligationPayment } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue'>('all')
   const [vendorFilter, setVendorFilter] = useState('all')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
   const [error, setError] = useState('')
+  const [payId, setPayId] = useState<string | null>(null)
   const currency = profile?.currency || 'EUR'
-  const send = sendCopy(statusFilter, t)
+  const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
   const vendors = useMemo(() => uniqueVendors(obligations), [obligations])
   const summaries = useMemo(() => vendorSummaries(obligations), [obligations])
   const paidItems = obligations.filter((item) => obligationStatus(item) === 'paid')
@@ -70,7 +73,13 @@ export function ObligationListPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return obligations.filter((item) => {
-      if (statusFilter !== 'all' && obligationStatus(item) !== statusFilter) return false
+      if (statusFilter === 'overdue') {
+        if (!isOverdue({ ...item, total: item.amount })) return false
+      } else if (statusFilter !== 'all') {
+        const status = obligationStatus(item)
+        if (statusFilter === 'paid' && status !== 'paid') return false
+        if (statusFilter === 'unpaid' && status !== 'unpaid' && status !== 'partial') return false
+      }
       if (vendorFilter !== 'all' && item.vendor.trim().toLowerCase() !== vendorFilter) return false
       if (!q) return true
       const related = invoices.find((inv) => inv.id === item.relatedInvoiceId)
@@ -80,20 +89,9 @@ export function ObligationListPage() {
   }, [obligations, invoices, query, statusFilter, vendorFilter])
 
   const unpaid = obligations
-    .filter((item) => obligationStatus(item) === 'unpaid')
-    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+    .filter((item) => obligationStatus(item) !== 'paid' && obligationStatus(item) !== 'cancelled')
+    .reduce((sum, item) => sum + remainingOf({ ...item, total: item.amount }), 0)
   const paid = paidItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
-
-  async function onTogglePaid(id: string, current: 'paid' | 'unpaid') {
-    if (busyId) return
-    setBusyId(id)
-    setError('')
-    try {
-      await updateObligation(id, { status: current === 'paid' ? 'unpaid' : 'paid' })
-    } finally {
-      setBusyId(null)
-    }
-  }
 
   async function onDelete(id: string) {
     if (!window.confirm(t('obligations.deleteConfirm'))) return
@@ -281,6 +279,13 @@ export function ObligationListPage() {
             >
               {t('invoiceList.filterPaid')}
             </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('overdue')}
+              className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${statusFilter === 'overdue' ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink'}`}
+            >
+              {t('invoiceList.filterOverdue')}
+            </button>
             {vendors.length > 1 ? (
               <button
                 type="button"
@@ -310,6 +315,8 @@ export function ObligationListPage() {
                   const related = invoices.find((inv) => inv.id === item.relatedInvoiceId)
                   const status = obligationStatus(item)
                   const hasProof = Boolean(item.proofName || item.proofData)
+                  const late = daysOverdue({ ...item, total: item.amount })
+                  const due = remainingOf({ ...item, total: item.amount })
                   return (
                     <tr key={item.id} className="border-b border-brand-ink/5 last:border-0">
                       <td className="px-5 py-4">
@@ -324,17 +331,20 @@ export function ObligationListPage() {
                       <td className="px-5 py-4 text-brand-ink/60">
                         <div className="font-semibold">{item.date}</div>
                         <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
-                        <button
-                          type="button"
-                          disabled={busyId === item.id}
-                          title={status === 'unpaid' ? t('invoiceList.tapToMarkPaid') : undefined}
-                          onClick={() => onTogglePaid(item.id, status)}
-                          className={`mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            status === 'paid' ? 'bg-[#E7F4EA] text-[#2E7D32]' : 'bg-[#C0503A] text-white'
-                          }`}
-                        >
-                          {status === 'paid' ? t('invoiceList.statusPaid') : t('invoiceList.statusUnpaid')}
-                        </button>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              status === 'paid' ? 'bg-[#E7F4EA] text-[#2E7D32]' : status === 'partial' ? 'bg-[#FFF4D6] text-[#8A6D00]' : 'bg-[#C0503A] text-white'
+                            }`}
+                          >
+                            {status === 'paid' ? t('invoiceList.statusPaid') : status === 'partial' ? t('docs.statusPartial') : t('invoiceList.statusUnpaid')}
+                          </span>
+                          {late > 0 ? (
+                            <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
+                              {t('docs.overdueDays', { days: late })}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-brand-ink/60">
                         {related ? (
@@ -371,9 +381,21 @@ export function ObligationListPage() {
                           </label>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-right font-semibold">{formatMoney(Number(item.amount) || 0, currency)}</td>
+                      <td className="px-5 py-4 text-right font-semibold">
+                        {formatMoney(status === 'paid' ? Number(item.amount) || 0 : due, currency)}
+                        {status === 'partial' ? <div className="text-xs font-normal text-brand-ink/40">{t('docs.remaining')}</div> : null}
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-1">
+                          {due > 0 && status !== 'paid' ? (
+                            <button
+                              type="button"
+                              onClick={() => setPayId(item.id)}
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
+                            >
+                              {t('docs.recordPayment')}
+                            </button>
+                          ) : null}
                           <Link
                             to={`/app/obligations/${item.id}/edit`}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
@@ -421,6 +443,15 @@ export function ObligationListPage() {
         >
           <iframe title="obligation-list-preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
         </Modal>
+      ) : null}
+
+      {payId ? (
+        <PaymentModal
+          doc={{ ...((obligations.find((item) => item.id === payId) || {}) as Obligation), total: obligations.find((item) => item.id === payId)?.amount }}
+          currency={currency}
+          onClose={() => setPayId(null)}
+          onSave={(payment) => addObligationPayment(payId, payment).then(() => undefined)}
+        />
       ) : null}
     </div>
   )

@@ -10,12 +10,15 @@ import { extractCompanyInfo } from '../api/extract';
 import { stripSampleCompanyFields } from '../storage/companySamples';
 
 export default function ProfileScreen({ navigation }) {
-  const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl, plan } = useApp();
+  const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl, plan, user, token, login, signup, logout, syncState } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   const [form, setForm] = useState(() => stripSampleCompanyFields(companyProfile));
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(settings.apiBaseUrl);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
   const [importing, setImporting] = useState(false);
 
   useEffect(() => {
@@ -68,6 +71,51 @@ export default function ProfileScreen({ navigation }) {
       contentContainerStyle={{ padding: spacing.md, paddingTop: insets.top + spacing.md, paddingBottom: spacing.xl }}
     >
       <Text style={typography.title}>{t('profile.title')}</Text>
+      <Section title={t('docs.login')} style={{ marginTop: spacing.md }}>
+        {token && user ? (
+          <>
+            <Text style={typography.body}>{user.email}</Text>
+            <Text style={[typography.muted, { marginTop: 6 }]}>
+              {syncState?.status === 'synced' ? t('docs.synced') : syncState?.status === 'error' ? t('docs.error') : t('docs.pending')}
+            </Text>
+            <Button title={t('docs.logout')} variant="secondary" onPress={() => void logout()} style={{ marginTop: spacing.sm }} />
+          </>
+        ) : (
+          <>
+            <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('docs.signInHint')}</Text>
+            <FormField label={t('docs.email')} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+            <FormField label={t('docs.password')} value={password} onChangeText={setPassword} secureTextEntry />
+            <Button
+              title={authBusy ? t('common.loading') : t('docs.login')}
+              onPress={async () => {
+                setAuthBusy(true);
+                try {
+                  await login(email.trim(), password);
+                } catch (err) {
+                  Alert.alert(t('common.error'), err.message);
+                } finally {
+                  setAuthBusy(false);
+                }
+              }}
+            />
+            <Button
+              title={t('docs.signup')}
+              variant="secondary"
+              onPress={async () => {
+                setAuthBusy(true);
+                try {
+                  await signup(email.trim(), password);
+                } catch (err) {
+                  Alert.alert(t('common.error'), err.message);
+                } finally {
+                  setAuthBusy(false);
+                }
+              }}
+              style={{ marginTop: spacing.sm }}
+            />
+          </>
+        )}
+      </Section>
 
       <Section title={t('billing.title')} style={{ marginTop: spacing.md }}>
         <Text style={typography.body}>

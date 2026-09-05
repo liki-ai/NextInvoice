@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LogOut, Menu, Plus, UserRound, Wallet, X } from 'lucide-react'
+import { FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Wallet, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -8,19 +8,24 @@ import { LanguagePicker } from '../../components/LangSwitch'
 import { cn } from '../../lib/cn'
 
 const NAV = [
-  { to: '/app/obligations', end: false, icon: Wallet, key: 'nav.obligations' },
-  { to: '/app', end: true, icon: FileText, key: 'nav.invoices' },
-  { to: '/app/profile', end: true, icon: UserRound, key: 'nav.profile' },
+  { to: '/app', end: true, icon: FileText, key: 'nav.invoices', id: 'invoices' },
+  { to: '/app/obligations', end: false, icon: Wallet, key: 'nav.obligations', id: 'obligations' },
+  { to: '/app/overview', end: false, icon: LayoutDashboard, key: 'nav.overview', id: 'overview' },
+  { to: '/app/profile', end: true, icon: Settings, key: 'nav.profile', id: 'settings' },
 ] as const
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useI18n()
   const { logout, user } = useAuth()
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const invoicesActive =
-    pathname === '/app' || pathname.startsWith('/app/invoices') || pathname.startsWith('/app/statement')
+    pathname === '/app' ||
+    pathname.startsWith('/app/invoices') ||
+    (pathname.startsWith('/app/statement') && !search.includes('from=overview'))
   const obligationsActive = pathname.startsWith('/app/obligations')
+  const overviewActive = pathname.startsWith('/app/overview') || search.includes('from=overview')
+  const settingsActive = pathname.startsWith('/app/profile') || pathname.startsWith('/app/upgrade')
 
   return (
     <div className="flex h-full flex-col">
@@ -39,7 +44,15 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             className={({ isActive }) => {
               const active =
-                item.to === '/app' ? invoicesActive : item.to === '/app/obligations' ? obligationsActive : isActive
+                item.id === 'invoices'
+                  ? invoicesActive
+                  : item.id === 'obligations'
+                    ? obligationsActive
+                    : item.id === 'overview'
+                      ? overviewActive
+                      : item.id === 'settings'
+                        ? settingsActive
+                        : isActive
               return cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition',
                 active ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/6 hover:text-white',

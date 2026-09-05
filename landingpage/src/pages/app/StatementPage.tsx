@@ -14,6 +14,8 @@ import {
   statementFileName,
 } from '../../lib/invoice'
 import { localizeCompanyProfile, isSampleCompanyValue } from '../../lib/companySamples'
+import { parseLooseDate, remainingOf } from '../../lib/document'
+import { buildOverview } from '../../lib/overview'
 
 function companyForStatement(profile: Parameters<typeof localizeCompanyProfile>[0], t: (key: string) => string) {
   const company = localizeCompanyProfile(profile, t)
@@ -29,11 +31,60 @@ export function StatementPage() {
   const { t, dict } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const [preview, setPreview] = useState(false)
-  const currency = profile?.currency || 'EUR'
-  const summaries = useMemo(() => clientUnpaidSummaries(invoices), [invoices])
+  const fromOverview = searchParams.get('from') === 'overview'
+  const asOfRaw = searchParams.get('asOf')
+  const asOf = parseLooseDate(asOfRaw)
+  const fallbackCurrency = profile?.currency || 'EUR'
+  const currency = searchParams.get('currency') || fallbackCurrency
+  const summaries = useMemo(() => {
+    if (!asOf) return clientUnpaidSummaries(invoices)
+    const report = buildOverview({
+      invoices,
+      obligations: [],
+      period: { start: asOf, end: asOf, preset: 'custom' },
+      currency,
+      fallbackCurrency,
+    })
+    return report.customers.map((item) => ({
+      client: {
+        fullName: item.client?.fullName || '',
+        address: item.client?.address || '',
+        phone: item.client?.phone || '',
+        email: item.client?.email || '',
+      },
+      clientId: item.clientId,
+      unpaid: item.invoices.flatMap((inv) => {
+        const original = invoices.find((row) => row.id === inv.id)
+        return original ? [{ ...original, amountDue: inv.amountDueAsOf }] : []
+      }),
+      unpaidCount: item.invoices.length,
+      unpaidTotal: item.amount,
+      paidTotal: 0,
+    }))
+  }, [invoices, asOf, currency, fallbackCurrency])
+  const clientId = searchParams.get('clientId') || ''
   const selectedKey = clientKey(searchParams.get('client') || summaries[0]?.client.fullName)
-  const selected = summaries.find((item) => clientKey(item.client.fullName) === selectedKey) || summaries[0]
-  const issuedDate = formatStatementFileDate(new Date())
+  const selected =
+    summaries.find((item) => {
+      const id = 'clientId' in item ? String(item.clientId || '') : ''
+      return (clientId && id === clientId) || clientKey(item.client.fullName) === selectedKey
+    }) || summaries[0]
+  const issuedDate = formatStatementFileDate(asOf || new Date())
+  const overviewBack = (() => {
+    const params = new URLSearchParams()
+    params.set('currency', currency)
+    const preset = searchParams.get('preset')
+    if (preset) params.set('preset', preset)
+    const year = searchParams.get('year')
+    if (year) params.set('year', year)
+    const month = searchParams.get('month')
+    if (month) params.set('month', month)
+    const rangeFrom = searchParams.get('rangeFrom')
+    const rangeTo = searchParams.get('rangeTo')
+    if (rangeFrom) params.set('from', rangeFrom)
+    if (rangeTo) params.set('to', rangeTo)
+    return `/app/overview?${params.toString()}`
+  })()
 
   const html = useMemo(() => {
     if (!selected || !profile || !preview) return ''
@@ -48,8 +99,11 @@ export function StatementPage() {
     })
   }, [selected, profile, preview, issuedDate, dict.pdf, t])
 
-  function selectClient(name: string) {
-    setSearchParams({ client: name })
+  function selectClient(name: string, id?: string) {
+    const next = new URLSearchParams(searchParams)
+    next.set('client', name)
+    if (id) next.set('clientId', id)
+    setSearchParams(next)
     setPreview(false)
   }
 
@@ -70,13 +124,14 @@ export function StatementPage() {
 
   return (
     <div>
-      <Link to="/app" className="text-sm font-semibold text-brand-ink/50 hover:text-brand">
-        ← {t('nav.invoices')}
+      <Link to={fromOverview ? overviewBack : '/app'} className="text-sm font-semibold text-brand-ink/50 hover:text-brand">
+        ← {fromOverview ? t('nav.overview') : t('nav.invoices')}
       </Link>
       <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="font-display text-4xl font-medium tracking-tight">{t('statement.title')}</h1>
           <p className="mt-2 text-sm text-brand-ink/55">{t('statement.subtitle')}</p>
+          {asOfRaw ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('statement.asOf', { date: asOfRaw })}</p> : null}
         </div>
         {selected ? (
           <div className="flex flex-wrap gap-2">
@@ -107,7 +162,7 @@ export function StatementPage() {
                   <button
                     key={item.client.fullName}
                     type="button"
-                    onClick={() => selectClient(item.client.fullName)}
+                    onClick={() => selectClient(item.client.fullName, 'clientId' in item ? String(item.clientId || '') : undefined)}
                     className={`w-full rounded-xl px-3 py-3 text-left transition ${
                       active ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink hover:bg-brand/10'
                     }`}
@@ -167,7 +222,7 @@ export function StatementPage() {
                           </Link>
                         </td>
                         <td className="px-6 py-3 text-brand-ink/60">{item.date}</td>
-                        <td className="px-6 py-3 text-right font-semibold">{formatMoney(item.total, currency)}</td>
+                        <td className="px-6 py-3 text-right font-semibold">{formatMoney(remainingOf(item), currency)}</td>
                       </tr>
                     ))}
                   </tbody>

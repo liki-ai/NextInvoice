@@ -1,4 +1,5 @@
 import { formatMoney, currencySymbol, toNumber } from '../utils/money';
+import { remainingOf } from '../utils/document';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -199,6 +200,7 @@ export function buildInvoiceHtml({ company, client, invoice, pdfLabels }) {
       <div><span>${escapeHtml(pdfLabels.subtotal)}</span><span>${formatMoney(subtotal, company.currency)}</span></div>
       <div><span>${escapeHtml(pdfLabels.discount)}</span><span>${formatMoney(toNumber(invoice.discount), company.currency)}</span></div>
       <div class="total-row"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, company.currency)}</span></div>
+      ${remainingOf(invoice) > 0 && remainingOf(invoice) < total ? `<div><span>${escapeHtml(pdfLabels.amountDue || 'Due')}</span><span>${formatMoney(remainingOf(invoice), company.currency)}</span></div>` : ''}
     </div>
 
     ${invoice.notes ? `<div class="notes">${escapeHtml(invoice.notes)}</div>` : ''}
@@ -317,7 +319,7 @@ export function buildStatementHtml({ company, client, invoices, paidTotal, issue
     company.exportNote === undefined || company.exportNote === null
       ? DEFAULT_EXPORT_NOTE
       : String(company.exportNote).trim();
-  const unpaidTotal = (invoices || []).reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+  const unpaidTotal = (invoices || []).reduce((sum, inv) => sum + remainingOf(inv), 0);
   const payments = Number(paidTotal) || 0;
   const dateLabel = issuedDate || formatStatementFileDate(new Date());
   const cityLine = [company.zipCode, company.state].filter(Boolean).join(' ');
@@ -551,6 +553,106 @@ export function buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels 
       <tbody>${rows}</tbody>
     </table>
     <div class="totals"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, currency)}</span></div>
+  </body>
+  </html>`;
+}
+
+export function overviewFileName(date = new Date()) {
+  return `pasqyra-${formatStatementFileDate(date)}.pdf`;
+}
+
+export function buildOverviewHtml({ company, report, periodText, issuedDate, pdfLabels, notes = [] }) {
+  const currency = report.currency || company.currency || 'EUR';
+  const dateLabel = issuedDate || formatStatementFileDate(new Date());
+  const cityLine = [company.zipCode, company.state].filter(Boolean).join(' ');
+  const nuiLabel = pdfLabels.pivaLabel || pdfLabels.nuiLabel;
+  const summaryRows = [
+    [pdfLabels.invoiced, report.invoiced],
+    [pdfLabels.received, report.paymentsReceived],
+    [pdfLabels.obligationsRecorded, report.obligationsRecorded],
+    [pdfLabels.paidOut, report.paymentsMade],
+    [pdfLabels.receivables, report.receivables],
+    [pdfLabels.payables, report.payables],
+    [pdfLabels.netPayments, report.netPayments],
+  ]
+    .map(
+      ([label, amount]) =>
+        `<tr><td>${escapeHtml(label)}</td><td class="right">${formatMoney(Number(amount) || 0, currency)}</td></tr>`,
+    )
+    .join('');
+  const customerRows = (report.customers || [])
+    .map(
+      (item) =>
+        `<tr><td>${escapeHtml(item.client?.fullName || '')}</td><td class="right">${formatMoney(item.amount, currency)}</td></tr>`,
+    )
+    .join('');
+  const overdueRows = (report.overduePayables || [])
+    .map(
+      (item) =>
+        `<tr><td>${escapeHtml(item.vendor || '')}</td><td>${escapeHtml(item.dueDate || '')}</td><td class="right">${formatMoney(item.amountDueAsOf || 0, currency)}</td></tr>`,
+    )
+    .join('');
+  const noteBlock = notes.length
+    ? `<div class="notes"><div class="block-title">${escapeHtml(pdfLabels.limitationTitle || '')}</div>${notes
+        .map((note) => `<p>${escapeHtml(note)}</p>`)
+        .join('')}</div>`
+    : '';
+
+  return `<!DOCTYPE html>
+  <html lang="sq">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1D2B2E; padding: 20px; font-size: 12px; }
+      .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 3px solid #2C6E7F; padding-bottom: 16px; margin-bottom: 18px; }
+      .company-block h1 { margin: 0 0 6px 0; font-size: 20px; color: #1F4E5A; text-transform: uppercase; }
+      .company-block p { margin: 2px 0; color: #444; }
+      .invoice-meta { text-align: right; }
+      .invoice-meta h2 { margin: 0 0 8px 0; font-size: 18px; color: #2C6E7F; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      thead tr { background: #2C6E7F; color: #fff; }
+      th, td { padding: 6px 7px; border-bottom: 1px solid #E1E6E7; text-align: left; font-size: 11px; }
+      th.right, td.right { text-align: right; }
+      h3 { margin: 18px 0 8px; font-size: 13px; color: #1F4E5A; text-transform: uppercase; letter-spacing: 0.04em; }
+      .notes { margin-top: 16px; padding: 10px 12px; background: #F8E8E4; border-radius: 8px; }
+      .notes p { margin: 4px 0; color: #7A3B2E; }
+      .block-title { font-weight: 700; margin-bottom: 6px; }
+      .hint { color: #6B7A7D; margin: 0 0 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="top-row">
+      <div class="company-block">
+        <h1>${escapeHtml(company.companyName)}</h1>
+        ${company.streetAddress ? `<p>${escapeHtml(company.streetAddress)}</p>` : ''}
+        ${cityLine ? `<p>${escapeHtml(cityLine)}</p>` : ''}
+        ${company.nui ? `<p>${escapeHtml(nuiLabel)} ${escapeHtml(company.nui)}</p>` : ''}
+      </div>
+      <div class="invoice-meta">
+        <h2>${escapeHtml(pdfLabels.pdfTitle || pdfLabels.listTitle || 'Overview')}</h2>
+        <p>${escapeHtml(pdfLabels.period || '')}: ${escapeHtml(periodText)}</p>
+        <p>${escapeHtml(pdfLabels.asOf || '')}: ${escapeHtml(report.period?.endIso || dateLabel)}</p>
+        <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(dateLabel)}</p>
+        <p>${escapeHtml(currency)}</p>
+      </div>
+    </div>
+    <p class="hint">${escapeHtml(pdfLabels.netHint || '')}</p>
+    <table>
+      <thead><tr><th>${escapeHtml(pdfLabels.summary || '')}</th><th class="right">${escapeHtml(pdfLabels.sum)}</th></tr></thead>
+      <tbody>${summaryRows}</tbody>
+    </table>
+    <h3>${escapeHtml(pdfLabels.customers || '')}</h3>
+    <table>
+      <thead><tr><th>${escapeHtml(pdfLabels.clientLabel)}</th><th class="right">${escapeHtml(pdfLabels.sum)}</th></tr></thead>
+      <tbody>${customerRows || `<tr><td colspan="2">${escapeHtml(pdfLabels.empty || '')}</td></tr>`}</tbody>
+    </table>
+    <h3>${escapeHtml(pdfLabels.overdue || '')}</h3>
+    <table>
+      <thead><tr><th>${escapeHtml(pdfLabels.vendor || '')}</th><th>${escapeHtml(pdfLabels.dateLabel)}</th><th class="right">${escapeHtml(pdfLabels.sum)}</th></tr></thead>
+      <tbody>${overdueRows || `<tr><td colspan="3">${escapeHtml(pdfLabels.empty || '')}</td></tr>`}</tbody>
+    </table>
+    ${noteBlock}
   </body>
   </html>`;
 }

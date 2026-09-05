@@ -16,6 +16,8 @@ import {
 } from '../pdf/invoiceTemplate';
 import { localizeCompanyProfile, isSampleCompanyValue } from '../storage/companySamples';
 import { shareStatementPdf } from '../pdf/generateInvoicePdf';
+import { remainingOf } from '../utils/document';
+import { buildOverview, parseLooseDate } from '../utils/overview';
 
 function companyForStatement(profile, t) {
   const company = localizeCompanyProfile(profile, t);
@@ -32,10 +34,37 @@ export default function StatementScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const [sharing, setSharing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const summaries = useMemo(() => clientUnpaidSummaries(invoices), [invoices]);
+  const asOf = parseLooseDate(route?.params?.asOf);
+  const currency = route?.params?.currency || companyProfile.currency || 'EUR';
+  const summaries = useMemo(() => {
+    if (!asOf) return clientUnpaidSummaries(invoices);
+    const report = buildOverview({
+      invoices,
+      obligations: [],
+      period: { start: asOf, end: asOf, preset: 'custom' },
+      currency,
+      fallbackCurrency: companyProfile.currency || 'EUR',
+    });
+    return report.customers.map((item) => ({
+      client: item.client || { fullName: '' },
+      clientId: item.clientId,
+      unpaid: item.invoices.map((inv) => {
+        const original = invoices.find((row) => row.id === inv.id) || inv;
+        return { ...original, amountDue: inv.amountDueAsOf };
+      }),
+      unpaidCount: item.invoices.length,
+      unpaidTotal: item.amount,
+      paidTotal: 0,
+    }));
+  }, [invoices, asOf, currency, companyProfile.currency]);
   const selectedKey = clientKey(route?.params?.clientName || summaries[0]?.client?.fullName);
-  const selected = summaries.find((item) => clientKey(item.client.fullName) === selectedKey) || summaries[0];
-  const issuedDate = formatStatementFileDate(new Date());
+  const selected =
+    summaries.find(
+      (item) =>
+        (route?.params?.clientId && item.clientId === route.params.clientId) ||
+        clientKey(item.client.fullName) === selectedKey,
+    ) || summaries[0];
+  const issuedDate = formatStatementFileDate(asOf || new Date());
   const pdfLabels = t('pdf');
 
   const previewHtml = useMemo(() => {
@@ -85,6 +114,9 @@ export default function StatementScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+        {route?.params?.asOf ? (
+          <Text style={styles.sectionLabel}>{t('statement.asOf', { date: route.params.asOf })}</Text>
+        ) : null}
         <Text style={styles.sectionLabel}>{t('statement.selectClient')}</Text>
         {summaries.map((item) => {
           const active = clientKey(item.client.fullName) === clientKey(selected?.client.fullName);
@@ -97,7 +129,7 @@ export default function StatementScreen({ route, navigation }) {
               <View style={styles.cardRow}>
                 <Text style={[styles.clientName, active && styles.clientNameActive]}>{item.client.fullName}</Text>
                 <Text style={[styles.amount, active && styles.amountActive]}>
-                  {formatMoney(item.unpaidTotal, companyProfile.currency)}
+                  {formatMoney(item.unpaidTotal, currency)}
                 </Text>
               </View>
               <Text style={[styles.meta, active && styles.metaActive]}>
@@ -118,15 +150,15 @@ export default function StatementScreen({ route, navigation }) {
             <Section title={t('statement.title')}>
               <View style={styles.totalsRow}>
                 <Text style={typography.muted}>{pdfLabels.ordersTotal}</Text>
-                <Text style={typography.body}>{formatMoney(selected.unpaidTotal, companyProfile.currency)}</Text>
+                <Text style={typography.body}>{formatMoney(selected.unpaidTotal, currency)}</Text>
               </View>
               <View style={styles.totalsRow}>
                 <Text style={typography.muted}>{pdfLabels.paymentsTotal}</Text>
-                <Text style={typography.body}>{formatMoney(selected.paidTotal, companyProfile.currency)}</Text>
+                <Text style={typography.body}>{formatMoney(selected.paidTotal, currency)}</Text>
               </View>
               <View style={styles.totalsRow}>
                 <Text style={typography.muted}>{pdfLabels.balanceDue}</Text>
-                <Text style={styles.balance}>{formatMoney(selected.unpaidTotal, companyProfile.currency)}</Text>
+                <Text style={styles.balance}>{formatMoney(selected.unpaidTotal, currency)}</Text>
               </View>
             </Section>
 
@@ -138,7 +170,7 @@ export default function StatementScreen({ route, navigation }) {
               >
                 <View style={styles.cardRow}>
                   <Text style={styles.invoiceNumber}>{item.number}</Text>
-                  <Text style={styles.amount}>{formatMoney(item.total, companyProfile.currency)}</Text>
+                  <Text style={styles.amount}>{formatMoney(remainingOf(item), currency)}</Text>
                 </View>
                 <Text style={typography.muted}>{item.date}</Text>
               </Pressable>

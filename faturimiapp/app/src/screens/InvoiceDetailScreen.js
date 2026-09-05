@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
@@ -11,27 +11,35 @@ import { formatMoney } from '../utils/money';
 import { buildInvoiceHtml } from '../pdf/invoiceTemplate';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
+import { daysOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, reminderText } from '../utils/document';
+import PaymentModal from '../components/PaymentModal';
 
 export default function InvoiceDetailScreen({ route, navigation }) {
   const { invoiceId } = route.params;
-  const { invoices, companyProfile, deleteInvoice, updateInvoice } = useApp();
+  const { invoices, companyProfile, deleteInvoice, issueInvoice, cancelInvoice, addInvoicePayment } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [sharing, setSharing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   const invoice = useMemo(() => invoices.find((inv) => inv.id === invoiceId), [invoices, invoiceId]);
-  const status = invoice?.status === 'paid' ? 'paid' : 'unpaid';
+  const status = invoice ? paymentStatus(invoice) : 'unpaid';
+  const company = invoice ? pdfCompany(invoice, localizeCompanyProfile(companyProfile, t)) : companyProfile;
+  const client = invoice ? pdfClient(invoice) : null;
+  const currency = invoice?.currency || company?.currency || 'EUR';
+  const late = invoice ? daysOverdue(invoice) : 0;
+  const due = invoice ? remainingOf(invoice) : 0;
 
   const previewHtml = useMemo(() => {
     if (!previewVisible || !invoice) return '';
     return buildInvoiceHtml({
-      company: localizeCompanyProfile(companyProfile, t),
-      client: invoice.client,
+      company,
+      client,
       invoice,
       pdfLabels: t('pdf'),
     });
-  }, [previewVisible, invoice, companyProfile, t]);
+  }, [previewVisible, invoice, company, client, t]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -60,8 +68,8 @@ export default function InvoiceDetailScreen({ route, navigation }) {
     setSharing(true);
     try {
       await shareInvoicePdf({
-        company: localizeCompanyProfile(companyProfile, t),
-        client: invoice.client,
+        company,
+        client,
         invoice,
         pdfLabels: t('pdf'),
       });
@@ -77,6 +85,7 @@ export default function InvoiceDetailScreen({ route, navigation }) {
   };
 
   const handleDelete = () => {
+    if (status !== 'draft') return;
     Alert.alert(t('invoiceList.deleteConfirmTitle'), t('invoiceList.deleteConfirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
@@ -90,9 +99,33 @@ export default function InvoiceDetailScreen({ route, navigation }) {
     ]);
   };
 
-  const handleTogglePaid = async () => {
-    await updateInvoice(invoice.id, { status: status === 'paid' ? 'unpaid' : 'paid' });
+  const handleCancel = () => {
+    const run = async (reason) => {
+      if (!reason?.trim()) return;
+      await cancelInvoice(invoice.id, reason.trim());
+    };
+    if (Platform.OS === 'ios') {
+      Alert.prompt(t('docs.cancelInvoice'), t('docs.cancelReason'), (reason) => void run(reason));
+      return;
+    }
+    Alert.alert(t('docs.cancelInvoice'), t('docs.cancelReason'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.ok'), onPress: () => void run('Cancelled') },
+    ]);
   };
+
+  const reminder = invoice
+    ? reminderText(
+        invoice,
+        {
+          hello: t('docs.reminderHello'),
+          body: t('docs.reminderBody'),
+          thanks: t('docs.reminderThanks'),
+          onReceipt: t('pdf.onReceipt'),
+        },
+        late,
+      )
+    : '';
 
   return (
     <View style={styles.container}>
@@ -100,35 +133,53 @@ export default function InvoiceDetailScreen({ route, navigation }) {
         <Section title={`${t('newInvoice.invoiceNumber')}: ${invoice.number}`}>
           <Text style={typography.muted}>{t('newInvoice.date')}: {invoice.date}</Text>
           <Text style={typography.muted}>{t('pdf.dueDateLabel')}: {invoice.dueDate || t('pdf.onReceipt')}</Text>
+          {late > 0 ? <Text style={[typography.muted, { color: colors.danger }]}>{t('docs.overdueDays', { days: late })}</Text> : null}
+          <Text style={typography.muted}>{status === 'paid' ? t('invoiceDetail.statusPaid') : status === 'partial' ? t('docs.statusPartial') : status === 'draft' ? t('docs.statusDraft') : status === 'cancelled' ? t('docs.statusCancelled') : t('invoiceDetail.statusUnpaid')}</Text>
         </Section>
 
         <Section title={t('newInvoice.clientSectionTitle')}>
-          <Text style={typography.body}>{invoice.client?.fullName}</Text>
-          <Text style={typography.muted}>{invoice.client?.address}</Text>
-          <Text style={typography.muted}>{invoice.client?.phone}</Text>
+          <Text style={typography.body}>{client?.fullName}</Text>
+          <Text style={typography.muted}>{client?.address}</Text>
+          <Text style={typography.muted}>{client?.phone}</Text>
         </Section>
 
         <Section title={t('newInvoice.itemsSectionTitle')}>
           {(invoice.items || []).map((item, idx) => (
             <View key={idx} style={styles.itemRow}>
               <Text style={[typography.body, { flex: 1 }]}>{item.description}</Text>
-              <Text style={typography.muted}>{item.quantity} x {formatMoney(Number(item.unitPrice), companyProfile.currency)}</Text>
+              <Text style={typography.muted}>{item.quantity} x {formatMoney(Number(item.unitPrice), currency)}</Text>
             </View>
           ))}
           <View style={styles.divider} />
           <View style={styles.totalsRow}>
             <Text style={typography.muted}>{t('newInvoice.subtotal')}</Text>
-            <Text style={typography.body}>{formatMoney(invoice.subtotal, companyProfile.currency)}</Text>
+            <Text style={typography.body}>{formatMoney(invoice.subtotal, currency)}</Text>
           </View>
           <View style={styles.totalsRow}>
             <Text style={typography.muted}>{t('newInvoice.discount')}</Text>
-            <Text style={typography.body}>{formatMoney(Number(invoice.discount) || 0, companyProfile.currency)}</Text>
+            <Text style={typography.body}>{formatMoney(Number(invoice.discount) || 0, currency)}</Text>
           </View>
           <View style={styles.totalsRow}>
             <Text style={typography.subtitle}>{t('newInvoice.total')}</Text>
-            <Text style={typography.subtitle}>{formatMoney(invoice.total, companyProfile.currency)}</Text>
+            <Text style={typography.subtitle}>{formatMoney(invoice.total, currency)}</Text>
+          </View>
+          <View style={styles.totalsRow}>
+            <Text style={typography.muted}>{t('docs.amountDue')}</Text>
+            <Text style={typography.body}>{formatMoney(due, currency)}</Text>
           </View>
         </Section>
+
+        {late > 0 ? (
+          <Section title={t('docs.reminder')}>
+            <Text style={typography.body}>{reminder}</Text>
+            <Button
+              title={t('docs.share')}
+              variant="secondary"
+              onPress={() => Share.share({ message: reminder })}
+              style={{ marginTop: spacing.sm }}
+            />
+          </Section>
+        ) : null}
 
         <View style={styles.actions}>
           <Pressable style={styles.previewButton} onPress={handleEdit}>
@@ -146,16 +197,21 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           loading={sharing}
           style={{ marginTop: spacing.sm }}
         />
-        <Button
-          title={status === 'paid' ? t('invoiceDetail.statusUnpaid') : t('invoiceDetail.statusPaid')}
-          variant="secondary"
-          onPress={handleTogglePaid}
-          style={{ marginTop: spacing.sm }}
-        />
+        {status === 'draft' ? (
+          <Button title={t('docs.issue')} onPress={() => issueInvoice(invoice.id)} style={{ marginTop: spacing.sm }} />
+        ) : null}
+        {status !== 'draft' && status !== 'cancelled' && due > 0 ? (
+          <Button title={t('docs.recordPayment')} variant="secondary" onPress={() => setPayOpen(true)} style={{ marginTop: spacing.sm }} />
+        ) : null}
+        {status !== 'draft' && status !== 'cancelled' ? (
+          <Button title={t('docs.cancelInvoice')} variant="secondary" onPress={handleCancel} style={{ marginTop: spacing.sm }} />
+        ) : null}
+        {status === 'draft' ? (
         <Pressable style={styles.deleteLink} onPress={handleDelete}>
           <Ionicons name="trash-outline" size={16} color={colors.danger} />
           <Text style={styles.deleteLinkText}>{t('invoiceDetail.deleteInvoice')}</Text>
         </Pressable>
+        ) : null}
       </ScrollView>
 
       <Modal visible={previewVisible} animationType="slide" onRequestClose={() => setPreviewVisible(false)}>
@@ -189,6 +245,13 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+      <PaymentModal
+        visible={payOpen}
+        doc={invoice}
+        currency={currency}
+        onClose={() => setPayOpen(false)}
+        onSave={(payment) => addInvoicePayment(invoice.id, payment)}
+      />
     </View>
   );
 }

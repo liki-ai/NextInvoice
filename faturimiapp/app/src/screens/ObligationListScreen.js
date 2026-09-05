@@ -11,6 +11,9 @@ import { sharePaidObligationsPdf } from '../pdf/generateInvoicePdf';
 import { buildPaidObligationsHtml, formatStatementFileDate } from '../pdf/invoiceTemplate';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import PdfPreviewModal from '../components/PdfPreviewModal';
+import PaymentModal from '../components/PaymentModal';
+import SyncBanner from '../components/SyncBanner';
+import { daysOverdue, isOverdue, paymentStatus, remainingOf } from '../utils/document';
 
 const CATEGORY_KEYS = {
   shipping: 'obligations.categoryShipping',
@@ -31,23 +34,28 @@ function sendCopy(filter, t) {
 }
 
 export default function ObligationListScreen({ navigation }) {
-  const { obligations, invoices, companyProfile, updateObligation, deleteObligation } = useApp();
+  const { obligations, invoices, companyProfile, updateObligation, deleteObligation, addObligationPayment } = useApp();
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('all');
   const [sharing, setSharing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [payId, setPayId] = useState(null);
   const currency = companyProfile.currency || 'EUR';
-  const send = sendCopy(statusFilter, t);
+  const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t);
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return obligations;
-    if (statusFilter === 'paid') return obligations.filter((item) => item.status === 'paid');
-    return obligations.filter((item) => item.status !== 'paid');
+    if (statusFilter === 'paid') return obligations.filter((item) => paymentStatus({ ...item, total: item.amount }) === 'paid');
+    if (statusFilter === 'overdue') return obligations.filter((item) => isOverdue({ ...item, total: item.amount }));
+    return obligations.filter((item) => {
+      const status = paymentStatus({ ...item, total: item.amount });
+      return status === 'unpaid' || status === 'partial';
+    });
   }, [obligations, statusFilter]);
 
   const unpaid = obligations
-    .filter((item) => item.status !== 'paid')
-    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    .filter((item) => paymentStatus({ ...item, total: item.amount }) !== 'paid')
+    .reduce((sum, item) => sum + remainingOf({ ...item, total: item.amount }), 0);
   const paidItems = obligations.filter((item) => item.status === 'paid');
   const paid = paidItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
@@ -113,8 +121,9 @@ export default function ObligationListScreen({ navigation }) {
           </Pressable>
         ) : null}
       </View>
-
-      {obligations.length > 0 ? (
+      <View style={{ paddingHorizontal: spacing.md }}>
+        <SyncBanner />
+      </View>
         <View style={styles.totals}>
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>{t('obligations.unpaidTotal')}</Text>
@@ -153,6 +162,14 @@ export default function ObligationListScreen({ navigation }) {
               {t('invoiceDetail.statusPaid')}
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.filterItem, statusFilter === 'overdue' && styles.filterItemActive]}
+            onPress={() => setStatusFilter('overdue')}
+          >
+            <Text style={[styles.filterText, statusFilter === 'overdue' && styles.filterTextActive]}>
+              {t('docs.overdue')}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -174,14 +191,17 @@ export default function ObligationListScreen({ navigation }) {
         }
         renderItem={({ item }) => {
           const related = invoices.find((inv) => inv.id === item.relatedInvoiceId);
-          const paidItem = item.status === 'paid';
+          const status = paymentStatus({ ...item, total: item.amount });
+          const paidItem = status === 'paid';
+          const due = remainingOf({ ...item, total: item.amount });
+          const late = daysOverdue({ ...item, total: item.amount });
           return (
             <SwipeableRow
               paid={paidItem}
               labels={{
                 edit: t('common.edit'),
                 delete: t('common.delete'),
-                markPaid: t('invoiceDetail.statusPaid'),
+                markPaid: t('docs.recordPayment'),
                 markUnpaid: t('invoiceDetail.statusUnpaid'),
               }}
               onEdit={() => navigation.navigate('ObligationForm', { obligationId: item.id })}
@@ -195,7 +215,7 @@ export default function ObligationListScreen({ navigation }) {
                   },
                 ]);
               }}
-              onTogglePaid={() => updateObligation(item.id, { status: paidItem ? 'unpaid' : 'paid' })}
+              onTogglePaid={() => (due > 0 ? setPayId(item.id) : null)}
             >
               <Pressable
                 style={styles.card}
@@ -203,7 +223,7 @@ export default function ObligationListScreen({ navigation }) {
               >
                 <View style={styles.cardRow}>
                   <Text style={styles.vendor}>{item.vendor}</Text>
-                  <Text style={styles.amount}>{formatMoney(Number(item.amount) || 0, currency)}</Text>
+                  <Text style={styles.amount}>{formatMoney(paidItem ? Number(item.amount) || 0 : due, currency)}</Text>
                 </View>
                 {item.notes || item.description ? (
                   <Text style={styles.description}>{item.notes || item.description}</Text>
@@ -212,7 +232,7 @@ export default function ObligationListScreen({ navigation }) {
                 <View style={styles.cardRow}>
                   <Text style={typography.muted}>{item.date}</Text>
                   <Pressable
-                    onPress={() => updateObligation(item.id, { status: paidItem ? 'unpaid' : 'paid' })}
+                    onPress={() => (due > 0 ? setPayId(item.id) : null)}
                     hitSlop={8}
                     accessibilityHint={paidItem ? undefined : t('invoiceList.tapToMarkPaid')}
                     style={[styles.statusChip, paidItem ? styles.statusPaid : styles.statusUnpaid]}
@@ -263,6 +283,13 @@ export default function ObligationListScreen({ navigation }) {
         sendLabel={t('common.send')}
         onCancel={() => setPreviewVisible(false)}
         onSend={onShareList}
+      />
+      <PaymentModal
+        visible={Boolean(payId)}
+        doc={{ ...(obligations.find((item) => item.id === payId) || {}), total: obligations.find((item) => item.id === payId)?.amount }}
+        currency={currency}
+        onClose={() => setPayId(null)}
+        onSave={(payment) => addObligationPayment(payId, payment)}
       />
     </View>
   );

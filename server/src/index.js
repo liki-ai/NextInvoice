@@ -8,6 +8,8 @@ const extractCompanyRouter = require('./routes/extractCompany');
 const authRouter = require('./routes/auth');
 const invoicesRouter = require('./routes/invoices');
 const obligationsRouter = require('./routes/obligations');
+const clientsRouter = require('./routes/clients');
+const syncRouter = require('./routes/sync');
 const profileRouter = require('./routes/profile');
 const billingRouter = require('./routes/billing');
 const { handleStripeWebhook } = require('./routes/billing');
@@ -37,6 +39,8 @@ app.get('/health', (_req, res) => res.json({ ok: true, persist: hasPostgres() ? 
 app.use('/api/auth', authRouter);
 app.use('/api/invoices', invoicesRouter);
 app.use('/api/obligations', obligationsRouter);
+app.use('/api/clients', clientsRouter);
+app.use('/api/sync', syncRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api', extractClientRouter);

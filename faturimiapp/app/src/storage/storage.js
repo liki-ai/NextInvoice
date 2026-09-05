@@ -6,6 +6,12 @@ const KEYS = {
   INVOICES: '@nextinvoice/invoices',
   OBLIGATIONS: '@nextinvoice/obligations',
   PLAN: '@nextinvoice/plan',
+  CLIENTS: '@nextinvoice/clients',
+  AUTH_TOKEN: '@nextinvoice/authToken',
+  AUTH_USER: '@nextinvoice/authUser',
+  SYNC_QUEUE: '@nextinvoice/syncQueue',
+  SYNC_STATE: '@nextinvoice/syncState',
+  MIGRATED_USER_ID: '@nextinvoice/migratedUserId',
 };
 
 async function getJson(key, fallback) {

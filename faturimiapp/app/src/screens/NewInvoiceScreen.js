@@ -31,14 +31,15 @@ function emptyItem() {
 }
 
 function emptyClient() {
-  return { fullName: '', address: '', phone: '' };
+  return { fullName: '', address: '', phone: '', email: '', businessId: '' };
 }
 
 function clientFromInvoice(invoice) {
   return {
     fullName: invoice?.client?.fullName || '',
     address: invoice?.client?.address || '',
-    phone: invoice?.client?.phone || '',
+    email: invoice?.client?.email || '',
+    businessId: invoice?.client?.businessId || '',
   };
 }
 
@@ -54,7 +55,7 @@ function itemsFromInvoice(invoice) {
 
 export default function NewInvoiceScreen({ navigation, route }) {
   const invoiceId = route?.params?.invoiceId;
-  const { invoices, companyProfile, settings, addInvoice, updateInvoice } = useApp();
+  const { invoices, clients, companyProfile, settings, addInvoice, updateInvoice, addClient } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
@@ -68,7 +69,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices));
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()));
   const [dueDate, setDueDate] = useState(() => existing?.dueDate || '');
-  const [status, setStatus] = useState(() => existing?.status || 'unpaid');
+  const [clientId, setClientId] = useState(() => existing?.clientId || '');
+  const [savingDraft, setSavingDraft] = useState(false);
   const [items, setItems] = useState(() => (existing ? itemsFromInvoice(existing) : [emptyItem()]));
   const [discount, setDiscount] = useState(() => String(existing?.discount ?? '0'));
   const [notes, setNotes] = useState(() => existing?.notes || '');
@@ -95,7 +97,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setInvoiceNumber(generateInvoiceNumber(invoices));
     setDate(formatDateForInvoice(new Date()));
     setDueDate('');
-    setStatus('unpaid');
+    setClientId('');
     setItems([emptyItem()]);
     setDiscount('0');
     setNotes('');
@@ -120,8 +122,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
       number: invoiceNumber,
       date,
       dueDate,
-      status,
-      client,
+      client: { ...client, id: clientId },
+      clientId,
       items: validItems,
       discount,
       notes,
@@ -136,7 +138,6 @@ export default function NewInvoiceScreen({ navigation, route }) {
       number: invoiceNumber,
       date,
       dueDate,
-      status,
       client,
       items: items.filter((it) => it.description.trim()),
       discount,
@@ -161,6 +162,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
         fullName: result.fullName || '',
         address: result.address || '',
         phone: result.phone || '',
+        email: '',
+        businessId: '',
       });
     } catch (err) {
       Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
@@ -175,22 +178,34 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setPreviewVisible(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (asDraft = false) => {
     const invoice = buildDraftInvoice();
     if (!invoice) return;
 
     setSaving(true);
     try {
-      if (isEditing) {
-        await updateInvoice(invoiceId, {
-          ...invoice,
-          updatedAt: new Date().toISOString(),
+      let savedClientId = clientId;
+      if (!savedClientId && client.fullName.trim()) {
+        const savedClient = await addClient({
+          fullName: client.fullName.trim(),
+          address: client.address || '',
+          phone: client.phone || '',
+          email: client.email || '',
+          businessId: client.businessId || '',
         });
+        savedClientId = savedClient.id;
+        setClientId(savedClientId);
+      }
+      const payload = { ...invoice, clientId: savedClientId, lifecycle: asDraft ? 'draft' : 'issued' };
+      if (isEditing) {
+        await updateInvoice(invoiceId, payload);
         Alert.alert(t('common.success'), t('newInvoice.updatedSuccess'));
         navigation.goBack();
       } else {
-        await addInvoice(invoice);
-        await shareInvoicePdf({ company: localizeCompanyProfile(companyProfile, t), client, invoice, pdfLabels: t('pdf') });
+        await addInvoice(payload);
+        if (!asDraft) {
+          await shareInvoicePdf({ company: localizeCompanyProfile(companyProfile, t), client, invoice: payload, pdfLabels: t('pdf') });
+        }
         Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
         resetForm();
         if (navigation.canGoBack()) navigation.goBack();
@@ -210,10 +225,11 @@ export default function NewInvoiceScreen({ navigation, route }) {
       }
     } finally {
       setSaving(false);
+      setSavingDraft(false);
     }
   };
 
-  const saveLabel = isEditing ? t('newInvoice.saveChanges') : t('newInvoice.saveAndShare');
+  const saveLabel = isEditing ? t('newInvoice.saveChanges') : t('docs.issue');
 
   if (isEditing && !existing) {
     return (
@@ -266,11 +282,39 @@ export default function NewInvoiceScreen({ navigation, route }) {
         )}
 
         <Section title={t('newInvoice.clientSectionTitle')}>
+          {clients.length > 0 ? (
+            <View style={{ marginBottom: spacing.sm }}>
+              <Text style={typography.label}>{t('docs.pickClient')}</Text>
+              {clients.slice(0, 8).map((item) => (
+                <Pressable
+                  key={item.id}
+                  onPress={() => {
+                    setClientId(item.id);
+                    setClient({
+                      fullName: item.fullName || '',
+                      address: item.address || '',
+                      phone: item.phone || '',
+                      email: item.email || '',
+                      businessId: item.businessId || '',
+                    });
+                  }}
+                  style={{ paddingVertical: 6 }}
+                >
+                  <Text style={{ color: clientId === item.id ? colors.primary : colors.text, fontWeight: clientId === item.id ? '700' : '500' }}>
+                    {item.fullName}{item.phone ? ` · ${item.phone}` : ''}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <FormField
             label={t('newInvoice.fullName')}
             value={client.fullName}
             placeholder={t('newInvoice.phFullName')}
-            onChangeText={(v) => setClient((c) => ({ ...c, fullName: v }))}
+            onChangeText={(v) => {
+              setClientId('');
+              setClient((c) => ({ ...c, fullName: v }));
+            }}
           />
           <FormField
             label={t('newInvoice.address')}
@@ -288,20 +332,14 @@ export default function NewInvoiceScreen({ navigation, route }) {
             blurOnSubmit
             onSubmitEditing={Keyboard.dismiss}
           />
+          <FormField label={t('docs.email')} value={client.email || ''} onChangeText={(v) => setClient((c) => ({ ...c, email: v }))} />
+          <FormField label={t('docs.businessId')} value={client.businessId || ''} onChangeText={(v) => setClient((c) => ({ ...c, businessId: v }))} />
         </Section>
 
         <Section title={t('newInvoice.invoiceDetailsSectionTitle')}>
           <FormField label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChangeText={setInvoiceNumber} />
           <FormField label={t('newInvoice.date')} value={date} onChangeText={setDate} />
           <FormField label={t('pdf.dueDateLabel')} value={dueDate} placeholder={t('pdf.onReceipt')} onChangeText={setDueDate} />
-          <SegmentedControl
-            options={[
-              { value: 'unpaid', label: t('invoiceDetail.statusUnpaid') },
-              { value: 'paid', label: t('invoiceDetail.statusPaid') },
-            ]}
-            value={status}
-            onChange={(v) => setStatus(v)}
-          />
         </Section>
 
         <Section title={t('newInvoice.itemsSectionTitle')}>
@@ -403,8 +441,19 @@ export default function NewInvoiceScreen({ navigation, route }) {
             <Ionicons name="eye-outline" size={18} color={colors.primary} />
             <Text style={styles.previewButtonText}>{t('newInvoice.preview')}</Text>
           </Pressable>
-          <Button title={saveLabel} onPress={handleSave} loading={saving} style={{ flex: 1 }} />
         </View>
+        {!isEditing ? (
+          <Button
+            title={savingDraft ? t('common.loading') : t('docs.saveDraft')}
+            variant="secondary"
+            onPress={() => {
+              setSavingDraft(true);
+              void handleSave(true);
+            }}
+            style={{ marginTop: spacing.sm }}
+          />
+        ) : null}
+        <Button title={saveLabel} onPress={() => void handleSave(false)} loading={saving} style={{ marginTop: spacing.sm }} />
       </ScrollView>
 
       <Modal visible={previewVisible} animationType="slide" onRequestClose={() => setPreviewVisible(false)}>
@@ -431,7 +480,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
             />
             <Button
               title={saveLabel}
-              onPress={handleSave}
+              onPress={() => void handleSave(false)}
               loading={saving}
               style={{ flex: 1.4 }}
             />

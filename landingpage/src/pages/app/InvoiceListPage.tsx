@@ -14,6 +14,8 @@ import {
   invoiceListFileName,
   invoiceStatus,
 } from '../../lib/invoice'
+import { daysOverdue, formatMoneyList, isOverdue, remainingOf, totalsByCurrency } from '../../lib/document'
+import { PaymentModal } from '../../components/PaymentModal'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
@@ -27,16 +29,17 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
 }
 
 export function InvoiceListPage() {
-  const { invoices, loading, profile, updateInvoice, removeInvoice } = useAppData()
+  const { invoices, loading, profile, removeInvoice, addInvoicePayment } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue'>('all')
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
+  const [payId, setPayId] = useState<string | null>(null)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
-  const send = sendCopy(statusFilter, t)
+  const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
 
   useEffect(() => {
     void api<{ plan: 'free' | 'premium'; used: number; limit: number | null }>('/api/billing/usage')
@@ -58,27 +61,24 @@ export function InvoiceListPage() {
         })
 
     if (statusFilter === 'all') return list
-    return list.filter((item) => invoiceStatus(item) === statusFilter)
+    if (statusFilter === 'overdue') return list.filter((item) => isOverdue(item))
+    if (statusFilter === 'paid') return list.filter((item) => invoiceStatus(item) === 'paid')
+    return list.filter((item) => {
+      const status = invoiceStatus(item)
+      return status === 'unpaid' || status === 'partial'
+    })
   }, [invoices, query, statusFilter])
 
   const unpaidClients = useMemo(() => clientUnpaidSummaries(invoices), [invoices])
   const statementTotal = unpaidClients.reduce((sum, item) => sum + item.unpaidTotal, 0)
-  const unpaidInvoiceTotal = invoices
-    .filter((item) => invoiceStatus(item) === 'unpaid')
-    .reduce((sum, item) => sum + (Number(item.total) || 0), 0)
-  const paidInvoiceTotal = invoices
-    .filter((item) => invoiceStatus(item) === 'paid')
-    .reduce((sum, item) => sum + (Number(item.total) || 0), 0)
-
-  async function onTogglePaid(id: string, current: 'paid' | 'unpaid') {
-    if (busyId) return
-    setBusyId(id)
-    try {
-      await updateInvoice(id, { status: current === 'paid' ? 'unpaid' : 'paid' })
-    } finally {
-      setBusyId(null)
-    }
-  }
+  const unpaidInvoiceTotal = formatMoneyList(
+    totalsByCurrency(invoices, (item) => (invoiceStatus(item) === 'paid' ? 0 : remainingOf(item))),
+    formatMoney,
+  )
+  const paidInvoiceTotal = formatMoneyList(
+    totalsByCurrency(invoices, (item) => (invoiceStatus(item) === 'paid' ? Number(item.total) || 0 : 0)),
+    formatMoney,
+  )
 
   async function onDelete(id: string) {
     if (!window.confirm(t('invoiceList.deleteConfirm'))) return
@@ -86,9 +86,19 @@ export function InvoiceListPage() {
     setBusyId(id)
     try {
       await removeInvoice(id)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : t('common.error'))
     } finally {
       setBusyId(null)
     }
+  }
+
+  function statusLabel(status: ReturnType<typeof invoiceStatus>) {
+    if (status === 'paid') return t('invoiceList.statusPaid')
+    if (status === 'partial') return t('docs.statusPartial')
+    if (status === 'draft') return t('docs.statusDraft')
+    if (status === 'cancelled') return t('docs.statusCancelled')
+    return t('invoiceList.statusUnpaid')
   }
 
   const previewHtml =
@@ -186,11 +196,11 @@ export function InvoiceListPage() {
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-brand-ink/8 bg-white px-5 py-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('invoiceList.unpaidTotal')}</p>
-            <p className="mt-1 font-display text-2xl font-medium">{formatMoney(unpaidInvoiceTotal, currency)}</p>
+            <p className="mt-1 font-display text-2xl font-medium">{unpaidInvoiceTotal}</p>
           </div>
           <div className="rounded-2xl border border-brand-ink/8 bg-white px-5 py-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('invoiceList.paidTotal')}</p>
-            <p className="mt-1 font-display text-2xl font-medium">{formatMoney(paidInvoiceTotal, currency)}</p>
+            <p className="mt-1 font-display text-2xl font-medium">{paidInvoiceTotal}</p>
           </div>
         </div>
       ) : null}
@@ -261,6 +271,13 @@ export function InvoiceListPage() {
             >
               {t('invoiceList.filterPaid')}
             </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('overdue')}
+              className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${statusFilter === 'overdue' ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink'}`}
+            >
+              {t('invoiceList.filterOverdue')}
+            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -278,51 +295,85 @@ export function InvoiceListPage() {
               <tbody>
                 {filtered.map((item) => {
                   const status = invoiceStatus(item)
+                  const late = daysOverdue(item)
+                  const due = remainingOf(item)
                   return (
-                  <tr key={item.id} className="border-b border-brand-ink/5 last:border-0">
+                  <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${status === 'cancelled' ? 'opacity-60' : ''}`}>
                     <td className="px-5 py-4">
                       <Link to={`/app/invoices/${item.id}`} className="font-semibold text-brand hover:underline">
                         {item.number}
                       </Link>
+                      {status === 'draft' ? <div className="text-xs text-brand-ink/40">{t('docs.draft')}</div> : null}
                     </td>
                     <td className="px-5 py-4">{item.client?.fullName}</td>
                     <td className="px-5 py-4 text-brand-ink/60">
                       <div className="font-semibold">{item.date}</div>
                       <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
-                      <button
-                        type="button"
-                        disabled={busyId === item.id}
-                        title={status === 'unpaid' ? t('invoiceList.tapToMarkPaid') : undefined}
-                        onClick={() => onTogglePaid(item.id, status)}
-                        className={`mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          status === 'paid'
-                            ? 'bg-[#E7F4EA] text-[#2E7D32]'
-                            : 'bg-[#C0503A] text-white'
-                        }`}
-                      >
-                        {status === 'paid' ? t('invoiceList.statusPaid') : t('invoiceList.statusUnpaid')}
-                      </button>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            status === 'paid'
+                              ? 'bg-[#E7F4EA] text-[#2E7D32]'
+                              : status === 'partial'
+                                ? 'bg-[#FFF4D6] text-[#8A6D00]'
+                                : status === 'cancelled'
+                                  ? 'bg-brand-ink/10 text-brand-ink/55'
+                                  : 'bg-[#C0503A] text-white'
+                          }`}
+                        >
+                          {statusLabel(status)}
+                        </span>
+                        {late > 0 ? (
+                          <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
+                            {t('docs.overdueDays', { days: late })}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-5 py-4 text-brand-ink/60">{t('invoiceList.itemsCount', { count: item.items?.length || 0 })}</td>
-                    <td className="px-5 py-4 text-right font-semibold">{formatMoney(item.total, currency)}</td>
+                    <td className="px-5 py-4 text-right font-semibold">
+                      {formatMoney(status === 'cancelled' || status === 'draft' ? Number(item.total) || 0 : due, item.currency || currency)}
+                      {status === 'partial' ? <div className="text-xs font-normal text-brand-ink/40">{t('docs.remaining')}</div> : null}
+                    </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
-                        <Link
-                          to={`/app/invoices/${item.id}/edit`}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          {t('common.edit')}
-                        </Link>
-                        <button
-                          type="button"
-                          disabled={busyId === item.id}
-                          onClick={() => void onDelete(item.id)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#C0503A] hover:bg-[#F8E8E4]"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          {t('common.delete')}
-                        </button>
+                        {status !== 'cancelled' && status !== 'draft' && due > 0 ? (
+                          <button
+                            type="button"
+                            disabled={busyId === item.id}
+                            onClick={() => setPayId(item.id)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
+                          >
+                            {t('docs.recordPayment')}
+                          </button>
+                        ) : null}
+                        {status === 'draft' ? (
+                          <>
+                            <Link
+                              to={`/app/invoices/${item.id}/edit`}
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              {t('common.edit')}
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={busyId === item.id}
+                              onClick={() => void onDelete(item.id)}
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#C0503A] hover:bg-[#F8E8E4]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {t('common.delete')}
+                            </button>
+                          </>
+                        ) : (
+                          <Link
+                            to={`/app/invoices/${item.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
+                          >
+                            {t('invoiceList.view')}
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -354,6 +405,17 @@ export function InvoiceListPage() {
         >
           <iframe title="invoice-list-preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
         </Modal>
+      ) : null}
+
+      {payId ? (
+        <PaymentModal
+          doc={invoices.find((item) => item.id === payId) || { total: 0 }}
+          currency={invoices.find((item) => item.id === payId)?.currency || currency}
+          onClose={() => setPayId(null)}
+          onSave={async (payment) => {
+            await addInvoicePayment(payId, payment)
+          }}
+        />
       ) : null}
     </div>
   )

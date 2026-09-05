@@ -10,6 +10,9 @@ import { shareInvoiceListPdf } from '../pdf/generateInvoicePdf';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import SwipeableRow from '../components/SwipeableRow';
 import PdfPreviewModal from '../components/PdfPreviewModal';
+import SyncBanner from '../components/SyncBanner';
+import PaymentModal from '../components/PaymentModal';
+import { daysOverdue, isOverdue, paymentStatus, remainingOf } from '../utils/document';
 
 function sendCopy(filter, t) {
   if (filter === 'paid') {
@@ -22,26 +25,31 @@ function sendCopy(filter, t) {
 }
 
 export default function InvoiceListScreen({ navigation }) {
-  const { invoices, companyProfile, usage, updateInvoice, deleteInvoice } = useApp();
+  const { invoices, companyProfile, usage, deleteInvoice, addInvoicePayment } = useApp();
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('all');
   const [previewVisible, setPreviewVisible] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [payId, setPayId] = useState(null);
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
   const send = sendCopy(statusFilter, t);
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return invoices;
-    if (statusFilter === 'paid') return invoices.filter((inv) => inv.status === 'paid');
-    return invoices.filter((inv) => inv.status !== 'paid');
+    if (statusFilter === 'paid') return invoices.filter((inv) => paymentStatus(inv) === 'paid');
+    if (statusFilter === 'overdue') return invoices.filter((inv) => isOverdue(inv));
+    return invoices.filter((inv) => {
+      const status = paymentStatus(inv);
+      return status === 'unpaid' || status === 'partial';
+    });
   }, [invoices, statusFilter]);
 
   const unpaidInvoiceTotal = invoices
-    .filter((inv) => inv.status !== 'paid')
-    .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+    .filter((inv) => paymentStatus(inv) !== 'paid' && paymentStatus(inv) !== 'cancelled' && paymentStatus(inv) !== 'draft')
+    .reduce((sum, inv) => sum + remainingOf(inv), 0);
   const paidInvoiceTotal = invoices
-    .filter((inv) => inv.status === 'paid')
+    .filter((inv) => paymentStatus(inv) === 'paid')
     .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
 
   const previewHtml = useMemo(() => {
@@ -96,6 +104,9 @@ export default function InvoiceListScreen({ navigation }) {
           </Pressable>
         ) : null}
       </View>
+      <View style={{ paddingHorizontal: spacing.md }}>
+        <SyncBanner />
+      </View>
 
       {limitReached ? (
         <Pressable style={styles.limitBanner} onPress={() => navigation.navigate('Subscribe')}>
@@ -146,6 +157,14 @@ export default function InvoiceListScreen({ navigation }) {
               {t('invoiceDetail.statusPaid')}
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.filterItem, statusFilter === 'overdue' && styles.filterItemActive]}
+            onPress={() => setStatusFilter('overdue')}
+          >
+            <Text style={[styles.filterText, statusFilter === 'overdue' && styles.filterTextActive]}>
+              {t('docs.overdue')}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -160,18 +179,22 @@ export default function InvoiceListScreen({ navigation }) {
           </View>
         }
         renderItem={({ item }) => {
-          const paid = item.status === 'paid';
+          const status = paymentStatus(item);
+          const paid = status === 'paid';
+          const late = daysOverdue(item);
+          const due = remainingOf(item);
           return (
             <SwipeableRow
               paid={paid}
               labels={{
                 edit: t('common.edit'),
                 delete: t('common.delete'),
-                markPaid: t('invoiceDetail.statusPaid'),
+                markPaid: t('docs.recordPayment'),
                 markUnpaid: t('invoiceDetail.statusUnpaid'),
               }}
-              onEdit={() => navigation.navigate('EditInvoice', { invoiceId: item.id })}
+              onEdit={() => navigation.navigate(status === 'draft' ? 'EditInvoice' : 'InvoiceDetail', { invoiceId: item.id })}
               onDelete={() => {
+                if (status !== 'draft') return;
                 Alert.alert(t('invoiceList.deleteConfirmTitle'), t('invoiceList.deleteConfirmMessage'), [
                   { text: t('common.cancel'), style: 'cancel' },
                   {
@@ -181,7 +204,7 @@ export default function InvoiceListScreen({ navigation }) {
                   },
                 ]);
               }}
-              onTogglePaid={() => updateInvoice(item.id, { status: paid ? 'unpaid' : 'paid' })}
+              onTogglePaid={() => (due > 0 && status !== 'cancelled' && status !== 'draft' ? setPayId(item.id) : null)}
             >
               <Pressable
                 style={styles.card}
@@ -189,7 +212,7 @@ export default function InvoiceListScreen({ navigation }) {
               >
               <View style={styles.cardRow}>
                 <Text style={styles.invoiceNumber}>{item.number}</Text>
-                <Text style={styles.invoiceTotal}>{formatMoney(item.total, currency)}</Text>
+                <Text style={styles.invoiceTotal}>{formatMoney(status === 'cancelled' || status === 'draft' ? Number(item.total) || 0 : due, item.currency || currency)}</Text>
               </View>
               <Text style={styles.clientName}>{item.client?.fullName}</Text>
               <View style={styles.cardRow}>
@@ -198,22 +221,14 @@ export default function InvoiceListScreen({ navigation }) {
               </View>
               <View style={styles.subRow}>
                 <Text style={typography.muted}>{item.dueDate || t('pdf.onReceipt')}</Text>
-                <Pressable
-                  onPress={() => updateInvoice(item.id, { status: paid ? 'unpaid' : 'paid' })}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityHint={paid ? undefined : t('invoiceList.tapToMarkPaid')}
-                  style={[styles.statusChip, paid ? styles.statusPaid : styles.statusUnpaid]}
-                >
-                  <Ionicons
-                    name={paid ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={16}
-                    color={paid ? colors.success : '#fff'}
-                  />
-                  <Text style={paid ? styles.statusPaidText : styles.statusUnpaidText}>
-                    {paid ? t('invoiceDetail.statusPaid') : t('invoiceDetail.statusUnpaid')}
-                  </Text>
-                </Pressable>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <View style={[styles.statusChip, paid ? styles.statusPaid : status === 'partial' ? styles.statusPartial : styles.statusUnpaid]}>
+                    <Text style={paid || status === 'partial' ? styles.statusPaidText : styles.statusUnpaidText}>
+                      {paid ? t('invoiceDetail.statusPaid') : status === 'partial' ? t('docs.statusPartial') : status === 'draft' ? t('docs.statusDraft') : status === 'cancelled' ? t('docs.statusCancelled') : t('invoiceDetail.statusUnpaid')}
+                    </Text>
+                  </View>
+                  {late > 0 ? <Text style={styles.overdue}>{t('docs.overdueDays', { days: late })}</Text> : null}
+                </View>
               </View>
               </Pressable>
             </SwipeableRow>
@@ -243,6 +258,13 @@ export default function InvoiceListScreen({ navigation }) {
         sendLabel={t('common.send')}
         onCancel={() => setPreviewVisible(false)}
         onSend={onShareList}
+      />
+      <PaymentModal
+        visible={Boolean(payId)}
+        doc={invoices.find((item) => item.id === payId)}
+        currency={invoices.find((item) => item.id === payId)?.currency || currency}
+        onClose={() => setPayId(null)}
+        onSave={(payment) => addInvoicePayment(payId, payment)}
       />
     </View>
   );
@@ -346,6 +368,8 @@ const styles = StyleSheet.create({
   },
   statusUnpaid: { backgroundColor: colors.danger },
   statusPaid: { backgroundColor: '#E7F4EA' },
+  statusPartial: { backgroundColor: '#FFF4D6' },
+  overdue: { marginTop: 4, color: colors.danger, fontSize: 11, fontWeight: '700' },
   statusUnpaidText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   statusPaidText: { color: colors.success, fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.lg },

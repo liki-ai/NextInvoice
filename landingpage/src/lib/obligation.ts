@@ -1,6 +1,7 @@
 import { formatDateForInvoice, toNumber } from './invoice'
+import { paymentStatus, remainingOf, type Payment } from './document'
 
-export type ObligationStatus = 'paid' | 'unpaid'
+export type ObligationStatus = 'paid' | 'unpaid' | 'partial' | 'cancelled'
 
 export const OBLIGATION_CATEGORIES = ['shipping', 'supplies', 'rent', 'tax', 'other'] as const
 export type ObligationCategory = (typeof OBLIGATION_CATEGORIES)[number]
@@ -20,12 +21,19 @@ export type Obligation = {
   proofMime?: string
   proofData?: string
   proofUri?: string
+  payments?: Payment[]
+  amountPaid?: number
+  amountDue?: number
+  currency?: string
   createdAt?: string
   updatedAt?: string
 }
 
-export function obligationStatus(item: Pick<Obligation, 'status'> | null | undefined): ObligationStatus {
-  return item?.status === 'paid' ? 'paid' : 'unpaid'
+export function obligationStatus(item: Pick<Obligation, 'status' | 'amount' | 'payments'> | null | undefined): ObligationStatus {
+  if (!item) return 'unpaid'
+  const status = paymentStatus({ ...item, total: item.amount })
+  if (status === 'draft') return 'unpaid'
+  return status
 }
 
 export function isObligationCategory(value: unknown): value is ObligationCategory {
@@ -49,9 +57,10 @@ export function vendorSummaries(obligations: Obligation[]) {
     const name = item.vendor?.trim() || ''
     const key = name.toLowerCase() || '_'
     const current = map.get(key) || { vendor: name || '—', unpaid: 0, paid: 0, count: 0 }
-    const amount = Number(item.amount) || 0
-    if (obligationStatus(item) === 'paid') current.paid += amount
-    else current.unpaid += amount
+    const amount = remainingOf({ ...item, total: item.amount })
+    const status = obligationStatus(item)
+    if (status === 'paid') current.paid += Number(item.amount) || 0
+    else if (status !== 'cancelled') current.unpaid += amount
     current.count += 1
     map.set(key, current)
   }

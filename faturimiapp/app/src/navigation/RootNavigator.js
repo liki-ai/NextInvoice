@@ -9,6 +9,8 @@ import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import NewInvoiceScreen from '../screens/NewInvoiceScreen';
 import ObligationListScreen from '../screens/ObligationListScreen';
 import ObligationFormScreen from '../screens/ObligationFormScreen';
+import OverviewScreen from '../screens/OverviewScreen';
+import OverviewDrillScreen from '../screens/OverviewDrillScreen';
 import StatementScreen from '../screens/StatementScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SubscribeScreen from '../screens/SubscribeScreen';
@@ -18,6 +20,7 @@ import { colors } from '../theme';
 const Tab = createBottomTabNavigator();
 const InvoicesStack = createNativeStackNavigator();
 const ObligationsStack = createNativeStackNavigator();
+const OverviewStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 
 function InvoicesStackNavigator() {
@@ -78,6 +81,46 @@ function ObligationsStackNavigator() {
   );
 }
 
+function OverviewStackNavigator() {
+  const { t } = useTranslation();
+  return (
+    <OverviewStack.Navigator>
+      <OverviewStack.Screen
+        name="OverviewHome"
+        component={OverviewScreen}
+        options={{ title: t('overview.title') }}
+      />
+      <OverviewStack.Screen
+        name="OverviewDrill"
+        component={OverviewDrillScreen}
+        options={{ title: t('overview.title') }}
+      />
+      <OverviewStack.Screen
+        name="InvoiceDetail"
+        component={InvoiceDetailScreen}
+        options={{ title: t('invoiceDetail.title') }}
+      />
+      <OverviewStack.Screen
+        name="EditInvoice"
+        component={NewInvoiceScreen}
+        options={{ title: t('invoiceDetail.editTitle') }}
+      />
+      <OverviewStack.Screen
+        name="ObligationForm"
+        component={ObligationFormScreen}
+        options={({ route }) => ({
+          title: route?.params?.obligationId ? t('obligations.editTitle') : t('obligations.newTitle'),
+        })}
+      />
+      <OverviewStack.Screen
+        name="Statement"
+        component={StatementScreen}
+        options={{ title: t('statement.title') }}
+      />
+    </OverviewStack.Navigator>
+  );
+}
+
 function ProfileStackNavigator() {
   const { t } = useTranslation();
   return (
@@ -121,15 +164,6 @@ export default function RootNavigator() {
         }}
       >
         <Tab.Screen
-          name="Obligations"
-          component={ObligationsStackNavigator}
-          options={{
-            title: t('tabs.obligations'),
-            tabBarLabel: t('tabs.obligations'),
-            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="wallet" outline="wallet-outline" />,
-          }}
-        />
-        <Tab.Screen
           name="Invoices"
           component={InvoicesStackNavigator}
           options={{
@@ -141,12 +175,32 @@ export default function RootNavigator() {
           }}
         />
         <Tab.Screen
+          name="Obligations"
+          component={ObligationsStackNavigator}
+          options={{
+            title: t('tabs.obligations'),
+            tabBarLabel: t('tabs.obligations'),
+            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="wallet" outline="wallet-outline" />,
+          }}
+        />
+        <Tab.Screen
+          name="Overview"
+          component={OverviewStackNavigator}
+          options={{
+            title: t('tabs.overview'),
+            tabBarLabel: t('tabs.overview'),
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused} name="stats-chart" outline="stats-chart-outline" />
+            ),
+          }}
+        />
+        <Tab.Screen
           name="Profile"
           component={ProfileStackNavigator}
           options={{
             title: t('tabs.profile'),
             tabBarLabel: t('tabs.profile'),
-            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="person" outline="person-outline" />,
+            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="settings" outline="settings-outline" />,
           }}
         />
       </Tab.Navigator>

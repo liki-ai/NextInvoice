@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
+import { Button, Card, Field, Modal, Select, TextArea } from '../../components/ui'
 import {
   buildInvoiceHtml,
   computeTotals,
@@ -11,11 +11,9 @@ import {
   formatMoney,
   generateId,
   generateInvoiceNumber,
-  uniqueClients,
   draftFromInvoice,
   toNumber,
   type InvoiceItem,
-  type InvoiceStatus,
 } from '../../lib/invoice'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
@@ -27,7 +25,7 @@ function emptyItem(): InvoiceItem {
 
 export function InvoiceFormPage() {
   const { invoiceId } = useParams()
-  const { invoices, profile, createInvoice, updateInvoice } = useAppData()
+  const { invoices, clients, profile, createInvoice, updateInvoice, issueInvoice, correctInvoice, createClient } = useAppData()
   const { t, dict } = useI18n()
   const navigate = useNavigate()
   const existing = invoiceId ? invoices.find((inv) => inv.id === invoiceId) : null
@@ -37,11 +35,11 @@ export function InvoiceFormPage() {
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [aiText, setAiText] = useState('')
   const [extracting, setExtracting] = useState(false)
-  const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '' })
+  const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' })
+  const [clientId, setClientId] = useState(existing?.clientId || '')
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()))
   const [dueDate, setDueDate] = useState(() => existing?.dueDate || '')
-  const [status, setStatus] = useState<InvoiceStatus>(() => existing?.status || 'unpaid')
   const [items, setItems] = useState<InvoiceItem[]>(() =>
     existing?.items?.length
       ? existing.items.map((it) => ({
@@ -60,11 +58,11 @@ export function InvoiceFormPage() {
 
   useEffect(() => {
     if (!existing) return
-    setClient(existing.client || { fullName: '', address: '', phone: '' })
+    setClient(existing.client || { fullName: '', address: '', phone: '', email: '', businessId: '' })
+    setClientId(existing.clientId || '')
     setInvoiceNumber(existing.number)
     setDate(existing.date)
     setDueDate(existing.dueDate || '')
-    setStatus(existing.status || 'unpaid')
     setItems(
       existing.items?.length
         ? existing.items.map((it) => ({
@@ -87,11 +85,11 @@ export function InvoiceFormPage() {
     if (!source) return
 
     const draftCopy = draftFromInvoice(source, invoices)
-    setClient({ ...draftCopy.client })
+    setClient({ ...draftCopy.client, email: draftCopy.client.email || '', businessId: draftCopy.client.businessId || '' })
+    setClientId(source.clientId || '')
     setInvoiceNumber(draftCopy.number)
     setDate(draftCopy.date)
     setDueDate(draftCopy.dueDate || '')
-    setStatus(draftCopy.status || 'unpaid')
     setItems(
       (source.items || []).map((it) => ({
         id: generateId(),
@@ -106,15 +104,16 @@ export function InvoiceFormPage() {
 
   const currency = profile?.currency || 'EUR'
   const { subtotal, total } = computeTotals(items, discount)
-  const saveLabel = isEditing ? t('newInvoice.saveChanges') : t('newInvoice.saveAndShare')
-  const recentClients = useMemo(() => uniqueClients(invoices), [invoices])
+  const issued = existing && existing.lifecycle !== 'draft'
+  const [correctReason, setCorrectReason] = useState('')
+  const saveLabel = issued ? t('docs.correct') : isEditing ? t('newInvoice.saveChanges') : t('docs.issue')
+  const [savingDraft, setSavingDraft] = useState(false)
 
   const draft = useMemo(
     () => ({
       number: invoiceNumber,
       date,
       dueDate,
-      status,
       client,
       items,
       discount,
@@ -122,7 +121,7 @@ export function InvoiceFormPage() {
       subtotal,
       total,
     }),
-    [invoiceNumber, date, dueDate, status, client, items, discount, notes, subtotal, total],
+    [invoiceNumber, date, dueDate, client, items, discount, notes, subtotal, total],
   )
 
   const previewHtml = useMemo(() => {
@@ -152,7 +151,10 @@ export function InvoiceFormPage() {
         fullName: result.fullName || '',
         address: result.address || '',
         phone: result.phone || '',
+        email: '',
+        businessId: '',
       })
+      setClientId('')
     } catch {
       setError(t('newInvoice.aiExtractError'))
     } finally {
@@ -175,8 +177,8 @@ export function InvoiceFormPage() {
       number: invoiceNumber,
       date,
       dueDate,
-      status,
-      client,
+      client: { ...client, id: clientId },
+      clientId,
       items: validItems,
       discount,
       notes,
@@ -185,17 +187,41 @@ export function InvoiceFormPage() {
     }
   }
 
-  async function onSave() {
+  async function persistClient() {
+    if (!client.fullName.trim()) return clientId
+    if (clientId) return clientId
+    const saved = await createClient({
+      fullName: client.fullName.trim(),
+      address: client.address || '',
+      phone: client.phone || '',
+      email: client.email || '',
+      businessId: client.businessId || '',
+    })
+    setClientId(saved.id)
+    return saved.id
+  }
+
+  async function onSave(asDraft = false) {
     const invoice = validate()
     if (!invoice) return
+    if (issued && !correctReason.trim()) {
+      setError(t('docs.correctReason'))
+      return
+    }
     setSaving(true)
     setError('')
     try {
-      if (isEditing && invoiceId) {
-        await updateInvoice(invoiceId, invoice)
+      const savedClientId = await persistClient()
+      const payload = { ...invoice, clientId: savedClientId, lifecycle: asDraft ? ('draft' as const) : ('issued' as const) }
+      if (issued && invoiceId) {
+        await correctInvoice(invoiceId, { items: payload.items, discount: payload.discount, notes: payload.notes, reason: correctReason.trim() })
+        navigate(`/app/invoices/${invoiceId}`)
+      } else if (isEditing && invoiceId) {
+        await updateInvoice(invoiceId, payload)
+        if (!asDraft) await issueInvoice(invoiceId)
         navigate(`/app/invoices/${invoiceId}`)
       } else {
-        const saved = await createInvoice(invoice)
+        const saved = await createInvoice(payload)
         navigate(`/app/invoices/${saved.id}`)
       }
     } catch (err) {
@@ -206,6 +232,7 @@ export function InvoiceFormPage() {
       }
     } finally {
       setSaving(false)
+      setSavingDraft(false)
     }
   }
 
@@ -257,31 +284,47 @@ export function InvoiceFormPage() {
         <div className="space-y-6">
           <Card>
             <h2 className="mb-4 font-semibold">{t('newInvoice.clientSectionTitle')}</h2>
+            <Select
+              label={t('docs.pickClient')}
+              value={clientId}
+              onChange={(e) => {
+                const id = e.target.value
+                setClientId(id)
+                const match = clients.find((item) => item.id === id)
+                if (match) {
+                  setClient({
+                    fullName: match.fullName || '',
+                    address: match.address || '',
+                    phone: match.phone || '',
+                    email: match.email || '',
+                    businessId: match.businessId || '',
+                  })
+                }
+              }}
+            >
+              <option value="">{t('docs.newClient')}</option>
+              {clients.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.fullName}{item.phone ? ` · ${item.phone}` : ''}
+                </option>
+              ))}
+            </Select>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <Field
                   label={t('newInvoice.fullName')}
                   value={client.fullName}
                   placeholder={t('newInvoice.phFullName')}
-                  list="recentClientNames"
                   onChange={(e) => {
-                    const value = e.target.value
-                    const match = recentClients.find((c) => c.fullName.trim().toLowerCase() === value.trim().toLowerCase())
-                    setClient((c) => ({
-                      ...c,
-                      fullName: value,
-                      ...(match ? { address: match.address, phone: match.phone } : {}),
-                    }))
+                    setClientId('')
+                    setClient((c) => ({ ...c, fullName: e.target.value }))
                   }}
                 />
-                <datalist id="recentClientNames">
-                  {recentClients.map((c) => (
-                    <option key={c.fullName} value={c.fullName} />
-                  ))}
-                </datalist>
               </div>
               <Field label={t('newInvoice.address')} value={client.address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setClient((c) => ({ ...c, address: e.target.value }))} />
               <Field label={t('newInvoice.phone')} value={client.phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))} />
+              <Field label={t('docs.email')} value={client.email || ''} onChange={(e) => setClient((c) => ({ ...c, email: e.target.value }))} />
+              <Field label={t('docs.businessId')} value={client.businessId || ''} onChange={(e) => setClient((c) => ({ ...c, businessId: e.target.value }))} />
             </div>
           </Card>
 
@@ -363,13 +406,27 @@ export function InvoiceFormPage() {
                 <span>{formatMoney(total, currency)}</span>
               </div>
             </div>
+            {issued ? <Field label={t('docs.correctReason')} value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} /> : null}
             {error ? <p className="mt-4 text-sm text-[#C0503A]">{error}</p> : null}
             <div className="mt-5 flex flex-col gap-2">
               <Button type="button" variant="secondary" onClick={() => (validate() ? setPreview(true) : null)}>
                 <Eye className="h-4 w-4" />
                 {t('newInvoice.preview')}
               </Button>
-              <Button type="button" disabled={saving} onClick={onSave}>
+              {!issued ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={saving || savingDraft}
+                  onClick={() => {
+                    setSavingDraft(true)
+                    void onSave(true)
+                  }}
+                >
+                  {savingDraft ? t('common.loading') : t('docs.saveDraft')}
+                </Button>
+              ) : null}
+              <Button type="button" disabled={saving} onClick={() => void onSave(false)}>
                 {saving ? t('common.loading') : saveLabel}
               </Button>
             </div>
@@ -386,7 +443,7 @@ export function InvoiceFormPage() {
               <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
                 {t('common.close')}
               </Button>
-              <Button type="button" disabled={saving} onClick={onSave}>
+              <Button type="button" disabled={saving} onClick={() => void onSave(false)}>
                 {saveLabel}
               </Button>
             </>

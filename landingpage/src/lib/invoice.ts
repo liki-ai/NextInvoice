@@ -1,4 +1,6 @@
-export type Client = { fullName: string; address: string; phone: string }
+import { paymentStatus, remainingOf } from './document'
+
+export type Client = { id?: string; fullName: string; address: string; phone: string; email?: string; businessId?: string }
 
 export type InvoiceItem = {
   id: string
@@ -7,7 +9,7 @@ export type InvoiceItem = {
   unitPrice: string | number
 }
 
-export type InvoiceStatus = 'paid' | 'unpaid'
+export type InvoiceStatus = 'draft' | 'unpaid' | 'partial' | 'paid' | 'cancelled'
 
 export type Invoice = {
   id: string
@@ -15,12 +17,24 @@ export type Invoice = {
   date: string
   dueDate?: string
   status?: InvoiceStatus
+  lifecycle?: 'draft' | 'issued' | 'cancelled'
   client: Client
+  clientId?: string
+  clientSnapshot?: Client
+  companySnapshot?: CompanyProfile | null
+  snapshotSource?: 'issued' | 'migrated'
+  currency?: string
   items: InvoiceItem[]
   discount: string | number
   notes?: string
   subtotal: number
   total: number
+  amountPaid?: number
+  amountDue?: number
+  payments?: import('./document').Payment[]
+  cancelReason?: string
+  cancelledAt?: string
+  issuedAt?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -93,8 +107,9 @@ export function computeTotals(items: InvoiceItem[], discount: unknown) {
   return { subtotal, total }
 }
 
-export function invoiceStatus(invoice: Pick<Invoice, 'status'> | null | undefined): InvoiceStatus {
-  return invoice?.status === 'paid' ? 'paid' : 'unpaid'
+export function invoiceStatus(invoice: Pick<Invoice, 'status' | 'lifecycle' | 'total' | 'payments'> | null | undefined): InvoiceStatus {
+  if (!invoice) return 'unpaid'
+  return paymentStatus(invoice)
 }
 
 export function uniqueClients(invoices: Invoice[]): Client[] {
@@ -142,10 +157,10 @@ export function clientUnpaidSummaries(invoices: Invoice[]): ClientUnpaidSummary[
       group = { client: inv.client, unpaid: [], unpaidCount: 0, unpaidTotal: 0, paidTotal: 0 }
       groups.set(key, group)
     }
-    const total = Number(inv.total) || 0
+    const total = remainingOf(inv)
     if (invoiceStatus(inv) === 'paid') {
-      group.paidTotal += total
-    } else {
+      group.paidTotal += Number(inv.total) || 0
+    } else if (invoiceStatus(inv) !== 'cancelled' && invoiceStatus(inv) !== 'draft') {
       group.unpaid.push(inv)
       group.unpaidCount += 1
       group.unpaidTotal += total
@@ -204,11 +219,13 @@ export function buildInvoiceHtml({
 }: {
   company: CompanyProfile
   client: Client
-  invoice: Pick<Invoice, 'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'notes'>
+  invoice: Pick<Invoice, 'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency'>
   pdfLabels: Record<string, string>
 }) {
   const items = invoice.items || []
-  const { subtotal, total } = computeTotals(items, invoice.discount)
+    const { subtotal, total } = computeTotals(items, invoice.discount)
+    const paid = remainingOf(invoice) === 0 && paymentStatus(invoice) !== 'draft' ? total : total - remainingOf(invoice)
+    const due = remainingOf(invoice)
   const symbol = currencySymbol(company.currency)
   const exportNote = resolveExportNote(company)
   const rows = items
@@ -277,6 +294,8 @@ export function buildInvoiceHtml({
         <p><strong>${escapeHtml(pdfLabels.fullNameLabel)}:</strong> ${escapeHtml(client.fullName)}</p>
         <p><strong>${escapeHtml(pdfLabels.addressLabel)}:</strong> ${escapeHtml(client.address)}</p>
         <p><strong>${escapeHtml(pdfLabels.phoneLabel)}:</strong> ${escapeHtml(client.phone)}</p>
+        ${client.email ? `<p><strong>${escapeHtml(pdfLabels.emailLabel || 'Email')}:</strong> ${escapeHtml(client.email)}</p>` : ''}
+        ${client.businessId ? `<p><strong>${escapeHtml(pdfLabels.nuiLabel)}:</strong> ${escapeHtml(client.businessId)}</p>` : ''}
       </div>
     </div>
     <table>
@@ -294,6 +313,7 @@ export function buildInvoiceHtml({
       <div><span>${escapeHtml(pdfLabels.subtotal)}</span><span>${formatMoney(subtotal, company.currency)}</span></div>
       <div><span>${escapeHtml(pdfLabels.discount)}</span><span>${formatMoney(toNumber(invoice.discount), company.currency)}</span></div>
       <div class="total-row"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, company.currency)}</span></div>
+      ${due > 0 && due < total ? `<div><span>${escapeHtml(pdfLabels.amountPaid || '')}</span><span>${formatMoney(paid, company.currency)}</span></div><div class="total-row"><span>${escapeHtml(pdfLabels.amountDue || pdfLabels.total)}</span><span>${formatMoney(due, company.currency)}</span></div>` : ''}
     </div>
     ${invoice.notes ? `<div class="notes">${escapeHtml(invoice.notes)}</div>` : ''}
     ${company.bankName || company.iban ? `<div class="payment"><div class="block-title">${escapeHtml(pdfLabels.paymentInfo)}</div>${company.bankName ? `<p>${escapeHtml(pdfLabels.bankName)}: ${escapeHtml(company.bankName)}</p>` : ''}${company.iban ? `<p>${escapeHtml(pdfLabels.ibanLabel)}: ${escapeHtml(company.iban)}</p>` : ''}</div>` : ''}
@@ -363,7 +383,7 @@ export function buildStatementHtml({
   const currency = company.currency || 'EUR'
   const symbol = currencySymbol(currency)
   const exportNote = resolveExportNote(company)
-  const unpaidTotal = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0)
+  const unpaidTotal = invoices.reduce((sum, inv) => sum + remainingOf(inv), 0)
   const payments = Number(paidTotal) || 0
   const dateLabel = issuedDate || formatStatementFileDate(new Date())
   const cityLine = [company.zipCode, company.state].filter(Boolean).join(' ')
@@ -595,7 +615,11 @@ export function buildInvoiceListHtml({
     number?: string
     date?: string
     status?: string
+    lifecycle?: string
     total?: number
+    amountDue?: number
+    payments?: import('./document').Payment[]
+    currency?: string
     client?: { fullName?: string }
   }>
   issuedDate?: string
@@ -605,17 +629,32 @@ export function buildInvoiceListHtml({
   const dateLabel = issuedDate || formatStatementFileDate(new Date())
   const cityLine = [company.zipCode, company.state].filter(Boolean).join(' ')
   const nuiLabel = pdfLabels.pivaLabel || pdfLabels.nuiLabel
-  const total = invoices.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
+  const total = invoices.reduce((sum, item) => {
+    if (item.status === 'cancelled' || item.lifecycle === 'cancelled') return sum
+    return sum + remainingOf(item as Invoice)
+  }, 0)
   const rows = invoices
-    .map(
-      (item) => `<tr>
+    .map((item) => {
+      const status = paymentStatus(item as Invoice)
+      const statusLabel =
+        status === 'paid'
+          ? pdfLabels.statusPaid || 'Paid'
+          : status === 'partial'
+            ? pdfLabels.statusPartial || 'Partial'
+            : status === 'cancelled'
+              ? pdfLabels.statusCancelled || 'Cancelled'
+              : status === 'draft'
+                ? pdfLabels.statusDraft || 'Draft'
+                : pdfLabels.statusUnpaid || 'Unpaid'
+      const amount = status === 'cancelled' || status === 'draft' ? Number(item.total) || 0 : remainingOf(item as Invoice)
+      return `<tr>
         <td>${escapeHtml(item.number || '')}</td>
         <td>${escapeHtml(item.client?.fullName || '')}</td>
         <td>${escapeHtml(item.date || '')}</td>
-        <td>${escapeHtml(item.status === 'paid' ? pdfLabels.statusPaid || 'Paid' : pdfLabels.statusUnpaid || 'Unpaid')}</td>
-        <td class="right">${formatMoney(Number(item.total) || 0, currency)}</td>
-      </tr>`,
-    )
+        <td>${escapeHtml(statusLabel)}</td>
+        <td class="right">${formatMoney(amount, item.currency || currency)}</td>
+      </tr>`
+    })
     .join('')
 
   return `<!DOCTYPE html>
@@ -663,6 +702,132 @@ export function buildInvoiceListHtml({
       <tbody>${rows}</tbody>
     </table>
     <div class="totals"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, currency)}</span></div>
+  </body>
+  </html>`
+}
+
+export function overviewFileName(date: Date | string = new Date()) {
+  return `pasqyra-${formatStatementFileDate(date)}.pdf`
+}
+
+export function buildOverviewHtml({
+  company,
+  report,
+  periodText,
+  issuedDate,
+  pdfLabels,
+  notes = [],
+}: {
+  company: CompanyProfile
+  report: {
+    currency: string
+    invoiced: number
+    paymentsReceived: number
+    obligationsRecorded: number
+    paymentsMade: number
+    receivables: number
+    payables: number
+    netPayments: number
+    period: { endIso?: string }
+    customers: Array<{ client?: { fullName?: string }; amount: number }>
+    overduePayables: Array<{ vendor?: string; dueDate?: string; amountDueAsOf?: number; daysOverdueAsOf?: number }>
+  }
+  periodText: string
+  issuedDate?: string
+  pdfLabels: Record<string, string>
+  notes?: string[]
+}) {
+  const currency = report.currency || company.currency || 'EUR'
+  const dateLabel = issuedDate || formatStatementFileDate(new Date())
+  const cityLine = [company.zipCode, company.state].filter(Boolean).join(' ')
+  const nuiLabel = pdfLabels.pivaLabel || pdfLabels.nuiLabel
+  const summaryRows = [
+    [pdfLabels.invoiced, report.invoiced],
+    [pdfLabels.received, report.paymentsReceived],
+    [pdfLabels.obligationsRecorded, report.obligationsRecorded],
+    [pdfLabels.paidOut, report.paymentsMade],
+    [pdfLabels.receivables, report.receivables],
+    [pdfLabels.payables, report.payables],
+    [pdfLabels.netPayments, report.netPayments],
+  ]
+    .map(
+      ([label, amount]) =>
+        `<tr><td>${escapeHtml(String(label))}</td><td class="right">${formatMoney(Number(amount) || 0, currency)}</td></tr>`,
+    )
+    .join('')
+  const customerRows = (report.customers || [])
+    .map(
+      (item) =>
+        `<tr><td>${escapeHtml(item.client?.fullName || '')}</td><td class="right">${formatMoney(item.amount, currency)}</td></tr>`,
+    )
+    .join('')
+  const overdueRows = (report.overduePayables || [])
+    .map(
+      (item) =>
+        `<tr><td>${escapeHtml(item.vendor || '')}</td><td>${escapeHtml(item.dueDate || '')}</td><td class="right">${formatMoney(item.amountDueAsOf || 0, currency)}</td></tr>`,
+    )
+    .join('')
+  const noteBlock = notes.length
+    ? `<div class="notes"><div class="block-title">${escapeHtml(pdfLabels.limitationTitle || '')}</div>${notes
+        .map((note) => `<p>${escapeHtml(note)}</p>`)
+        .join('')}</div>`
+    : ''
+
+  return `<!DOCTYPE html>
+  <html lang="sq">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1D2B2E; padding: 20px; font-size: 12px; }
+      .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 3px solid #2C6E7F; padding-bottom: 16px; margin-bottom: 18px; }
+      .company-block h1 { margin: 0 0 6px 0; font-size: 20px; color: #1F4E5A; text-transform: uppercase; }
+      .company-block p { margin: 2px 0; color: #444; }
+      .invoice-meta { text-align: right; }
+      .invoice-meta h2 { margin: 0 0 8px 0; font-size: 18px; color: #2C6E7F; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      thead tr { background: #2C6E7F; color: #fff; }
+      th, td { padding: 6px 7px; border-bottom: 1px solid #E1E6E7; text-align: left; font-size: 11px; }
+      th.right, td.right { text-align: right; }
+      h3 { margin: 18px 0 8px; font-size: 13px; color: #1F4E5A; text-transform: uppercase; letter-spacing: 0.04em; }
+      .notes { margin-top: 16px; padding: 10px 12px; background: #F8E8E4; border-radius: 8px; }
+      .notes p { margin: 4px 0; color: #7A3B2E; }
+      .block-title { font-weight: 700; margin-bottom: 6px; }
+      .hint { color: #6B7A7D; margin: 0 0 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="top-row">
+      <div class="company-block">
+        <h1>${escapeHtml(company.companyName)}</h1>
+        ${company.streetAddress ? `<p>${escapeHtml(company.streetAddress)}</p>` : ''}
+        ${cityLine ? `<p>${escapeHtml(cityLine)}</p>` : ''}
+        ${company.nui ? `<p>${escapeHtml(nuiLabel)} ${escapeHtml(company.nui)}</p>` : ''}
+      </div>
+      <div class="invoice-meta">
+        <h2>${escapeHtml(pdfLabels.pdfTitle || pdfLabels.listTitle || 'Overview')}</h2>
+        <p>${escapeHtml(pdfLabels.period || '')}: ${escapeHtml(periodText)}</p>
+        <p>${escapeHtml(pdfLabels.asOf || '')}: ${escapeHtml(report.period?.endIso || dateLabel)}</p>
+        <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(dateLabel)}</p>
+        <p>${escapeHtml(currency)}</p>
+      </div>
+    </div>
+    <p class="hint">${escapeHtml(pdfLabels.netHint || '')}</p>
+    <table>
+      <thead><tr><th>${escapeHtml(pdfLabels.summary || '')}</th><th class="right">${escapeHtml(pdfLabels.sum)}</th></tr></thead>
+      <tbody>${summaryRows}</tbody>
+    </table>
+    <h3>${escapeHtml(pdfLabels.customers || '')}</h3>
+    <table>
+      <thead><tr><th>${escapeHtml(pdfLabels.clientLabel)}</th><th class="right">${escapeHtml(pdfLabels.sum)}</th></tr></thead>
+      <tbody>${customerRows || `<tr><td colspan="2">${escapeHtml(pdfLabels.empty || '')}</td></tr>`}</tbody>
+    </table>
+    <h3>${escapeHtml(pdfLabels.overdue || '')}</h3>
+    <table>
+      <thead><tr><th>${escapeHtml(pdfLabels.vendor || '')}</th><th>${escapeHtml(pdfLabels.dateLabel)}</th><th class="right">${escapeHtml(pdfLabels.sum)}</th></tr></thead>
+      <tbody>${overdueRows || `<tr><td colspan="3">${escapeHtml(pdfLabels.empty || '')}</td></tr>`}</tbody>
+    </table>
+    ${noteBlock}
   </body>
   </html>`
 }

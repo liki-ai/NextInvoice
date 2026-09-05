@@ -1,7 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { buildInvoiceHtml, buildStatementHtml, buildPaidObligationsHtml, buildInvoiceListHtml, statementFileName, invoiceListFileName, obligationsListFileName } from './invoiceTemplate';
+import { buildInvoiceHtml, buildStatementHtml, buildPaidObligationsHtml, buildInvoiceListHtml, buildOverviewHtml, statementFileName, invoiceListFileName, obligationsListFileName, overviewFileName } from './invoiceTemplate';
 
 function sanitizeFileName(value) {
   const cleaned = String(value || '')
@@ -110,6 +110,27 @@ export async function shareInvoiceListPdf({ company, invoices, issuedDate, pdfLa
   const html = buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels });
   const { uri } = await Print.printToFileAsync({ html, base64: false });
   const fileName = invoiceListFileName(kind, issuedDate);
+  const dest = `${FileSystem.cacheDirectory}${fileName}`;
+  const existing = await FileSystem.getInfoAsync(dest);
+  if (existing.exists) {
+    await FileSystem.deleteAsync(dest, { idempotent: true });
+  }
+  await FileSystem.copyAsync({ from: uri, to: dest });
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(dest, {
+      mimeType: 'application/pdf',
+      dialogTitle: fileName,
+      UTI: 'com.adobe.pdf',
+    });
+  }
+  return dest;
+}
+
+export async function shareOverviewPdf({ company, report, periodText, issuedDate, pdfLabels, notes = [] }) {
+  const html = buildOverviewHtml({ company, report, periodText, issuedDate, pdfLabels, notes });
+  const { uri } = await Print.printToFileAsync({ html, base64: false });
+  const fileName = overviewFileName(issuedDate);
   const dest = `${FileSystem.cacheDirectory}${fileName}`;
   const existing = await FileSystem.getInfoAsync(dest);
   if (existing.exists) {
