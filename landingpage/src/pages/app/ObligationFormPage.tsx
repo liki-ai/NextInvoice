@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Trash2 } from 'lucide-react'
+import { Calendar, Link2, StickyNote, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Select, TextArea } from '../../components/ui'
-import { formatMoney } from '../../lib/invoice'
+import { formatDateForInvoice, formatMoney } from '../../lib/invoice'
 import {
   OBLIGATION_CATEGORIES,
   emptyObligationDraft,
@@ -13,6 +13,21 @@ import {
   type ObligationCategory,
   type ObligationStatus,
 } from '../../lib/obligation'
+
+function toDateInputValue(display: string) {
+  if (!display) return ''
+  const parsed = new Date(display)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function fromDateInputValue(iso: string) {
+  if (!iso) return ''
+  return formatDateForInvoice(new Date(`${iso}T12:00:00`))
+}
 
 export function ObligationFormPage() {
   const { obligationId } = useParams()
@@ -25,31 +40,36 @@ export function ObligationFormPage() {
   const vendors = useMemo(() => uniqueVendors(obligations), [obligations])
 
   const [vendor, setVendor] = useState(existing?.vendor || '')
-  const [description, setDescription] = useState(existing?.description || '')
   const [amount, setAmount] = useState(existing ? String(existing.amount ?? '') : '')
   const [date, setDate] = useState(existing?.date || emptyObligationDraft().date)
   const [dueDate, setDueDate] = useState(existing?.dueDate || '')
   const [status, setStatus] = useState<ObligationStatus>(existing?.status || 'unpaid')
   const [category, setCategory] = useState<ObligationCategory>(existing?.category || 'shipping')
-  const [notes, setNotes] = useState(existing?.notes || '')
+  const [notes, setNotes] = useState(existing?.notes || existing?.description || '')
   const [relatedInvoiceId, setRelatedInvoiceId] = useState(existing?.relatedInvoiceId || '')
+  const [showNotes, setShowNotes] = useState(Boolean(existing?.notes || existing?.description))
+  const [showDueDate, setShowDueDate] = useState(Boolean(existing?.dueDate))
+  const [showInvoices, setShowInvoices] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!existing) return
     setVendor(existing.vendor || '')
-    setDescription(existing.description || '')
     setAmount(String(existing.amount ?? ''))
     setDate(existing.date || emptyObligationDraft().date)
     setDueDate(existing.dueDate || '')
     setStatus(existing.status || 'unpaid')
     setCategory(existing.category || 'other')
-    setNotes(existing.notes || '')
+    setNotes(existing.notes || existing.description || '')
     setRelatedInvoiceId(existing.relatedInvoiceId || '')
+    setShowNotes(Boolean(existing.notes || existing.description))
+    setShowDueDate(Boolean(existing.dueDate))
+    setShowInvoices(false)
   }, [existing?.id])
 
   const parsedAmount = parseObligationAmount(amount)
+  const relatedInvoice = invoices.find((inv) => inv.id === relatedInvoiceId)
 
   if (isEditing && !existing) {
     return <p className="text-brand-ink/60">{loading ? t('common.loading') : t('obligations.emptyTitle')}</p>
@@ -66,13 +86,13 @@ export function ObligationFormPage() {
     }
     return {
       vendor: vendor.trim(),
-      description: description.trim(),
+      description: notes.trim(),
       amount: parsedAmount,
       date,
       dueDate,
       status,
       category,
-      notes,
+      notes: notes.trim(),
       relatedInvoiceId,
     }
   }
@@ -116,7 +136,6 @@ export function ObligationFormPage() {
       <h1 className="mt-4 font-display text-4xl font-medium tracking-tight">
         {isEditing ? t('obligations.editTitle') : t('obligations.newTitle')}
       </h1>
-      <p className="mt-2 max-w-xl text-sm text-brand-ink/55">{t('obligations.formHint')}</p>
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <Card>
@@ -135,14 +154,6 @@ export function ObligationFormPage() {
                 ))}
               </datalist>
             </div>
-            <div className="sm:col-span-2">
-              <Field
-                label={t('obligations.description')}
-                value={description}
-                placeholder={t('obligations.phDescription')}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
             <Field
               label={t('invoiceList.amount')}
               value={amount}
@@ -158,27 +169,93 @@ export function ObligationFormPage() {
               ))}
             </Select>
             <Field label={t('newInvoice.date')} value={date} onChange={(e) => setDate(e.target.value)} />
-            <Field
-              label={t('newInvoice.dueDate')}
-              value={dueDate}
-              placeholder={t('newInvoice.phDueDate')}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
             <Select label={t('obligations.status')} value={status} onChange={(e) => setStatus(e.target.value as ObligationStatus)}>
               <option value="unpaid">{t('invoiceList.statusUnpaid')}</option>
               <option value="paid">{t('invoiceList.statusPaid')}</option>
             </Select>
-            <Select label={t('obligations.relatedInvoice')} value={relatedInvoiceId} onChange={(e) => setRelatedInvoiceId(e.target.value)}>
-              <option value="">{t('obligations.noRelatedInvoice')}</option>
-              {invoices.map((inv) => (
-                <option key={inv.id} value={inv.id}>
-                  {inv.number} · {inv.client?.fullName || ''}
-                </option>
-              ))}
-            </Select>
-            <div className="sm:col-span-2">
-              <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+
+            <div className="sm:col-span-2 flex flex-wrap gap-2">
+              {!showDueDate ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDueDate(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/10"
+                >
+                  <Calendar className="h-4 w-4" />
+                  {t('obligations.addDueDate')}
+                </button>
+              ) : null}
+              {!showNotes ? (
+                <button
+                  type="button"
+                  onClick={() => setShowNotes(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/10"
+                >
+                  <StickyNote className="h-4 w-4" />
+                  {t('obligations.optionalNotes')}
+                </button>
+              ) : null}
+              {!showInvoices ? (
+                <button
+                  type="button"
+                  onClick={() => setShowInvoices(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/10"
+                >
+                  <Link2 className="h-4 w-4" />
+                  {relatedInvoice
+                    ? `${relatedInvoice.number} · ${relatedInvoice.client?.fullName || ''}`
+                    : t('obligations.noRelatedInvoice')}
+                </button>
+              ) : null}
             </div>
+
+            {showDueDate ? (
+              <div>
+                <Field
+                  label={t('newInvoice.dueDate')}
+                  type="date"
+                  value={toDateInputValue(dueDate)}
+                  onChange={(e) => setDueDate(fromDateInputValue(e.target.value))}
+                />
+                {dueDate ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDueDate('')
+                      setShowDueDate(false)
+                    }}
+                    className="text-xs font-semibold text-brand-ink/50 hover:text-brand"
+                  >
+                    {t('obligations.clearDueDate')}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {showNotes ? (
+              <div className="sm:col-span-2">
+                <TextArea
+                  label={t('obligations.optionalNotes')}
+                  rows={3}
+                  value={notes}
+                  placeholder={t('obligations.phNotes')}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+            ) : null}
+
+            {showInvoices ? (
+              <div className="sm:col-span-2">
+                <Select label={t('obligations.relatedInvoice')} value={relatedInvoiceId} onChange={(e) => setRelatedInvoiceId(e.target.value)}>
+                  <option value="">{t('obligations.noRelatedInvoice')}</option>
+                  {invoices.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.number} · {inv.client?.fullName || ''}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
           </div>
         </Card>
 

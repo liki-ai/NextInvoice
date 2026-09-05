@@ -114,6 +114,20 @@ export default function InvoiceListScreen({ navigation }) {
           </Pressable>
         )}
       />
+      <Pressable
+        style={styles.fab}
+        onPress={() => {
+          if (usage?.plan === 'free' && usage.limit != null && !usage.canCreate) {
+            navigation.navigate('Subscribe');
+            return;
+          }
+          navigation.navigate('NewInvoice');
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={t('tabs.newInvoice')}
+      >
+        <Ionicons name="add" size={28} color={colors.primary} />
+      </Pressable>
     </View>
   );
 }
@@ -154,7 +168,7 @@ const styles = StyleSheet.create({
   },
   usageText: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '600' },
   usageCta: { color: colors.primary, fontWeight: '800', fontSize: 13 },
-  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: 96 },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -196,4 +210,22 @@ const styles = StyleSheet.create({
   clientName: { fontSize: 15, color: colors.text, marginTop: 4, marginBottom: 4 },
   emptyState: { alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.lg },
   emptyText: { marginTop: spacing.sm, textAlign: 'center', color: colors.textMuted, fontSize: 15 },
+  fab: {
+    position: 'absolute',
+    right: 18,
+    bottom: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#1D2B2E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 8,
+  },
 });

@@ -9,11 +9,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
-import { Button, FormField, Section, SegmentedControl } from '../components/ui';
+import { Button, DatePickerModal, FormField, Section, SegmentedControl } from '../components/ui';
 import { formatDateForInvoice } from '../utils/invoiceNumber';
 import { formatMoney, toNumber } from '../utils/money';
 
@@ -36,14 +37,16 @@ export default function ObligationFormScreen({ navigation, route }) {
   const currency = companyProfile.currency || 'EUR';
 
   const [vendor, setVendor] = useState(existing?.vendor || '');
-  const [description, setDescription] = useState(existing?.description || '');
   const [amount, setAmount] = useState(existing ? String(existing.amount ?? '') : '');
   const [date, setDate] = useState(existing?.date || formatDateForInvoice(new Date()));
   const [dueDate, setDueDate] = useState(existing?.dueDate || '');
   const [status, setStatus] = useState(existing?.status || 'unpaid');
   const [category, setCategory] = useState(existing?.category || 'shipping');
-  const [notes, setNotes] = useState(existing?.notes || '');
+  const [notes, setNotes] = useState(existing?.notes || existing?.description || '');
   const [relatedInvoiceId, setRelatedInvoiceId] = useState(existing?.relatedInvoiceId || '');
+  const [showNotes, setShowNotes] = useState(Boolean(existing?.notes || existing?.description));
+  const [showInvoices, setShowInvoices] = useState(false);
+  const [showDuePicker, setShowDuePicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const vendors = useMemo(() => {
@@ -60,6 +63,7 @@ export default function ObligationFormScreen({ navigation, route }) {
     return names;
   }, [obligations]);
 
+  const relatedInvoice = invoices.find((inv) => inv.id === relatedInvoiceId);
   const parsedAmount = Math.max(toNumber(amount), 0);
 
   const onSave = async () => {
@@ -75,13 +79,13 @@ export default function ObligationFormScreen({ navigation, route }) {
     try {
       const payload = {
         vendor: vendor.trim(),
-        description: description.trim(),
+        description: notes.trim(),
         amount: parsedAmount,
         date,
         dueDate,
         status,
         category,
-        notes,
+        notes: notes.trim(),
         relatedInvoiceId,
       };
       if (isEditing) await updateObligation(existing.id, payload);
@@ -113,9 +117,6 @@ export default function ObligationFormScreen({ navigation, route }) {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={typography.title}>{isEditing ? t('obligations.editTitle') : t('obligations.newTitle')}</Text>
-        <Text style={styles.hint}>{t('obligations.subtitle')}</Text>
-
         <Section>
           <FormField
             label={t('obligations.vendor')}
@@ -132,12 +133,6 @@ export default function ObligationFormScreen({ navigation, route }) {
               ))}
             </View>
           ) : null}
-          <FormField
-            label={t('obligations.description')}
-            value={description}
-            placeholder={t('obligations.phDescription')}
-            onChangeText={setDescription}
-          />
           <FormField
             label={t('obligations.amount')}
             value={amount}
@@ -158,12 +153,6 @@ export default function ObligationFormScreen({ navigation, route }) {
             ))}
           </View>
           <FormField label={t('newInvoice.date')} value={date} onChangeText={setDate} />
-          <FormField
-            label={t('obligations.dueDate')}
-            value={dueDate}
-            placeholder={t('obligations.phDueDate')}
-            onChangeText={setDueDate}
-          />
           <Text style={[typography.label, styles.statusLabel]}>{t('obligations.status')}</Text>
           <SegmentedControl
             value={status}
@@ -173,31 +162,70 @@ export default function ObligationFormScreen({ navigation, route }) {
               { value: 'paid', label: t('invoiceDetail.statusPaid') },
             ]}
           />
-          <Text style={typography.label}>{t('obligations.relatedInvoice')}</Text>
-          <Pressable
-            style={[styles.invoiceOption, !relatedInvoiceId && styles.invoiceOptionActive]}
-            onPress={() => setRelatedInvoiceId('')}
-          >
-            <Text style={styles.invoiceOptionText}>{t('obligations.noRelatedInvoice')}</Text>
-          </Pressable>
-          {invoices.map((inv) => (
-            <Pressable
-              key={inv.id}
-              style={[styles.invoiceOption, relatedInvoiceId === inv.id && styles.invoiceOptionActive]}
-              onPress={() => setRelatedInvoiceId(inv.id)}
-            >
-              <Text style={styles.invoiceOptionText}>
-                {inv.number} · {inv.client?.fullName || ''}
+
+          <View style={styles.optionLinks}>
+            <Pressable style={styles.optionLink} onPress={() => setShowDuePicker(true)}>
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+              <Text style={styles.optionLinkText}>
+                {dueDate ? `${t('obligations.dueDate')} · ${dueDate}` : t('obligations.addDueDate')}
               </Text>
             </Pressable>
-          ))}
-          <FormField
-            label={t('newInvoice.notes')}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            style={styles.notes}
-          />
+            {dueDate ? (
+              <Pressable style={styles.optionLink} onPress={() => setDueDate('')}>
+                <Text style={styles.optionLinkText}>{t('obligations.clearDueDate')}</Text>
+              </Pressable>
+            ) : null}
+            {!showNotes ? (
+              <Pressable style={styles.optionLink} onPress={() => setShowNotes(true)}>
+                <Ionicons name="create-outline" size={18} color={colors.primary} />
+                <Text style={styles.optionLinkText}>{t('obligations.optionalNotes')}</Text>
+              </Pressable>
+            ) : null}
+            {!showInvoices ? (
+              <Pressable style={styles.optionLink} onPress={() => setShowInvoices(true)}>
+                <Ionicons name="link-outline" size={18} color={colors.primary} />
+                <Text style={styles.optionLinkText}>
+                  {relatedInvoice
+                    ? `${relatedInvoice.number} · ${relatedInvoice.client?.fullName || ''}`
+                    : t('obligations.noRelatedInvoice')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {showNotes ? (
+            <FormField
+              label={t('obligations.optionalNotes')}
+              value={notes}
+              placeholder={t('obligations.phNotes')}
+              onChangeText={setNotes}
+              multiline
+              style={styles.notes}
+            />
+          ) : null}
+
+          {showInvoices ? (
+            <View style={styles.invoiceBlock}>
+              <Text style={typography.label}>{t('obligations.relatedInvoice')}</Text>
+              <Pressable
+                style={[styles.invoiceOption, !relatedInvoiceId && styles.invoiceOptionActive]}
+                onPress={() => setRelatedInvoiceId('')}
+              >
+                <Text style={styles.invoiceOptionText}>{t('obligations.noRelatedInvoice')}</Text>
+              </Pressable>
+              {invoices.map((inv) => (
+                <Pressable
+                  key={inv.id}
+                  style={[styles.invoiceOption, relatedInvoiceId === inv.id && styles.invoiceOptionActive]}
+                  onPress={() => setRelatedInvoiceId(inv.id)}
+                >
+                  <Text style={styles.invoiceOptionText}>
+                    {inv.number} · {inv.client?.fullName || ''}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
         </Section>
 
         <Section>
@@ -211,6 +239,16 @@ export default function ObligationFormScreen({ navigation, route }) {
           ) : null}
         </Section>
       </ScrollView>
+
+      <DatePickerModal
+        visible={showDuePicker}
+        value={dueDate}
+        title={t('obligations.dueDate')}
+        cancelLabel={t('common.cancel')}
+        doneLabel={t('common.ok')}
+        onClose={() => setShowDuePicker(false)}
+        onSelect={setDueDate}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -218,7 +256,6 @@ export default function ObligationFormScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, padding: spacing.md },
-  hint: { marginTop: 8, marginBottom: spacing.md, color: colors.textMuted, fontSize: 13, lineHeight: 18 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.sm },
   chip: {
     borderWidth: 1,
@@ -232,6 +269,28 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontWeight: '600', color: colors.text },
   chipTextActive: { color: '#fff' },
   statusLabel: { marginBottom: 8 },
+  optionLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  optionLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+    backgroundColor: '#EEF5F7',
+  },
+  optionLinkText: {
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  invoiceBlock: { marginTop: spacing.xs },
   invoiceOption: {
     borderWidth: 1,
     borderColor: colors.border,

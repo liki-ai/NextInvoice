@@ -55,6 +55,7 @@ See [faturimiapp/README.md](faturimiapp/README.md) for emulator URLs, deploy not
 cd landingpage
 npm install
 npm run dev
+# http://localhost:5180
 ```
 
 ## Stack

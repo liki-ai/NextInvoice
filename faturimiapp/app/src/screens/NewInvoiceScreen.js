@@ -193,7 +193,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
         await shareInvoicePdf({ company: localizeCompanyProfile(companyProfile, t), client, invoice, pdfLabels: t('pdf') });
         Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
         resetForm();
-        navigation.navigate('Invoices');
+        if (navigation.canGoBack()) navigation.goBack();
+        else navigation.navigate('InvoicesList');
       }
     } catch (err) {
       if (err?.code === 'PLAN_LIMIT' || err?.message === 'PLAN_LIMIT') {
@@ -201,7 +202,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
           { text: t('common.cancel'), style: 'cancel' },
           {
             text: t('billing.ctaIap'),
-            onPress: () => navigation.navigate('Invoices', { screen: 'Subscribe' }),
+            onPress: () => navigation.navigate('Subscribe'),
           },
         ]);
       } else {

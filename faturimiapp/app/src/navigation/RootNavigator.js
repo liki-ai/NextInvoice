@@ -30,6 +30,11 @@ function InvoicesStackNavigator() {
         options={{ title: t('invoiceList.title') }}
       />
       <InvoicesStack.Screen
+        name="NewInvoice"
+        component={NewInvoiceScreen}
+        options={{ title: t('newInvoice.title') }}
+      />
+      <InvoicesStack.Screen
         name="InvoiceDetail"
         component={InvoiceDetailScreen}
         options={{ title: t('invoiceDetail.title') }}
@@ -91,12 +96,10 @@ function ProfileStackNavigator() {
   );
 }
 
-function PlusTabIcon({ focused }) {
+function TabIcon({ focused, name, outline }) {
   return (
-    <View style={[styles.plusWrap, focused && styles.plusWrapActive]}>
-      <View style={[styles.plusButton, focused ? styles.plusButtonActive : styles.plusButtonInactive]}>
-        <Ionicons name="add" size={34} color={focused ? '#fff' : colors.primary} />
-      </View>
+    <View style={[styles.sideIcon, focused && styles.sideIconActive]}>
+      <Ionicons name={focused ? name : outline} size={24} color={focused ? colors.primary : colors.textMuted} />
     </View>
   );
 }
@@ -107,61 +110,44 @@ export default function RootNavigator() {
   return (
     <NavigationContainer>
       <Tab.Navigator
-        screenOptions={({ route }) => ({
+        initialRouteName="Invoices"
+        screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarStyle: styles.tabBar,
           tabBarItemStyle: styles.tabBarItem,
           tabBarLabelStyle: styles.tabBarLabel,
-          tabBarIcon: ({ color, focused }) => {
-            if (route.name === 'Invoices') {
-              return (
-                <View style={[styles.sideIcon, focused && styles.sideIconActive]}>
-                  <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={24} color={color} />
-                </View>
-              );
-            }
-            if (route.name === 'Obligations') {
-              return (
-                <View style={[styles.sideIcon, focused && styles.sideIconActive]}>
-                  <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
-                </View>
-              );
-            }
-            if (route.name === 'NewInvoice') {
-              return <PlusTabIcon focused={focused} />;
-            }
-            if (route.name === 'Profile') {
-              return (
-                <View style={[styles.sideIcon, focused && styles.sideIconActive]}>
-                  <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
-                </View>
-              );
-            }
-            return null;
-          },
-        })}
+        }}
       >
-        <Tab.Screen
-          name="Invoices"
-          component={InvoicesStackNavigator}
-          options={{ title: t('tabs.invoices'), tabBarLabel: t('tabs.invoices') }}
-        />
         <Tab.Screen
           name="Obligations"
           component={ObligationsStackNavigator}
-          options={{ title: t('tabs.obligations'), tabBarLabel: t('tabs.obligations') }}
+          options={{
+            title: t('tabs.obligations'),
+            tabBarLabel: t('tabs.obligations'),
+            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="wallet" outline="wallet-outline" />,
+          }}
         />
         <Tab.Screen
-          name="NewInvoice"
-          component={NewInvoiceScreen}
-          options={{ title: t('tabs.newInvoice'), tabBarLabel: () => null }}
+          name="Invoices"
+          component={InvoicesStackNavigator}
+          options={{
+            title: t('tabs.invoices'),
+            tabBarLabel: t('tabs.invoices'),
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused} name="document-text" outline="document-text-outline" />
+            ),
+          }}
         />
         <Tab.Screen
           name="Profile"
           component={ProfileStackNavigator}
-          options={{ title: t('tabs.profile'), tabBarLabel: t('tabs.profile') }}
+          options={{
+            title: t('tabs.profile'),
+            tabBarLabel: t('tabs.profile'),
+            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="person" outline="person-outline" />,
+          }}
         />
       </Tab.Navigator>
     </NavigationContainer>
@@ -197,40 +183,5 @@ const styles = StyleSheet.create({
   },
   sideIconActive: {
     transform: [{ scale: 1.05 }],
-  },
-  plusWrap: {
-    position: 'absolute',
-    top: -22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  plusWrapActive: {
-    top: -26,
-  },
-  plusButton: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: colors.surface,
-  },
-  plusButtonActive: {
-    backgroundColor: colors.primary,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  plusButtonInactive: {
-    backgroundColor: '#EEF5F7',
-    borderColor: colors.surface,
-    shadowColor: '#1D2B2E',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
   },
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LogOut, Menu, Plus, UserRound, Wallet, X } from 'lucide-react'
+import { FileText, LogOut, Menu, UserRound, Wallet, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -8,9 +8,8 @@ import { LanguagePicker } from '../../components/LangSwitch'
 import { cn } from '../../lib/cn'
 
 const NAV = [
-  { to: '/app', end: true, icon: FileText, key: 'nav.invoices' },
   { to: '/app/obligations', end: false, icon: Wallet, key: 'nav.obligations' },
-  { to: '/app/new', end: true, icon: Plus, key: 'nav.newInvoice' },
+  { to: '/app', end: true, icon: FileText, key: 'nav.invoices' },
   { to: '/app/profile', end: true, icon: UserRound, key: 'nav.profile' },
 ] as const
 

@@ -1,6 +1,7 @@
-import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { formatDateForInvoice } from '../utils/invoiceNumber';
 
 export function Section({ title, children, style }) {
   return (
@@ -47,6 +48,105 @@ export function Button({ title, onPress, variant = 'primary', loading, disabled,
         </>
       )}
     </Pressable>
+  );
+}
+
+const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+function parsePickedDate(value) {
+  if (!value) return new Date();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+export function DatePickerModal({ visible, value, title, cancelLabel, doneLabel, onClose, onSelect }) {
+  const initial = parsePickedDate(value);
+  const [view, setView] = useState(initial);
+  const [picked, setPicked] = useState(initial);
+
+  useEffect(() => {
+    if (!visible) return;
+    const next = parsePickedDate(value);
+    setView(next);
+    setPicked(next);
+  }, [visible, value]);
+
+  const cells = useMemo(() => {
+    const year = view.getFullYear();
+    const month = view.getMonth();
+    const startPad = (new Date(year, month, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const items = [];
+    for (let i = 0; i < startPad; i += 1) items.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) items.push(new Date(year, month, day));
+    return items;
+  }, [view]);
+
+  const monthLabel = view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.dateOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={styles.dateSheet}>
+          {title ? <Text style={styles.dateTitle}>{title}</Text> : null}
+          <View style={styles.dateNav}>
+            <Pressable
+              hitSlop={12}
+              onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))}
+            >
+              <Text style={styles.dateNavBtn}>‹</Text>
+            </Pressable>
+            <Text style={styles.dateMonth}>{monthLabel}</Text>
+            <Pressable
+              hitSlop={12}
+              onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))}
+            >
+              <Text style={styles.dateNavBtn}>›</Text>
+            </Pressable>
+          </View>
+          <View style={styles.dateWeekRow}>
+            {WEEKDAYS.map((day) => (
+              <Text key={day} style={styles.dateWeekday}>
+                {day}
+              </Text>
+            ))}
+          </View>
+          <View style={styles.dateGrid}>
+            {cells.map((day, index) => {
+              if (!day) return <View key={`empty-${index}`} style={styles.dateCell} />;
+              const selected =
+                day.getFullYear() === picked.getFullYear() &&
+                day.getMonth() === picked.getMonth() &&
+                day.getDate() === picked.getDate();
+              return (
+                <Pressable
+                  key={day.toISOString()}
+                  style={[styles.dateCell, selected && styles.dateCellSelected]}
+                  onPress={() => setPicked(day)}
+                >
+                  <Text style={[styles.dateCellText, selected && styles.dateCellTextSelected]}>{day.getDate()}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.dateActions}>
+            <Pressable onPress={onClose} style={styles.dateAction}>
+              <Text style={styles.dateCancel}>{cancelLabel}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                onSelect(formatDateForInvoice(picked));
+                onClose();
+              }}
+              style={styles.dateAction}
+            >
+              <Text style={styles.dateDone}>{doneLabel}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -144,5 +244,94 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: '#fff',
     fontWeight: '700',
+  },
+  dateOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(29,43,46,0.35)',
+    justifyContent: 'flex-end',
+  },
+  dateSheet: {
+    zIndex: 1,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  dateTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  dateNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  dateNavBtn: {
+    fontSize: 28,
+    color: colors.primary,
+    paddingHorizontal: 8,
+    lineHeight: 32,
+  },
+  dateMonth: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    textTransform: 'capitalize',
+  },
+  dateWeekRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  dateWeekday: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  dateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dateCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateCellSelected: {
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+  },
+  dateCellText: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  dateCellTextSelected: {
+    color: '#fff',
+  },
+  dateActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  dateAction: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  dateCancel: {
+    color: colors.textMuted,
+    fontWeight: '700',
+  },
+  dateDone: {
+    color: colors.primary,
+    fontWeight: '800',
   },
 });

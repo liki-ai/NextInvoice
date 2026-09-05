@@ -63,7 +63,8 @@ export default function ObligationListScreen({ navigation }) {
         </View>
       ) : null}
 
-      <View style={styles.filterRow}>
+      {obligations.length > 0 ? (
+        <View style={styles.filterRow}>
         <Pressable
           style={[styles.filterItem, statusFilter === 'all' && styles.filterItemActive]}
           onPress={() => setStatusFilter('all')}
@@ -87,6 +88,7 @@ export default function ObligationListScreen({ navigation }) {
           </Text>
         </Pressable>
       </View>
+      ) : null}
 
       <FlatList
         data={filtered}
@@ -96,6 +98,12 @@ export default function ObligationListScreen({ navigation }) {
           <View style={styles.emptyState}>
             <Ionicons name="wallet-outline" size={48} color={colors.textMuted} />
             <Text style={styles.emptyText}>{t('obligations.empty')}</Text>
+            {obligations.length === 0 ? (
+              <Pressable style={styles.emptyCta} onPress={() => navigation.navigate('ObligationForm')}>
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={styles.emptyCtaText}>{t('obligations.addCta')}</Text>
+              </Pressable>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => {
@@ -110,7 +118,9 @@ export default function ObligationListScreen({ navigation }) {
                 <Text style={styles.vendor}>{item.vendor}</Text>
                 <Text style={styles.amount}>{formatMoney(Number(item.amount) || 0, currency)}</Text>
               </View>
-              {item.description ? <Text style={styles.description}>{item.description}</Text> : null}
+              {item.notes || item.description ? (
+                <Text style={styles.description}>{item.notes || item.description}</Text>
+              ) : null}
               <Text style={styles.category}>{t(CATEGORY_KEYS[item.category] || CATEGORY_KEYS.other)}</Text>
               <View style={styles.cardRow}>
                 <Text style={typography.muted}>{item.date}</Text>
@@ -183,4 +193,15 @@ const styles = StyleSheet.create({
   related: { marginTop: 6, fontSize: 13, fontWeight: '600', color: colors.primary },
   emptyState: { alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.lg },
   emptyText: { marginTop: spacing.sm, textAlign: 'center', color: colors.textMuted, fontSize: 15 },
+  emptyCta: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  emptyCtaText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });

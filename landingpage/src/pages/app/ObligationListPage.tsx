@@ -24,7 +24,7 @@ export function ObligationListPage() {
       if (vendorFilter !== 'all' && item.vendor.trim().toLowerCase() !== vendorFilter) return false
       if (!q) return true
       const related = invoices.find((inv) => inv.id === item.relatedInvoiceId)
-      const hay = `${item.vendor} ${item.description} ${item.date} ${related?.number || ''} ${related?.client?.fullName || ''}`.toLowerCase()
+      const hay = `${item.vendor} ${item.notes || ''} ${item.description} ${item.date} ${related?.number || ''} ${related?.client?.fullName || ''}`.toLowerCase()
       return hay.includes(q)
     })
   }, [obligations, invoices, query, statusFilter, vendorFilter])
@@ -177,7 +177,7 @@ export function ObligationListPage() {
               <thead className="border-b border-brand-ink/8 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
                 <tr>
                   <th className="px-5 py-3 font-semibold">{t('obligations.vendor')}</th>
-                  <th className="px-5 py-3 font-semibold">{t('obligations.description')}</th>
+                  <th className="px-5 py-3 font-semibold">{t('obligations.optionalNotes')}</th>
                   <th className="px-5 py-3 font-semibold">{t('newInvoice.date')}</th>
                   <th className="px-5 py-3 font-semibold">{t('obligations.relatedInvoice')}</th>
                   <th className="px-5 py-3 text-right font-semibold">{t('invoiceList.amount')}</th>
@@ -197,7 +197,7 @@ export function ObligationListPage() {
                           {t(`obligations.category.${item.category || 'other'}`)}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-brand-ink/70">{item.description || '—'}</td>
+                      <td className="px-5 py-4 text-brand-ink/70">{item.notes || item.description || '—'}</td>
                       <td className="px-5 py-4 text-brand-ink/60">
                         <div className="font-semibold">{item.date}</div>
                         <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>

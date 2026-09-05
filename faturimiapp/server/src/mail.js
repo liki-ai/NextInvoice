@@ -1,6 +1,6 @@
 function appUrl() {
   if (process.env.APP_URL) return String(process.env.APP_URL).replace(/\/+$/, '');
-  if (!process.env.RENDER) return 'http://localhost:5173';
+  if (!process.env.RENDER) return 'http://localhost:5180';
   return 'https://mynextinvoice.com';
 }
 
