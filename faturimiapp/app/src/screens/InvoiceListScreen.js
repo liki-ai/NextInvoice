@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { formatMoney } from '../utils/money';
+import { clientUnpaidSummaries } from '../pdf/invoiceTemplate';
 
 export default function InvoiceListScreen({ navigation }) {
   const { invoices, obligations, companyProfile, usage } = useApp();
@@ -20,11 +21,19 @@ export default function InvoiceListScreen({ navigation }) {
   const unpaidObligations = obligations
     .filter((item) => item.status !== 'paid')
     .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const unpaidClients = useMemo(() => clientUnpaidSummaries(invoices), [invoices]);
+  const unpaidInvoiceTotal = unpaidClients.reduce((sum, item) => sum + item.unpaidTotal, 0);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={typography.title}>{t('invoiceList.title')}</Text>
+        {unpaidClients.length > 0 ? (
+          <Pressable style={styles.headerCta} onPress={() => navigation.navigate('Statement')}>
+            <Ionicons name="send-outline" size={16} color={colors.primary} />
+            <Text style={styles.headerCtaText}>{t('invoiceList.sendStatement')}</Text>
+          </Pressable>
+        ) : null}
       </View>
       {usage?.plan === 'free' && usage.limit != null ? (
         <Pressable style={styles.usageBanner} onPress={() => navigation.navigate('Subscribe')}>
@@ -34,6 +43,14 @@ export default function InvoiceListScreen({ navigation }) {
               : t('billing.usageBanner', { used: usage.used, limit: usage.limit })}
           </Text>
           <Text style={styles.usageCta}>{t('billing.upgrade')}</Text>
+        </Pressable>
+      ) : null}
+      {unpaidClients.length > 0 ? (
+        <Pressable style={styles.usageBanner} onPress={() => navigation.navigate('Statement')}>
+          <Text style={styles.usageText}>
+            {t('invoiceList.unpaidStatement', { amount: formatMoney(unpaidInvoiceTotal, companyProfile.currency) })}
+          </Text>
+          <Text style={styles.usageCta}>{t('invoiceList.sendStatement')}</Text>
         </Pressable>
       ) : null}
       {unpaidObligations > 0 ? (
@@ -103,7 +120,25 @@ export default function InvoiceListScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  header: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  headerCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    backgroundColor: '#EEF5F7',
+  },
+  headerCtaText: { color: colors.primary, fontWeight: '800', fontSize: 12 },
   usageBanner: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,

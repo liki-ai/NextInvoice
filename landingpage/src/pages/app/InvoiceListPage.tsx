@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileText, Plus, Search } from 'lucide-react'
+import { FileText, Plus, Search, Send } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
-import { formatMoney, invoiceStatus } from '../../lib/invoice'
+import { clientUnpaidSummaries, formatMoney, invoiceStatus } from '../../lib/invoice'
 import { obligationStatus } from '../../lib/obligation'
 
 export function InvoiceListPage() {
@@ -40,6 +40,8 @@ export function InvoiceListPage() {
   }, [invoices, query, statusFilter])
 
   const billed = invoices.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
+  const unpaidClients = useMemo(() => clientUnpaidSummaries(invoices), [invoices])
+  const unpaidInvoiceTotal = unpaidClients.reduce((sum, item) => sum + item.unpaidTotal, 0)
   const unpaidObligations = obligations
     .filter((item) => obligationStatus(item) === 'unpaid')
     .reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
@@ -51,19 +53,30 @@ export function InvoiceListPage() {
           <h1 className="font-display text-4xl font-medium tracking-tight">{t('invoiceList.title')}</h1>
           <p className="mt-2 text-sm text-brand-ink/55">{t('invoiceList.subtitle')}</p>
         </div>
-        <Link
-          to="/app/new"
-          onClick={(e) => {
-            if (limitReached) {
-              e.preventDefault()
-              navigate('/app/upgrade')
-            }
-          }}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark ${limitReached ? 'opacity-60' : ''}`}
-        >
-          <Plus className="h-4 w-4" />
-          {t('nav.newInvoice')}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {unpaidClients.length > 0 ? (
+            <Link
+              to="/app/statement"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-4 py-2.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
+            >
+              <Send className="h-4 w-4" />
+              {t('statement.cta')}
+            </Link>
+          ) : null}
+          <Link
+            to="/app/new"
+            onClick={(e) => {
+              if (limitReached) {
+                e.preventDefault()
+                navigate('/app/upgrade')
+              }
+            }}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark ${limitReached ? 'opacity-60' : ''}`}
+          >
+            <Plus className="h-4 w-4" />
+            {t('nav.newInvoice')}
+          </Link>
+        </div>
       </div>
 
       {usage && usage.plan === 'free' && usage.limit !== null ? (
@@ -83,6 +96,19 @@ export function InvoiceListPage() {
             <p className="text-sm text-brand-ink/55">{t('invoiceList.usageBanner', { used: usage.used, limit: usage.limit })}</p>
           )}
         </div>
+      ) : null}
+
+      {unpaidClients.length > 0 ? (
+        <Link
+          to="/app/statement"
+          className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-brand-ink/8 bg-white px-5 py-4 hover:border-brand/30"
+        >
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('statement.title')}</p>
+            <p className="mt-1 text-sm text-brand-ink/70">{t('statement.banner')}</p>
+          </div>
+          <p className="font-display text-xl font-medium">{formatMoney(unpaidInvoiceTotal, currency)}</p>
+        </Link>
       ) : null}
 
       {unpaidObligations > 0 ? (

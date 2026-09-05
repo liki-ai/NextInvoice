@@ -19,7 +19,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { logout, user } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const invoicesActive = pathname === '/app' || pathname.startsWith('/app/invoices')
+  const invoicesActive =
+    pathname === '/app' || pathname.startsWith('/app/invoices') || pathname.startsWith('/app/statement')
   const obligationsActive = pathname.startsWith('/app/obligations')
 
   return (

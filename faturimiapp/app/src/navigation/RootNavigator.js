@@ -9,6 +9,7 @@ import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import NewInvoiceScreen from '../screens/NewInvoiceScreen';
 import ObligationListScreen from '../screens/ObligationListScreen';
 import ObligationFormScreen from '../screens/ObligationFormScreen';
+import StatementScreen from '../screens/StatementScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SubscribeScreen from '../screens/SubscribeScreen';
 import { useTranslation } from '../i18n/I18nContext';
@@ -42,6 +43,11 @@ function InvoicesStackNavigator() {
         name="Subscribe"
         component={SubscribeScreen}
         options={{ title: t('billing.title'), presentation: 'modal' }}
+      />
+      <InvoicesStack.Screen
+        name="Statement"
+        component={StatementScreen}
+        options={{ title: t('statement.title') }}
       />
     </InvoicesStack.Navigator>
   );

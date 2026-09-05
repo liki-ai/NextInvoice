@@ -1,7 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { buildInvoiceHtml } from './invoiceTemplate';
+import { buildInvoiceHtml, buildStatementHtml, statementFileName } from './invoiceTemplate';
 
 function sanitizeFileName(value) {
   const cleaned = String(value || '')
@@ -43,6 +43,42 @@ export async function shareInvoicePdf({ company, client, invoice, pdfLabels }) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/pdf',
       dialogTitle: buildPdfFileName(company, invoice),
+      UTI: 'com.adobe.pdf',
+    });
+  }
+  return uri;
+}
+
+export async function generateStatementPdfFile({ company, client, invoices, paidTotal, issuedDate, pdfLabels }) {
+  const html = buildStatementHtml({ company, client, invoices, paidTotal, issuedDate, pdfLabels });
+  const { uri } = await Print.printToFileAsync({ html, base64: false });
+
+  const fileName = statementFileName(client?.fullName, issuedDate);
+  const dest = `${FileSystem.cacheDirectory}${fileName}`;
+
+  const existing = await FileSystem.getInfoAsync(dest);
+  if (existing.exists) {
+    await FileSystem.deleteAsync(dest, { idempotent: true });
+  }
+
+  await FileSystem.copyAsync({ from: uri, to: dest });
+  return dest;
+}
+
+export async function shareStatementPdf({ company, client, invoices, paidTotal, issuedDate, pdfLabels }) {
+  const uri = await generateStatementPdfFile({
+    company,
+    client,
+    invoices,
+    paidTotal,
+    issuedDate,
+    pdfLabels,
+  });
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: statementFileName(client?.fullName, issuedDate),
       UTI: 'com.adobe.pdf',
     });
   }
