@@ -47,6 +47,7 @@ export default function StatementScreen({ route, navigation }) {
       paidTotal: selected.paidTotal,
       issuedDate,
       pdfLabels,
+      showPayments: false,
     });
   }, [previewVisible, selected, companyProfile, issuedDate, pdfLabels, t]);
 
@@ -62,6 +63,7 @@ export default function StatementScreen({ route, navigation }) {
         issuedDate,
         pdfLabels,
       });
+      setPreviewVisible(false);
     } catch (err) {
       Alert.alert(t('common.error'), err.message);
     } finally {
@@ -147,8 +149,7 @@ export default function StatementScreen({ route, navigation }) {
 
       {selected ? (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-          <Button title={t('statement.preview')} variant="secondary" onPress={() => setPreviewVisible(true)} />
-          <Button title={t('statement.sendPdf')} loading={sharing} onPress={handleShare} />
+          <Button title={t('statement.sendPdf')} onPress={() => setPreviewVisible(true)} />
         </View>
       ) : null}
 
@@ -170,8 +171,8 @@ export default function StatementScreen({ route, navigation }) {
             />
           ) : null}
           <View style={[styles.previewFooter, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-            <Button title={t('common.close')} variant="secondary" onPress={() => setPreviewVisible(false)} style={{ flex: 1 }} />
-            <Button title={t('statement.sendPdf')} loading={sharing} onPress={handleShare} style={{ flex: 1.4 }} />
+            <Button title={t('common.cancel')} variant="secondary" onPress={() => setPreviewVisible(false)} style={{ flex: 1 }} />
+            <Button title={t('common.send')} loading={sharing} onPress={handleShare} style={{ flex: 1.4 }} />
           </View>
         </View>
       </Modal>

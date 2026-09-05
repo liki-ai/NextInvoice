@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Eye, Send } from 'lucide-react'
+import { Send } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Modal } from '../../components/ui'
@@ -44,6 +44,7 @@ export function StatementPage() {
       paidTotal: selected.paidTotal,
       issuedDate,
       pdfLabels: dict.pdf,
+      showPayments: false,
     })
   }, [selected, profile, preview, issuedDate, dict.pdf, t])
 
@@ -61,8 +62,10 @@ export function StatementPage() {
       paidTotal: selected.paidTotal,
       issuedDate,
       pdfLabels: dict.pdf,
+      showPayments: false,
     })
     downloadHtmlAsPdf(doc, statementFileName(selected.client.fullName, issuedDate))
+    setPreview(false)
   }
 
   return (
@@ -77,13 +80,9 @@ export function StatementPage() {
         </div>
         {selected ? (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => setPreview(true)}>
-              <Eye className="h-4 w-4" />
-              {t('statement.preview')}
-            </Button>
-            <Button type="button" onClick={onDownload}>
+            <Button type="button" onClick={() => setPreview(true)}>
               <Send className="h-4 w-4" />
-              {t('statement.sendPdf')}
+              {t('statement.cta')}
             </Button>
           </div>
         ) : null}
@@ -186,10 +185,10 @@ export function StatementPage() {
           footer={
             <>
               <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
-                {t('common.close')}
+                {t('common.cancel')}
               </Button>
               <Button type="button" onClick={onDownload}>
-                {t('statement.sendPdf')}
+                {t('common.send')}
               </Button>
             </>
           }

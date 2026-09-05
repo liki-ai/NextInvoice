@@ -9,13 +9,24 @@ import {
   downloadHtmlAsPdf,
   formatMoney,
   formatStatementFileDate,
-  paidObligationsFileName,
+  obligationsListFileName,
 } from '../../lib/invoice'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { obligationStatus, uniqueVendors, vendorSummaries } from '../../lib/obligation'
 import type { Obligation } from '../../lib/obligation'
+import { Button, Modal } from '../../components/ui'
 
 const MAX_PROOF_BYTES = 4 * 1024 * 1024
+
+function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
+  if (filter === 'paid') {
+    return { kind: 'paid' as const, cta: t('obligations.sendPaid'), title: t('obligations.sendPaidTitle') }
+  }
+  if (filter === 'unpaid') {
+    return { kind: 'unpaid' as const, cta: t('obligations.sendUnpaid'), title: t('obligations.sendUnpaidTitle') }
+  }
+  return { kind: 'all' as const, cta: t('obligations.sendList'), title: t('obligations.sendAllTitle') }
+}
 
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -48,9 +59,10 @@ export function ObligationListPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [vendorFilter, setVendorFilter] = useState('all')
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [sending, setSending] = useState(false)
+  const [preview, setPreview] = useState(false)
   const [error, setError] = useState('')
   const currency = profile?.currency || 'EUR'
+  const send = sendCopy(statusFilter, t)
   const vendors = useMemo(() => uniqueVendors(obligations), [obligations])
   const summaries = useMemo(() => vendorSummaries(obligations), [obligations])
   const paidItems = obligations.filter((item) => obligationStatus(item) === 'paid')
@@ -117,28 +129,27 @@ export function ObligationListPage() {
     }
   }
 
-  function onSendPaid() {
-    if (!paidItems.length || !profile) return
-    setSending(true)
-    setError('')
-    try {
-      const html = buildPaidObligationsHtml({
-        company: localizeCompanyProfile(profile, t),
-        obligations: paidItems,
-        issuedDate: formatStatementFileDate(new Date()),
-        pdfLabels: {
-          ...dict.pdf,
-          paidObligationsTitle: t('obligations.sendPaidTitle'),
-          vendor: t('obligations.vendor'),
-          proofLabel: t('obligations.proofTitle'),
-          proofYes: t('obligations.proofAttached'),
-          proofNo: t('obligations.proofMissing'),
-        },
-      })
-      downloadHtmlAsPdf(html, paidObligationsFileName())
-    } finally {
-      setSending(false)
-    }
+  const previewHtml =
+    preview && profile && filtered.length
+      ? buildPaidObligationsHtml({
+          company: localizeCompanyProfile(profile, t),
+          obligations: filtered,
+          issuedDate: formatStatementFileDate(new Date()),
+          pdfLabels: {
+            ...dict.pdf,
+            paidObligationsTitle: send.title,
+            vendor: t('obligations.vendor'),
+            proofLabel: t('obligations.proofTitle'),
+            proofYes: t('obligations.proofAttached'),
+            proofNo: t('obligations.proofMissing'),
+          },
+        })
+      : ''
+
+  function onSendList() {
+    if (!previewHtml) return
+    downloadHtmlAsPdf(previewHtml, obligationsListFileName(send.kind))
+    setPreview(false)
   }
 
   return (
@@ -149,15 +160,14 @@ export function ObligationListPage() {
           <p className="mt-2 text-sm text-brand-ink/55">{t('obligations.subtitle')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {paidItems.length > 0 ? (
+          {filtered.length > 0 ? (
             <button
               type="button"
-              onClick={onSendPaid}
-              disabled={sending}
+              onClick={() => setPreview(true)}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-4 py-2.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
             >
               <Send className="h-4 w-4" />
-              {sending ? t('common.loading') : t('obligations.sendPaid')}
+              {send.cta}
             </button>
           ) : null}
           <Link
@@ -392,6 +402,25 @@ export function ObligationListPage() {
             <p className="px-5 py-8 text-center text-sm text-brand-ink/50">{t('obligations.emptyTitle')}</p>
           ) : null}
         </div>
+      ) : null}
+
+      {preview ? (
+        <Modal
+          title={send.title}
+          onClose={() => setPreview(false)}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" onClick={onSendList}>
+                {t('common.send')}
+              </Button>
+            </>
+          }
+        >
+          <iframe title="obligation-list-preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
+        </Modal>
       ) : null}
     </div>
   )

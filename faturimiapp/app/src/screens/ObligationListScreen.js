@@ -8,8 +8,9 @@ import { formatMoney } from '../utils/money';
 import SwipeableRow from '../components/SwipeableRow';
 import { pickObligationProof, openObligationProof } from '../utils/obligationProof';
 import { sharePaidObligationsPdf } from '../pdf/generateInvoicePdf';
-import { formatStatementFileDate } from '../pdf/invoiceTemplate';
+import { buildPaidObligationsHtml, formatStatementFileDate } from '../pdf/invoiceTemplate';
 import { localizeCompanyProfile } from '../storage/companySamples';
+import PdfPreviewModal from '../components/PdfPreviewModal';
 
 const CATEGORY_KEYS = {
   shipping: 'obligations.categoryShipping',
@@ -19,12 +20,24 @@ const CATEGORY_KEYS = {
   other: 'obligations.categoryOther',
 };
 
+function sendCopy(filter, t) {
+  if (filter === 'paid') {
+    return { kind: 'paid', cta: t('obligations.sendPaid'), title: t('obligations.sendPaidTitle') };
+  }
+  if (filter === 'unpaid') {
+    return { kind: 'unpaid', cta: t('obligations.sendUnpaid'), title: t('obligations.sendUnpaidTitle') };
+  }
+  return { kind: 'all', cta: t('obligations.sendList'), title: t('obligations.sendAllTitle') };
+}
+
 export default function ObligationListScreen({ navigation }) {
   const { obligations, invoices, companyProfile, updateObligation, deleteObligation } = useApp();
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('all');
   const [sharing, setSharing] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const currency = companyProfile.currency || 'EUR';
+  const send = sendCopy(statusFilter, t);
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return obligations;
@@ -38,6 +51,25 @@ export default function ObligationListScreen({ navigation }) {
   const paidItems = obligations.filter((item) => item.status === 'paid');
   const paid = paidItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
+  const obligationPdfLabels = {
+    ...t('pdf'),
+    paidObligationsTitle: send.title,
+    vendor: t('obligations.vendor'),
+    proofLabel: t('obligations.proofTitle'),
+    proofYes: t('obligations.proofAttached'),
+    proofNo: t('obligations.proofMissing'),
+  };
+
+  const previewHtml = useMemo(() => {
+    if (!previewVisible || !filtered.length) return '';
+    return buildPaidObligationsHtml({
+      company: localizeCompanyProfile(companyProfile, t),
+      obligations: filtered,
+      issuedDate: formatStatementFileDate(new Date()),
+      pdfLabels: obligationPdfLabels,
+    });
+  }, [previewVisible, filtered, companyProfile, t, send.title]);
+
   const onAttachProof = async (item) => {
     try {
       const proof = await pickObligationProof(t);
@@ -48,23 +80,18 @@ export default function ObligationListScreen({ navigation }) {
     }
   };
 
-  const onSendPaid = async () => {
-    if (!paidItems.length) return;
+  const onShareList = async () => {
+    if (!filtered.length) return;
     setSharing(true);
     try {
       await sharePaidObligationsPdf({
         company: localizeCompanyProfile(companyProfile, t),
-        obligations: paidItems,
+        obligations: filtered,
         issuedDate: formatStatementFileDate(new Date()),
-        pdfLabels: {
-          ...t('pdf'),
-          paidObligationsTitle: t('obligations.sendPaidTitle'),
-          vendor: t('obligations.vendor'),
-          proofLabel: t('obligations.proofTitle'),
-          proofYes: t('obligations.proofAttached'),
-          proofNo: t('obligations.proofMissing'),
-        },
+        kind: send.kind,
+        pdfLabels: obligationPdfLabels,
       });
+      setPreviewVisible(false);
     } catch (err) {
       Alert.alert(t('common.error'), err.message);
     } finally {
@@ -79,10 +106,10 @@ export default function ObligationListScreen({ navigation }) {
           <Text style={typography.title}>{t('obligations.title')}</Text>
           <Text style={styles.subtitle}>{t('obligations.subtitle')}</Text>
         </View>
-        {paidItems.length > 0 ? (
-          <Pressable style={styles.headerCta} onPress={onSendPaid} disabled={sharing}>
+        {filtered.length > 0 ? (
+          <Pressable style={styles.headerCta} onPress={() => setPreviewVisible(true)}>
             <Ionicons name="send-outline" size={16} color={colors.primary} />
-            <Text style={styles.headerCtaText}>{sharing ? t('common.loading') : t('obligations.sendPaid')}</Text>
+            <Text style={styles.headerCtaText}>{send.cta}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -227,6 +254,16 @@ export default function ObligationListScreen({ navigation }) {
       >
         <Ionicons name="add" size={30} color="#fff" />
       </Pressable>
+      <PdfPreviewModal
+        visible={previewVisible}
+        title={send.title}
+        html={previewHtml}
+        sharing={sharing}
+        cancelLabel={t('common.cancel')}
+        sendLabel={t('common.send')}
+        onCancel={() => setPreviewVisible(false)}
+        onSend={onShareList}
+      />
     </View>
   );
 }

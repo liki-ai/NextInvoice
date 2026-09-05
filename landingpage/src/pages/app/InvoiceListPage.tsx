@@ -4,17 +4,39 @@ import { FileText, Pencil, Plus, Search, Send, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
-import { clientUnpaidSummaries, formatMoney, invoiceStatus } from '../../lib/invoice'
+import { Button, Modal } from '../../components/ui'
+import {
+  buildInvoiceListHtml,
+  clientUnpaidSummaries,
+  downloadHtmlAsPdf,
+  formatMoney,
+  formatStatementFileDate,
+  invoiceListFileName,
+  invoiceStatus,
+} from '../../lib/invoice'
+import { localizeCompanyProfile } from '../../lib/companySamples'
+
+function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
+  if (filter === 'paid') {
+    return { kind: 'paid' as const, cta: t('invoiceList.sendPaid'), title: t('invoiceList.sendPaidTitle') }
+  }
+  if (filter === 'unpaid') {
+    return { kind: 'unpaid' as const, cta: t('invoiceList.sendUnpaid'), title: t('invoiceList.sendUnpaidTitle') }
+  }
+  return { kind: 'all' as const, cta: t('invoiceList.sendList'), title: t('invoiceList.sendAllTitle') }
+}
 
 export function InvoiceListPage() {
   const { invoices, loading, profile, updateInvoice, removeInvoice } = useAppData()
-  const { t } = useI18n()
+  const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [preview, setPreview] = useState(false)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
+  const send = sendCopy(statusFilter, t)
 
   useEffect(() => {
     void api<{ plan: 'free' | 'premium'; used: number; limit: number | null }>('/api/billing/usage')
@@ -69,6 +91,28 @@ export function InvoiceListPage() {
     }
   }
 
+  const previewHtml =
+    preview && profile && filtered.length
+      ? buildInvoiceListHtml({
+          company: localizeCompanyProfile(profile, t),
+          invoices: filtered,
+          issuedDate: formatStatementFileDate(new Date()),
+          pdfLabels: {
+            ...dict.pdf,
+            listTitle: send.title,
+            statusPaid: t('invoiceList.statusPaid'),
+            statusUnpaid: t('invoiceList.statusUnpaid'),
+            statusLabel: t('obligations.status'),
+          },
+        })
+      : ''
+
+  function onSendList() {
+    if (!previewHtml) return
+    downloadHtmlAsPdf(previewHtml, invoiceListFileName(send.kind))
+    setPreview(false)
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
@@ -77,14 +121,15 @@ export function InvoiceListPage() {
           <p className="mt-2 text-sm text-brand-ink/55">{t('invoiceList.subtitle')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {unpaidClients.length > 0 ? (
-            <Link
-              to="/app/statement"
+          {filtered.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setPreview(true)}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-4 py-2.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
             >
               <Send className="h-4 w-4" />
-              {t('statement.cta')}
-            </Link>
+              {send.cta}
+            </button>
           ) : null}
           <Link
             to="/app/new"
@@ -120,17 +165,21 @@ export function InvoiceListPage() {
         </div>
       ) : null}
 
-      {unpaidClients.length > 0 ? (
-        <Link
-          to="/app/statement"
-          className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-brand-ink/8 bg-white px-5 py-4 hover:border-brand/30"
+      {statusFilter !== 'paid' && unpaidClients.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter('unpaid')
+            setPreview(true)
+          }}
+          className="mt-5 flex w-full items-center justify-between gap-4 rounded-2xl border border-brand-ink/8 bg-white px-5 py-4 text-left hover:border-brand/30"
         >
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('statement.title')}</p>
             <p className="mt-1 text-sm text-brand-ink/70">{t('statement.banner')}</p>
           </div>
           <p className="font-display text-xl font-medium">{formatMoney(statementTotal, currency)}</p>
-        </Link>
+        </button>
       ) : null}
 
       {invoices.length > 0 ? (
@@ -286,6 +335,25 @@ export function InvoiceListPage() {
             <p className="px-5 py-8 text-center text-sm text-brand-ink/50">{t('invoiceList.emptyTitle')}</p>
           ) : null}
         </div>
+      ) : null}
+
+      {preview ? (
+        <Modal
+          title={send.title}
+          onClose={() => setPreview(false)}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" onClick={onSendList}>
+                {t('common.send')}
+              </Button>
+            </>
+          }
+        >
+          <iframe title="invoice-list-preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
+        </Modal>
       ) : null}
     </div>
   )

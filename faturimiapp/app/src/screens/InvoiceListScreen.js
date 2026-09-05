@@ -5,15 +5,31 @@ import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { formatMoney } from '../utils/money';
-import { clientUnpaidSummaries } from '../pdf/invoiceTemplate';
+import { buildInvoiceListHtml, formatStatementFileDate } from '../pdf/invoiceTemplate';
+import { shareInvoiceListPdf } from '../pdf/generateInvoicePdf';
+import { localizeCompanyProfile } from '../storage/companySamples';
 import SwipeableRow from '../components/SwipeableRow';
+import PdfPreviewModal from '../components/PdfPreviewModal';
+
+function sendCopy(filter, t) {
+  if (filter === 'paid') {
+    return { kind: 'paid', cta: t('invoiceList.sendPaid'), title: t('invoiceList.sendPaidTitle') };
+  }
+  if (filter === 'unpaid') {
+    return { kind: 'unpaid', cta: t('invoiceList.sendUnpaid'), title: t('invoiceList.sendUnpaidTitle') };
+  }
+  return { kind: 'all', cta: t('invoiceList.sendList'), title: t('invoiceList.sendAllTitle') };
+}
 
 export default function InvoiceListScreen({ navigation }) {
   const { invoices, companyProfile, usage, updateInvoice, deleteInvoice } = useApp();
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('all');
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
+  const send = sendCopy(statusFilter, t);
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return invoices;
@@ -21,7 +37,6 @@ export default function InvoiceListScreen({ navigation }) {
     return invoices.filter((inv) => inv.status !== 'paid');
   }, [invoices, statusFilter]);
 
-  const unpaidClients = useMemo(() => clientUnpaidSummaries(invoices), [invoices]);
   const unpaidInvoiceTotal = invoices
     .filter((inv) => inv.status !== 'paid')
     .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
@@ -29,14 +44,55 @@ export default function InvoiceListScreen({ navigation }) {
     .filter((inv) => inv.status === 'paid')
     .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
 
+  const previewHtml = useMemo(() => {
+    if (!previewVisible || !filtered.length) return '';
+    return buildInvoiceListHtml({
+      company: localizeCompanyProfile(companyProfile, t),
+      invoices: filtered,
+      issuedDate: formatStatementFileDate(new Date()),
+      pdfLabels: {
+        ...t('pdf'),
+        listTitle: send.title,
+        statusPaid: t('invoiceDetail.statusPaid'),
+        statusUnpaid: t('invoiceDetail.statusUnpaid'),
+        statusLabel: t('obligations.status'),
+      },
+    });
+  }, [previewVisible, filtered, companyProfile, t, send.title]);
+
+  const onShareList = async () => {
+    if (!filtered.length) return;
+    setSharing(true);
+    try {
+      await shareInvoiceListPdf({
+        company: localizeCompanyProfile(companyProfile, t),
+        invoices: filtered,
+        issuedDate: formatStatementFileDate(new Date()),
+        kind: send.kind,
+        pdfLabels: {
+          ...t('pdf'),
+          listTitle: send.title,
+          statusPaid: t('invoiceDetail.statusPaid'),
+          statusUnpaid: t('invoiceDetail.statusUnpaid'),
+          statusLabel: t('obligations.status'),
+        },
+      });
+      setPreviewVisible(false);
+    } catch (err) {
+      Alert.alert(t('common.error'), err.message);
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={typography.title}>{t('invoiceList.title')}</Text>
-        {unpaidClients.length > 0 ? (
-          <Pressable style={styles.headerCta} onPress={() => navigation.navigate('Statement')}>
+        {filtered.length > 0 ? (
+          <Pressable style={styles.headerCta} onPress={() => setPreviewVisible(true)}>
             <Ionicons name="send-outline" size={16} color={colors.primary} />
-            <Text style={styles.headerCtaText}>{t('invoiceList.sendStatement')}</Text>
+            <Text style={styles.headerCtaText}>{send.cta}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -178,6 +234,16 @@ export default function InvoiceListScreen({ navigation }) {
       >
         <Ionicons name="add" size={30} color="#fff" />
       </Pressable>
+      <PdfPreviewModal
+        visible={previewVisible}
+        title={send.title}
+        html={previewHtml}
+        sharing={sharing}
+        cancelLabel={t('common.cancel')}
+        sendLabel={t('common.send')}
+        onCancel={() => setPreviewVisible(false)}
+        onSend={onShareList}
+      />
     </View>
   );
 }
