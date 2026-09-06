@@ -15,10 +15,15 @@ export type DocStatus = 'draft' | 'unpaid' | 'partial' | 'paid' | 'cancelled'
 export type ClientRecord = {
   id: string
   fullName: string
+  firstName?: string
+  lastName?: string
   address?: string
   phone?: string
   email?: string
   businessId?: string
+  notes?: string
+  measurements?: Record<string, string>
+  photos?: { proofUri?: string; proofData?: string; proofName?: string; proofMime?: string; data?: string }[]
   createdAt?: string
   updatedAt?: string
 }
@@ -76,7 +81,6 @@ export function remainingOf(doc: {
 }) {
   const status = paymentStatus(doc)
   if (status === 'cancelled' || status === 'draft') return 0
-  if (typeof doc.amountDue === 'number') return doc.amountDue
   if (status === 'paid') return 0
   return documentTotals(doc).amountDue
 }

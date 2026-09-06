@@ -26,6 +26,7 @@ const DEFAULT_COMPANY_PROFILE = {
   bankName: '',
   iban: '',
   exportNote: 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)',
+  industry: 'other',
 };
 
 const OBLIGATION_CATEGORIES = ['shipping', 'supplies', 'rent', 'tax', 'other'];
@@ -51,6 +52,7 @@ async function initStore() {
   if (!cache.invoices) cache.invoices = {};
   if (!cache.obligations) cache.obligations = {};
   if (!cache.clients) cache.clients = {};
+  if (!cache.items) cache.items = {};
   if (!cache.syncOps) cache.syncOps = {};
   if (!cache.migrations) cache.migrations = {};
   if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
@@ -67,6 +69,8 @@ function ensureUserCollections(db, userId) {
   if (!db.obligations[userId]) db.obligations[userId] = [];
   if (!db.clients) db.clients = {};
   if (!db.clients[userId]) db.clients[userId] = [];
+  if (!db.items) db.items = {};
+  if (!db.items[userId]) db.items[userId] = [];
   if (!db.syncOps) db.syncOps = {};
   if (!db.syncOps[userId]) db.syncOps[userId] = {};
   if (!db.migrations) db.migrations = {};
@@ -187,7 +191,7 @@ function normalizeLang(value) {
   return value === 'en' || value === 'it' ? value : 'sq';
 }
 
-async function createUser({ email, passwordHash, language }) {
+async function createUser({ email, passwordHash, language, industry }) {
   return withWriteLock(async () => {
     const db = readDb();
     const normalized = normalizeEmail(email);
@@ -203,12 +207,18 @@ async function createUser({ email, passwordHash, language }) {
       plan: 'free',
     };
     db.users.push(user);
-    db.profiles[user.id] = { ...DEFAULT_COMPANY_PROFILE, language: normalizeLang(language) };
+    db.profiles[user.id] = {
+      ...DEFAULT_COMPANY_PROFILE,
+      language: normalizeLang(language),
+      industry: ['fashion', 'services', 'retail', 'hospitality', 'construction', 'other'].includes(industry) ? industry : 'other',
+    };
     db.invoices[user.id] = [];
     if (!db.obligations) db.obligations = {};
     db.obligations[user.id] = [];
     if (!db.clients) db.clients = {};
     db.clients[user.id] = [];
+    if (!db.items) db.items = {};
+    db.items[user.id] = [];
     db.migrations[user.id] = { v: 1, at: new Date().toISOString() };
     await writeDb(db);
     return user;
@@ -414,6 +424,10 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
     partial = {
       ...(partial.dueDate !== undefined ? { dueDate: partial.dueDate } : {}),
       ...(partial.notes !== undefined ? { notes: partial.notes } : {}),
+      ...(partial.proofUri !== undefined ? { proofUri: partial.proofUri } : {}),
+      ...(partial.proofName !== undefined ? { proofName: partial.proofName } : {}),
+      ...(partial.proofMime !== undefined ? { proofMime: partial.proofMime } : {}),
+      ...(partial.proofData !== undefined ? { proofData: partial.proofData } : {}),
     };
   }
   if (lifecycle === 'cancelled' && !options.allowCancelledEdit) {
@@ -791,6 +805,74 @@ function deleteClient(userId, clientId) {
   return true;
 }
 
+function itemSnapshot(item) {
+  return {
+    description: String(item?.description || '').trim(),
+    unitCost: Number(item?.unitCost) || 0,
+    unit: String(item?.unit || 'pcs'),
+    taxable: item?.taxable !== false,
+    additionalDetails: String(item?.additionalDetails || '').trim(),
+  };
+}
+
+function listItems(userId) {
+  migrateUserData(userId);
+  const db = readDb();
+  return [...(db.items?.[userId] || [])];
+}
+
+function getItem(userId, itemId) {
+  return listItems(userId).find((item) => item.id === itemId) || null;
+}
+
+function addItem(userId, item) {
+  migrateUserData(userId);
+  const snap = itemSnapshot(item);
+  if (!snap.description) {
+    const err = new Error('ITEM_NAME');
+    throw err;
+  }
+  const db = readDb();
+  ensureUserCollections(db, userId);
+  const saved = {
+    ...snap,
+    id: item.id || crypto.randomUUID(),
+    createdAt: item.createdAt || nowIso(),
+    updatedAt: nowIso(),
+  };
+  db.items[userId] = [saved, ...(db.items[userId] || []).filter((row) => row.id !== saved.id)];
+  writeDb(db);
+  return { item: saved };
+}
+
+function updateItem(userId, itemId, partial) {
+  migrateUserData(userId);
+  const db = readDb();
+  const list = db.items[userId] || [];
+  const idx = list.findIndex((item) => item.id === itemId);
+  if (idx === -1) return null;
+  const snap = itemSnapshot({ ...list[idx], ...partial });
+  if (!snap.description) {
+    const err = new Error('ITEM_NAME');
+    throw err;
+  }
+  list[idx] = { ...list[idx], ...snap, id: itemId, createdAt: list[idx].createdAt, updatedAt: nowIso() };
+  db.items[userId] = list;
+  writeDb(db);
+  return list[idx];
+}
+
+function deleteItem(userId, itemId) {
+  migrateUserData(userId);
+  const db = readDb();
+  const list = db.items[userId] || [];
+  const next = list.filter((item) => item.id !== itemId);
+  if (next.length === list.length) return false;
+  db.items[userId] = next;
+  writeDb(db);
+  return true;
+}
+
 function checksumPayload(payload) {
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
@@ -801,6 +883,7 @@ function exportBackup(userId) {
     invoices: listInvoices(userId),
     obligations: listObligations(userId),
     clients: listClients(userId),
+    items: listItems(userId),
     profile: getProfile(userId),
   };
   return {
@@ -832,6 +915,7 @@ function restoreBackup(userId, backup) {
   db.invoices[userId] = Array.isArray(data.invoices) ? data.invoices : [];
   db.obligations[userId] = Array.isArray(data.obligations) ? data.obligations : [];
   db.clients[userId] = Array.isArray(data.clients) ? data.clients : [];
+  db.items[userId] = Array.isArray(data.items) ? data.items : [];
   if (data.profile) db.profiles[userId] = { ...getProfile(userId), ...data.profile };
   db.migrations[userId] = { v: 1, at: nowIso(), restoredAt: nowIso() };
   writeDb(db);
@@ -888,6 +972,17 @@ function applySyncChange(userId, change) {
     if (current) return { client: updateClient(userId, id, body) };
     return addClient(userId, { ...body, id });
   }
+  if (collection === 'items') {
+    if (op === 'delete') {
+      deleteItem(userId, id);
+      return { ok: true, id };
+    }
+    const current = getItem(userId, id);
+    const hit = conflictIfNeeded(current);
+    if (hit) return hit;
+    if (current) return { item: updateItem(userId, id, body) };
+    return addItem(userId, { ...body, id });
+  }
   if (collection === 'invoices') {
     if (op === 'delete') {
       deleteInvoice(userId, id);
@@ -938,6 +1033,7 @@ function snapshotForUser(userId) {
     invoices: listInvoices(userId),
     obligations: listObligations(userId),
     clients: listClients(userId),
+    items: listItems(userId),
     profile: getProfile(userId),
     serverTime: nowIso(),
   };
@@ -1015,6 +1111,11 @@ module.exports = {
   addClient,
   updateClient,
   deleteClient,
+  listItems,
+  getItem,
+  addItem,
+  updateItem,
+  deleteItem,
   addPayment,
   voidPayment,
   issueInvoice,

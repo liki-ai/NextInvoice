@@ -15,6 +15,9 @@ const SAMPLE_VALUES: Record<CompanySampleField, string[]> = {
   bankName: [],
   iban: [],
   exportNote: [],
+  industry: [],
+  logoUri: [],
+  logoData: [],
 }
 
 const PLACEHOLDER_KEYS: Record<CompanySampleField, string> = {
@@ -30,6 +33,9 @@ const PLACEHOLDER_KEYS: Record<CompanySampleField, string> = {
   bankName: 'profile.phBankName',
   iban: 'profile.phIban',
   exportNote: 'profile.phExportNote',
+  industry: 'industry.label',
+  logoUri: 'profile.companyName',
+  logoData: 'profile.companyName',
 }
 
 export function isSampleCompanyValue(field: CompanySampleField, value: string | undefined) {

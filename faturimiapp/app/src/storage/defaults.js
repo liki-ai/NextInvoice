@@ -11,6 +11,7 @@ export const DEFAULT_COMPANY_PROFILE = {
   bankName: '',
   iban: '',
   exportNote: 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)',
+  industry: 'other',
 };
 
 export const DEFAULT_SETTINGS = {

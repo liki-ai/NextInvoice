@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Eye, Plus, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -18,6 +18,8 @@ import {
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { localizeCompanyProfile } from '../../lib/companySamples'
+import { clientDisplayName } from '../../lib/client'
+import { invoiceLineFromCatalog } from '../../lib/catalog'
 
 function emptyItem(): InvoiceItem {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' }
@@ -25,9 +27,10 @@ function emptyItem(): InvoiceItem {
 
 export function InvoiceFormPage() {
   const { invoiceId } = useParams()
-  const { invoices, clients, profile, createInvoice, updateInvoice, issueInvoice, correctInvoice, createClient } = useAppData()
+  const { invoices, clients, items: catalogItems, profile, createInvoice, updateInvoice, issueInvoice, correctInvoice, createClient } = useAppData()
   const { t, dict } = useI18n()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const existing = invoiceId ? invoices.find((inv) => inv.id === invoiceId) : null
   const isEditing = Boolean(invoiceId)
   const location = useLocation()
@@ -36,7 +39,7 @@ export function InvoiceFormPage() {
   const [aiText, setAiText] = useState('')
   const [extracting, setExtracting] = useState(false)
   const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' })
-  const [clientId, setClientId] = useState(existing?.clientId || '')
+  const [clientId, setClientId] = useState(existing?.clientId || searchParams.get('clientId') || '')
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()))
   const [dueDate, setDueDate] = useState(() => existing?.dueDate || '')
@@ -101,6 +104,22 @@ export function InvoiceFormPage() {
     setDiscount(String(source.discount ?? '0'))
     setNotes(source.notes || '')
   }, [isEditing, (location as any).state, invoices])
+
+  useEffect(() => {
+    if (isEditing) return
+    const id = searchParams.get('clientId')
+    if (!id) return
+    const match = clients.find((item) => item.id === id)
+    if (!match) return
+    setClientId(id)
+    setClient({
+      fullName: clientDisplayName(match) || match.fullName || '',
+      address: match.address || '',
+      phone: match.phone || '',
+      email: match.email || '',
+      businessId: match.businessId || '',
+    })
+  }, [isEditing, searchParams, clients])
 
   const currency = profile?.currency || 'EUR'
   const { subtotal, total } = computeTotals(items, discount)
@@ -293,7 +312,7 @@ export function InvoiceFormPage() {
                 const match = clients.find((item) => item.id === id)
                 if (match) {
                   setClient({
-                    fullName: match.fullName || '',
+                    fullName: clientDisplayName(match) || match.fullName || '',
                     address: match.address || '',
                     phone: match.phone || '',
                     email: match.email || '',
@@ -305,7 +324,7 @@ export function InvoiceFormPage() {
               <option value="">{t('docs.newClient')}</option>
               {clients.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.fullName}{item.phone ? ` · ${item.phone}` : ''}
+                  {clientDisplayName(item)}{item.phone ? ` · ${item.phone}` : ''}
                 </option>
               ))}
             </Select>
@@ -339,6 +358,21 @@ export function InvoiceFormPage() {
                 <Plus className="h-4 w-4" /> {t('newInvoice.addItem')}
               </button>
             </div>
+            {catalogItems.length > 0 ? (
+              <div className="flex flex-wrap gap-2 border-b border-brand-ink/8 px-6 py-3">
+                <span className="w-full text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('items.pick')}</span>
+                {catalogItems.slice(0, 12).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setItems((prev) => [...prev, invoiceLineFromCatalog(item)])}
+                    className="rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+                  >
+                    {item.description}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-sm">
                 <thead className="bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">

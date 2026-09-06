@@ -37,6 +37,10 @@ export type Invoice = {
   issuedAt?: string
   createdAt?: string
   updatedAt?: string
+  proofUri?: string
+  proofName?: string
+  proofMime?: string
+  proofData?: string
 }
 
 export type CompanyProfile = {
@@ -54,6 +58,9 @@ export type CompanyProfile = {
   /** Legal footer on PDF. Empty string = hidden. Missing = use default. */
   exportNote?: string
   language?: 'sq' | 'en' | 'it'
+  industry?: string
+  logoUri?: string
+  logoData?: string
 }
 
 export const DEFAULT_EXPORT_NOTE = 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'

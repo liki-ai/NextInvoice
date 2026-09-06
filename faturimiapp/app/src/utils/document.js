@@ -37,7 +37,6 @@ export function paymentStatus(doc) {
 export function remainingOf(doc) {
   const status = paymentStatus(doc);
   if (status === 'cancelled' || status === 'draft') return 0;
-  if (typeof doc?.amountDue === 'number') return doc.amountDue;
   if (status === 'paid') return 0;
   return documentTotals(doc).amountDue;
 }

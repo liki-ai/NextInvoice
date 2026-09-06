@@ -41,7 +41,7 @@ router.post('/signup', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await createUser({ email, passwordHash, language: req.body?.language });
+    const user = await createUser({ email, passwordHash, language: req.body?.language, industry: req.body?.industry });
     const token = signToken(user);
     return res.status(201).json({ token, user: publicUser(user) });
   } catch (err) {

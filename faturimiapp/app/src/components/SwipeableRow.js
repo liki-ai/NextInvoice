@@ -11,9 +11,11 @@ export default function SwipeableRow({
   onEdit,
   onDelete,
   onTogglePaid,
+  onSendBalance,
 }) {
   const ref = useRef(null);
   const close = () => ref.current?.close();
+  const leftSend = Boolean(onSendBalance);
 
   return (
     <Swipeable
@@ -22,17 +24,30 @@ export default function SwipeableRow({
       overshootRight={false}
       friction={2}
       renderLeftActions={() => (
-        <View style={styles.leftWrap}>
-          <Pressable
-            style={[styles.action, paid ? styles.unpaid : styles.paid]}
-            onPress={() => {
-              close();
-              onTogglePaid();
-            }}
-          >
-            <Ionicons name={paid ? 'refresh' : 'checkmark-circle'} size={22} color="#fff" />
-            <Text style={styles.actionText}>{paid ? labels.markUnpaid : labels.markPaid}</Text>
-          </Pressable>
+        <View style={[styles.leftWrap, leftSend && styles.leftWide]}>
+          {leftSend ? (
+            <Pressable
+              style={[styles.action, styles.send]}
+              onPress={() => {
+                close();
+                onSendBalance();
+              }}
+            >
+              <Ionicons name="send" size={22} color="#fff" />
+              <Text style={styles.actionText}>{labels.sendBalance}</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={[styles.action, paid ? styles.unpaid : styles.paid]}
+              onPress={() => {
+                close();
+                onTogglePaid();
+              }}
+            >
+              <Ionicons name={paid ? 'refresh' : 'checkmark-circle'} size={22} color="#fff" />
+              <Text style={styles.actionText}>{paid ? labels.markUnpaid : labels.markPaid}</Text>
+            </Pressable>
+          )}
         </View>
       )}
       renderRightActions={() => (
@@ -83,6 +98,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
+  leftWide: { width: 112 },
+  send: { backgroundColor: colors.primary },
   paid: { backgroundColor: colors.success },
   unpaid: { backgroundColor: colors.accent },
   edit: { backgroundColor: colors.primary },

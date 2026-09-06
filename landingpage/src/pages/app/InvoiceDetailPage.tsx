@@ -4,19 +4,19 @@ import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal } from '../../components/ui'
-import { PaymentModal } from '../../components/PaymentModal'
 import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, invoiceStatus } from '../../lib/invoice'
 import { activePayments, daysOverdue, remainingOf, reminderText } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
+import { fullPaymentPayload } from '../../lib/invoiceBalance'
+import { ProofField } from '../../components/ProofField'
 
 export function InvoiceDetailPage() {
   const { invoiceId } = useParams()
-  const { invoices, profile, loading, removeInvoice, issueInvoice, cancelInvoice, addInvoicePayment, voidInvoicePayment } = useAppData()
+  const { invoices, profile, loading, removeInvoice, issueInvoice, cancelInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice } = useAppData()
   const { t, dict } = useI18n()
   const navigate = useNavigate()
   const [preview, setPreview] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [payOpen, setPayOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [copied, setCopied] = useState(false)
@@ -239,6 +239,21 @@ export function InvoiceDetailPage() {
             </Card>
           ) : null}
 
+          {status !== 'draft' ? (
+            <Card>
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('obligations.proofTitle')}</h2>
+              <div className="mt-3">
+                <ProofField
+                  proof={current}
+                  t={t}
+                  onChange={(proof) => {
+                    void updateInvoice(current.id, proof)
+                  }}
+                />
+              </div>
+            </Card>
+          ) : null}
+
           {late > 0 ? (
             <Card>
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('docs.reminder')}</h2>
@@ -285,8 +300,14 @@ export function InvoiceDetailPage() {
           {invoice.cancelReason ? <p className="mt-5 text-sm text-[#C0503A]">{t('docs.cancelInvoice')}: {invoice.cancelReason}</p> : null}
           <div className="mt-5 flex flex-col gap-2">
             {status !== 'draft' && status !== 'cancelled' && due > 0 ? (
-              <Button type="button" onClick={() => setPayOpen(true)}>
-                {t('docs.recordPayment')}
+              <Button
+                type="button"
+                onClick={() => {
+                  const payload = fullPaymentPayload(current)
+                  if (payload.amount > 0) void addInvoicePayment(current.id, payload)
+                }}
+              >
+                {t('invoiceList.statusPaid')}
               </Button>
             ) : null}
             {status !== 'cancelled' && status !== 'draft' ? (
@@ -326,15 +347,6 @@ export function InvoiceDetailPage() {
         >
           <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={html} />
         </Modal>
-      ) : null}
-
-      {payOpen ? (
-        <PaymentModal
-          doc={current}
-          currency={currency}
-          onClose={() => setPayOpen(false)}
-          onSave={(payment) => addInvoicePayment(current.id, payment).then(() => undefined)}
-        />
       ) : null}
 
       {cancelOpen ? (

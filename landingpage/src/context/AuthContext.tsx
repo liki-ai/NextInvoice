@@ -15,7 +15,7 @@ type AuthValue = {
   token: string | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string, language?: string) => Promise<void>
+  signup: (email: string, password: string, extras?: { language?: string; industry?: string }) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -57,10 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user)
   }, [])
 
-  const signup = useCallback(async (email: string, password: string, language?: string) => {
+  const signup = useCallback(async (email: string, password: string, extras?: { language?: string; industry?: string }) => {
     const res = await api<{ token: string; user: User }>('/api/auth/signup', {
       method: 'POST',
-      body: { email, password, language },
+      body: { email, password, language: extras?.language, industry: extras?.industry },
       token: null,
     })
     setToken(res.token)

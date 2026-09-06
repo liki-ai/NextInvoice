@@ -12,16 +12,16 @@ import { buildInvoiceHtml } from '../pdf/invoiceTemplate';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 import { daysOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, reminderText } from '../utils/document';
-import PaymentModal from '../components/PaymentModal';
+import { fullPaymentPayload } from '../utils/invoiceBalance';
+import ProofBlock from '../components/ProofBlock';
 
 export default function InvoiceDetailScreen({ route, navigation }) {
   const { invoiceId } = route.params;
-  const { invoices, companyProfile, deleteInvoice, issueInvoice, cancelInvoice, addInvoicePayment } = useApp();
+  const { invoices, companyProfile, deleteInvoice, issueInvoice, cancelInvoice, addInvoicePayment, updateInvoice } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [sharing, setSharing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [payOpen, setPayOpen] = useState(false);
 
   const invoice = useMemo(() => invoices.find((inv) => inv.id === invoiceId), [invoices, invoiceId]);
   const status = invoice ? paymentStatus(invoice) : 'unpaid';
@@ -202,7 +202,23 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           <Button title={t('docs.issue')} onPress={() => issueInvoice(invoice.id)} style={{ marginTop: spacing.sm }} />
         ) : null}
         {status !== 'draft' && status !== 'cancelled' && due > 0 ? (
-          <Button title={t('docs.recordPayment')} variant="secondary" onPress={() => setPayOpen(true)} style={{ marginTop: spacing.sm }} />
+          <Button
+            title={t('invoiceDetail.statusPaid')}
+            onPress={() => {
+              const payload = fullPaymentPayload(invoice);
+              if (payload.amount > 0) void addInvoicePayment(invoice.id, payload);
+            }}
+            style={{ marginTop: spacing.sm }}
+          />
+        ) : null}
+        {status !== 'draft' ? (
+          <Section title={t('obligations.proofTitle')} style={{ marginTop: spacing.md }}>
+            <ProofBlock
+              item={invoice}
+              t={t}
+              onChange={(proof) => void updateInvoice(invoice.id, proof)}
+            />
+          </Section>
         ) : null}
         {status !== 'draft' && status !== 'cancelled' ? (
           <Button title={t('docs.cancelInvoice')} variant="secondary" onPress={handleCancel} style={{ marginTop: spacing.sm }} />
@@ -246,13 +262,6 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
-      <PaymentModal
-        visible={payOpen}
-        doc={invoice}
-        currency={currency}
-        onClose={() => setPayOpen(false)}
-        onSave={(payment) => addInvoicePayment(invoice.id, payment)}
-      />
     </View>
   );
 }

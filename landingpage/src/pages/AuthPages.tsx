@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n'
 import { Button, Field } from '../components/ui'
 import { LanguagePicker } from '../components/LangSwitch'
+import { INDUSTRIES, type Industry } from '../lib/client'
 import { api, setToken } from '../lib/api'
 
 function authErrorMessage(err: unknown, t: (key: string) => string) {
@@ -104,6 +105,7 @@ export function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [industry, setIndustry] = useState<Industry>('other')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -118,7 +120,7 @@ export function SignupPage() {
     }
     setSubmitting(true)
     try {
-      await signup(email, password, lang)
+      await signup(email, password, { language: lang, industry })
       navigate('/app', { replace: true })
     } catch (err) {
       setError(authErrorMessage(err, t))
@@ -137,6 +139,19 @@ export function SignupPage() {
           <Field label={t('auth.email')} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <Field label={t('auth.password')} type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
           <Field label={t('auth.confirmPassword')} type="password" autoComplete="new-password" required minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('industry.label')}</p>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {INDUSTRIES.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setIndustry(value)}
+                className={`rounded-xl border px-3 py-2 text-xs font-semibold ${industry === value ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white'}`}
+              >
+                {t(`industry.${value}`)}
+              </button>
+            ))}
+          </div>
         </div>
         {error ? <p className="mb-4 text-sm text-[#C0503A]">{error}</p> : null}
         <Button type="submit" disabled={submitting} className="w-full">

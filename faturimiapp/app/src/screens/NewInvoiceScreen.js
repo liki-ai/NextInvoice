@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -25,6 +25,8 @@ import { generateId } from '../utils/id';
 import { extractClientInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 import { localizeCompanyProfile } from '../storage/companySamples';
+import { clientDisplayName } from '../utils/client';
+import { invoiceLineFromCatalog } from '../utils/catalog';
 
 function emptyItem() {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' };
@@ -55,7 +57,7 @@ function itemsFromInvoice(invoice) {
 
 export default function NewInvoiceScreen({ navigation, route }) {
   const invoiceId = route?.params?.invoiceId;
-  const { invoices, clients, companyProfile, settings, addInvoice, updateInvoice, addClient } = useApp();
+  const { invoices, clients, catalogItems, companyProfile, settings, addInvoice, updateInvoice, addClient } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
@@ -78,6 +80,21 @@ export default function NewInvoiceScreen({ navigation, route }) {
   const [showNotes, setShowNotes] = useState(() => Boolean(existing?.notes));
   const [saving, setSaving] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
+
+  useEffect(() => {
+    const id = route?.params?.clientId;
+    if (!id) return;
+    const found = clients.find((item) => item.id === id);
+    if (!found) return;
+    setClientId(found.id);
+    setClient({
+      fullName: clientDisplayName(found),
+      address: found.address || '',
+      phone: found.phone || '',
+      email: found.email || '',
+      businessId: found.businessId || '',
+    });
+  }, [route?.params?.clientId, clients]);
 
   const { subtotal, total } = computeTotals(items, discount);
 
@@ -291,7 +308,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
                   onPress={() => {
                     setClientId(item.id);
                     setClient({
-                      fullName: item.fullName || '',
+                      fullName: clientDisplayName(item),
                       address: item.address || '',
                       phone: item.phone || '',
                       email: item.email || '',
@@ -301,7 +318,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
                   style={{ paddingVertical: 6 }}
                 >
                   <Text style={{ color: clientId === item.id ? colors.primary : colors.text, fontWeight: clientId === item.id ? '700' : '500' }}>
-                    {item.fullName}{item.phone ? ` · ${item.phone}` : ''}
+                    {clientDisplayName(item)}{item.phone ? ` · ${item.phone}` : ''}
                   </Text>
                 </Pressable>
               ))}
@@ -343,6 +360,22 @@ export default function NewInvoiceScreen({ navigation, route }) {
         </Section>
 
         <Section title={t('newInvoice.itemsSectionTitle')}>
+          {catalogItems.length > 0 ? (
+            <View style={{ marginBottom: spacing.sm }}>
+              <Text style={typography.label}>{t('items.pick')}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+                {catalogItems.slice(0, 12).map((item) => (
+                  <Pressable
+                    key={item.id}
+                    style={styles.optionLink}
+                    onPress={() => setItems((prev) => [...prev, invoiceLineFromCatalog(item, generateId)])}
+                  >
+                    <Text style={styles.optionLinkText}>{item.description}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
           {items.map((item, idx) => (
             <View key={item.id} style={styles.itemBlock}>
               <View style={styles.itemHeaderRow}>

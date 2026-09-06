@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext'
 import type { CompanyProfile, Invoice } from '../lib/invoice'
 import type { Obligation } from '../lib/obligation'
 import type { ClientRecord, Payment } from '../lib/document'
+import type { CatalogItem } from '../lib/catalog'
 import { useI18n, isLang } from '../i18n'
 
 type PaymentInput = { amount: number; date: string; method?: string; note?: string; opId?: string }
@@ -12,6 +13,7 @@ type DataValue = {
   invoices: Invoice[]
   obligations: Obligation[]
   clients: ClientRecord[]
+  items: CatalogItem[]
   profile: CompanyProfile | null
   loading: boolean
   refresh: () => Promise<void>
@@ -31,6 +33,9 @@ type DataValue = {
   createClient: (client: Omit<ClientRecord, 'id' | 'createdAt'>) => Promise<ClientRecord>
   updateClient: (id: string, client: Partial<ClientRecord>) => Promise<ClientRecord>
   removeClient: (id: string) => Promise<void>
+  createItem: (item: Omit<CatalogItem, 'id' | 'createdAt'>) => Promise<CatalogItem>
+  updateItem: (id: string, item: Partial<CatalogItem>) => Promise<CatalogItem>
+  removeItem: (id: string) => Promise<void>
   saveProfile: (profile: CompanyProfile) => Promise<CompanyProfile>
   downloadBackup: () => Promise<void>
   restoreBackup: (backup: unknown) => Promise<void>
@@ -44,6 +49,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [obligations, setObligations] = useState<Obligation[]>([])
   const [clients, setClients] = useState<ClientRecord[]>([])
+  const [items, setItems] = useState<CatalogItem[]>([])
   const [profile, setProfile] = useState<CompanyProfile | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -52,23 +58,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setInvoices([])
       setObligations([])
       setClients([])
+      setItems([])
       setProfile(null)
       return
     }
     setLoading(true)
     try {
-      const snap = await api<{ invoices: Invoice[]; obligations: Obligation[]; clients: ClientRecord[]; profile: CompanyProfile }>('/api/sync').catch(async () => {
-        const [invRes, profRes, oblRes, clientRes] = await Promise.all([
+      const snap = await api<{ invoices: Invoice[]; obligations: Obligation[]; clients: ClientRecord[]; items: CatalogItem[]; profile: CompanyProfile }>('/api/sync').catch(async () => {
+        const [invRes, profRes, oblRes, clientRes, itemRes] = await Promise.all([
           api<{ invoices: Invoice[] }>('/api/invoices'),
           api<{ profile: CompanyProfile }>('/api/profile'),
           api<{ obligations: Obligation[] }>('/api/obligations').catch(() => ({ obligations: [] as Obligation[] })),
           api<{ clients: ClientRecord[] }>('/api/clients').catch(() => ({ clients: [] as ClientRecord[] })),
+          api<{ items: CatalogItem[] }>('/api/items').catch(() => ({ items: [] as CatalogItem[] })),
         ])
-        return { invoices: invRes.invoices, obligations: oblRes.obligations, clients: clientRes.clients, profile: profRes.profile }
+        return { invoices: invRes.invoices, obligations: oblRes.obligations, clients: clientRes.clients, items: itemRes.items, profile: profRes.profile }
       })
       setInvoices(snap.invoices || [])
       setObligations(snap.obligations || [])
       setClients(snap.clients || [])
+      setItems(snap.items || [])
       setProfile(snap.profile)
       if (isLang(snap.profile?.language)) setLang(snap.profile.language)
     } finally {
@@ -176,6 +185,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setClients((prev) => prev.filter((item) => item.id !== id))
   }, [])
 
+  const createItem = useCallback(async (item: Omit<CatalogItem, 'id' | 'createdAt'>) => {
+    const res = await api<{ item: CatalogItem }>('/api/items', { method: 'POST', body: item })
+    setItems((prev) => [res.item, ...prev.filter((row) => row.id !== res.item.id)])
+    return res.item
+  }, [])
+
+  const updateItem = useCallback(async (id: string, item: Partial<CatalogItem>) => {
+    const res = await api<{ item: CatalogItem }>(`/api/items/${id}`, { method: 'PUT', body: item })
+    setItems((prev) => prev.map((row) => (row.id === id ? res.item : row)))
+    return res.item
+  }, [])
+
+  const removeItem = useCallback(async (id: string) => {
+    await api(`/api/items/${id}`, { method: 'DELETE' })
+    setItems((prev) => prev.filter((row) => row.id !== id))
+  }, [])
+
   const saveProfile = useCallback(async (next: CompanyProfile) => {
     const res = await api<{ profile: CompanyProfile }>('/api/profile', { method: 'PUT', body: next })
     setProfile(res.profile)
@@ -205,6 +231,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       invoices,
       obligations,
       clients,
+      items,
       profile,
       loading,
       refresh,
@@ -224,6 +251,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       createClient,
       updateClient,
       removeClient,
+      createItem,
+      updateItem,
+      removeItem,
       saveProfile,
       downloadBackup,
       restoreBackup,
@@ -232,6 +262,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       invoices,
       obligations,
       clients,
+      items,
       profile,
       loading,
       refresh,
@@ -251,6 +282,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       createClient,
       updateClient,
       removeClient,
+      createItem,
+      updateItem,
+      removeItem,
       saveProfile,
       downloadBackup,
       restoreBackup,

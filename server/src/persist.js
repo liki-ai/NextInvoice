@@ -11,6 +11,7 @@ function emptyDb() {
     invoices: {},
     obligations: {},
     clients: {},
+    items: {},
     syncOps: {},
     migrations: {},
     passwordResets: [],

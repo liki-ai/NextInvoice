@@ -13,6 +13,10 @@ import { StatementPage } from './pages/app/StatementPage'
 import { ProfilePage } from './pages/app/ProfilePage'
 import { OverviewPage } from './pages/app/OverviewPage'
 import { UpgradePage } from './pages/app/UpgradePage'
+import { ClientListPage } from './pages/app/ClientListPage'
+import { ClientFormPage } from './pages/app/ClientFormPage'
+import { ItemListPage } from './pages/app/ItemListPage'
+import { ItemFormPage } from './pages/app/ItemFormPage'
 
 function RequireAuth() {
   const { user, loading } = useAuth()
@@ -47,6 +51,12 @@ export default function App() {
               <Route path="obligations/new" element={<ObligationFormPage />} />
               <Route path="obligations/:obligationId/edit" element={<ObligationFormPage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="clients" element={<ClientListPage />} />
+              <Route path="clients/new" element={<ClientFormPage />} />
+              <Route path="clients/:clientId" element={<ClientFormPage />} />
+              <Route path="items" element={<ItemListPage />} />
+              <Route path="items/new" element={<ItemFormPage />} />
+              <Route path="items/:itemId" element={<ItemFormPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

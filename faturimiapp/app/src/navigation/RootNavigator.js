@@ -14,6 +14,10 @@ import OverviewDrillScreen from '../screens/OverviewDrillScreen';
 import StatementScreen from '../screens/StatementScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SubscribeScreen from '../screens/SubscribeScreen';
+import ClientListScreen from '../screens/ClientListScreen';
+import ClientFormScreen from '../screens/ClientFormScreen';
+import ItemListScreen from '../screens/ItemListScreen';
+import ItemFormScreen from '../screens/ItemFormScreen';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors } from '../theme';
 
@@ -128,7 +132,19 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen
         name="ProfileHome"
         component={ProfileScreen}
-        options={{ title: t('profile.title'), headerShown: false }}
+        options={{ title: t('more.title'), headerShown: false }}
+      />
+      <ProfileStack.Screen name="ClientList" component={ClientListScreen} options={{ title: t('clients.title') }} />
+      <ProfileStack.Screen
+        name="ClientForm"
+        component={ClientFormScreen}
+        options={({ route }) => ({ title: route?.params?.clientId ? t('clients.edit') : t('clients.add') })}
+      />
+      <ProfileStack.Screen name="ItemList" component={ItemListScreen} options={{ title: t('items.title') }} />
+      <ProfileStack.Screen
+        name="ItemForm"
+        component={ItemFormScreen}
+        options={({ route }) => ({ title: route?.params?.itemId ? t('items.edit') : t('items.add') })}
       />
       <ProfileStack.Screen
         name="Subscribe"
@@ -198,9 +214,9 @@ export default function RootNavigator() {
           name="Profile"
           component={ProfileStackNavigator}
           options={{
-            title: t('tabs.profile'),
-            tabBarLabel: t('tabs.profile'),
-            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="settings" outline="settings-outline" />,
+            title: t('tabs.more'),
+            tabBarLabel: t('tabs.more'),
+            tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="ellipsis-horizontal" outline="ellipsis-horizontal-outline" />,
           }}
         />
       </Tab.Navigator>

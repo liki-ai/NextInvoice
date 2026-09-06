@@ -11,8 +11,9 @@ import { localizeCompanyProfile } from '../storage/companySamples';
 import SwipeableRow from '../components/SwipeableRow';
 import PdfPreviewModal from '../components/PdfPreviewModal';
 import SyncBanner from '../components/SyncBanner';
-import PaymentModal from '../components/PaymentModal';
 import { daysOverdue, isOverdue, paymentStatus, remainingOf } from '../utils/document';
+import { fullPaymentPayload, invoiceBalanceText } from '../utils/invoiceBalance';
+import BalanceShareModal from '../components/BalanceShareModal';
 
 function sendCopy(filter, t) {
   if (filter === 'paid') {
@@ -30,7 +31,7 @@ export default function InvoiceListScreen({ navigation }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [previewVisible, setPreviewVisible] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [payId, setPayId] = useState(null);
+  const [balanceId, setBalanceId] = useState(null);
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
   const send = sendCopy(statusFilter, t);
@@ -183,14 +184,16 @@ export default function InvoiceListScreen({ navigation }) {
           const paid = status === 'paid';
           const late = daysOverdue(item);
           const due = remainingOf(item);
+          const canPay = due > 0 && status !== 'cancelled' && status !== 'draft';
           return (
             <SwipeableRow
               paid={paid}
               labels={{
                 edit: t('common.edit'),
                 delete: t('common.delete'),
-                markPaid: t('docs.recordPayment'),
+                markPaid: t('invoiceDetail.statusPaid'),
                 markUnpaid: t('invoiceDetail.statusUnpaid'),
+                sendBalance: t('balance.send'),
               }}
               onEdit={() => navigation.navigate(status === 'draft' ? 'EditInvoice' : 'InvoiceDetail', { invoiceId: item.id })}
               onDelete={() => {
@@ -204,7 +207,7 @@ export default function InvoiceListScreen({ navigation }) {
                   },
                 ]);
               }}
-              onTogglePaid={() => (due > 0 && status !== 'cancelled' && status !== 'draft' ? setPayId(item.id) : null)}
+              onSendBalance={() => setBalanceId(item.id)}
             >
               <Pressable
                 style={styles.card}
@@ -222,11 +225,26 @@ export default function InvoiceListScreen({ navigation }) {
               <View style={styles.subRow}>
                 <Text style={typography.muted}>{item.dueDate || t('pdf.onReceipt')}</Text>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <View style={[styles.statusChip, paid ? styles.statusPaid : status === 'partial' ? styles.statusPartial : styles.statusUnpaid]}>
+                  <Pressable
+                    onPress={() => {
+                      if (!canPay) return;
+                      const payload = fullPaymentPayload(item);
+                      if (payload.amount > 0) void addInvoicePayment(item.id, payload);
+                    }}
+                    hitSlop={8}
+                    accessibilityHint={canPay ? t('invoiceList.tapToMarkPaid') : undefined}
+                    style={[styles.statusChip, paid ? styles.statusPaid : status === 'partial' ? styles.statusPartial : styles.statusUnpaid]}
+                  >
                     <Text style={paid || status === 'partial' ? styles.statusPaidText : styles.statusUnpaidText}>
-                      {paid ? t('invoiceDetail.statusPaid') : status === 'partial' ? t('docs.statusPartial') : status === 'draft' ? t('docs.statusDraft') : status === 'cancelled' ? t('docs.statusCancelled') : t('invoiceDetail.statusUnpaid')}
+                      {paid
+                        ? t('invoiceDetail.statusPaid')
+                        : status === 'draft'
+                          ? t('docs.statusDraft')
+                          : status === 'cancelled'
+                            ? t('docs.statusCancelled')
+                            : t('invoiceDetail.statusPaid')}
                     </Text>
-                  </View>
+                  </Pressable>
                   {late > 0 ? <Text style={styles.overdue}>{t('docs.overdueDays', { days: late })}</Text> : null}
                 </View>
               </View>
@@ -259,12 +277,22 @@ export default function InvoiceListScreen({ navigation }) {
         onCancel={() => setPreviewVisible(false)}
         onSend={onShareList}
       />
-      <PaymentModal
-        visible={Boolean(payId)}
-        doc={invoices.find((item) => item.id === payId)}
-        currency={invoices.find((item) => item.id === payId)?.currency || currency}
-        onClose={() => setPayId(null)}
-        onSave={(payment) => addInvoicePayment(payId, payment)}
+      <BalanceShareModal
+        visible={Boolean(balanceId)}
+        title={t('balance.title')}
+        text={
+          balanceId
+            ? invoiceBalanceText(
+                invoices.find((item) => item.id === balanceId),
+                t,
+                formatMoney,
+                invoices.find((item) => item.id === balanceId)?.currency || currency,
+              )
+            : ''
+        }
+        cancelLabel={t('common.cancel')}
+        sendLabel={t('common.send')}
+        onCancel={() => setBalanceId(null)}
       />
     </View>
   );

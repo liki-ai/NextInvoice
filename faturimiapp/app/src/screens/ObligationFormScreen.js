@@ -17,6 +17,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { Button, DatePickerModal, FormField, Section, SegmentedControl } from '../components/ui';
 import { formatDateForInvoice } from '../utils/invoiceNumber';
 import { formatMoney, toNumber } from '../utils/money';
+import ProofBlock from '../components/ProofBlock';
 
 const CATEGORIES = ['shipping', 'supplies', 'rent', 'tax', 'other'];
 const CATEGORY_KEYS = {
@@ -48,6 +49,12 @@ export default function ObligationFormScreen({ navigation, route }) {
   const [showInvoices, setShowInvoices] = useState(false);
   const [showDuePicker, setShowDuePicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [proof, setProof] = useState(() => ({
+    proofUri: existing?.proofUri || '',
+    proofName: existing?.proofName || '',
+    proofMime: existing?.proofMime || '',
+    proofData: existing?.proofData || '',
+  }));
 
   const vendors = useMemo(() => {
     const seen = new Set();
@@ -87,6 +94,10 @@ export default function ObligationFormScreen({ navigation, route }) {
         category,
         notes: notes.trim(),
         relatedInvoiceId,
+        proofUri: proof.proofUri || '',
+        proofName: proof.proofName || '',
+        proofMime: proof.proofMime || '',
+        proofData: proof.proofData || '',
       };
       if (isEditing) await updateObligation(existing.id, payload);
       else await addObligation(payload);
@@ -226,6 +237,10 @@ export default function ObligationFormScreen({ navigation, route }) {
               ))}
             </View>
           ) : null}
+        </Section>
+
+        <Section title={t('obligations.proofTitle')}>
+          <ProofBlock item={proof} t={t} onChange={setProof} />
         </Section>
 
         <Section>

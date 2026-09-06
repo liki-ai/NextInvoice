@@ -13,6 +13,7 @@ import {
   type ObligationCategory,
   type ObligationStatus,
 } from '../../lib/obligation'
+import { ProofField } from '../../components/ProofField'
 
 function toDateInputValue(display: string) {
   if (!display) return ''
@@ -52,6 +53,12 @@ export function ObligationFormPage() {
   const [showInvoices, setShowInvoices] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [proof, setProof] = useState({
+    proofUri: existing?.proofUri || '',
+    proofName: existing?.proofName || '',
+    proofMime: existing?.proofMime || '',
+    proofData: existing?.proofData || '',
+  })
 
   useEffect(() => {
     if (!existing) return
@@ -66,6 +73,12 @@ export function ObligationFormPage() {
     setShowNotes(Boolean(existing.notes || existing.description))
     setShowDueDate(Boolean(existing.dueDate))
     setShowInvoices(false)
+    setProof({
+      proofUri: existing.proofUri || '',
+      proofName: existing.proofName || '',
+      proofMime: existing.proofMime || '',
+      proofData: existing.proofData || '',
+    })
   }, [existing?.id])
 
   const parsedAmount = parseObligationAmount(amount)
@@ -94,6 +107,7 @@ export function ObligationFormPage() {
       category,
       notes: notes.trim(),
       relatedInvoiceId,
+      ...proof,
     }
   }
 
@@ -138,6 +152,7 @@ export function ObligationFormPage() {
       </h1>
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="space-y-6">
         <Card>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -258,6 +273,23 @@ export function ObligationFormPage() {
             ) : null}
           </div>
         </Card>
+
+        <Card>
+          <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('obligations.proofTitle')}</h2>
+          <ProofField
+            proof={proof}
+            t={t}
+            onChange={(next) =>
+              setProof({
+                proofUri: next.proofUri || '',
+                proofName: next.proofName || '',
+                proofMime: next.proofMime || '',
+                proofData: next.proofData || '',
+              })
+            }
+          />
+        </Card>
+        </div>
 
         <Card className="h-fit lg:sticky lg:top-8">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('invoiceDetail.summary')}</h2>

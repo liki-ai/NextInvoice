@@ -15,8 +15,8 @@ import { localizeCompanyProfile } from '../../lib/companySamples'
 import { obligationStatus, uniqueVendors, vendorSummaries } from '../../lib/obligation'
 import type { Obligation } from '../../lib/obligation'
 import { Button, Modal } from '../../components/ui'
-import { PaymentModal } from '../../components/PaymentModal'
 import { daysOverdue, isOverdue, remainingOf } from '../../lib/document'
+import { fullPaymentPayload } from '../../lib/invoiceBalance'
 
 const MAX_PROOF_BYTES = 4 * 1024 * 1024
 
@@ -63,7 +63,6 @@ export function ObligationListPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
   const [error, setError] = useState('')
-  const [payId, setPayId] = useState<string | null>(null)
   const currency = profile?.currency || 'EUR'
   const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
   const vendors = useMemo(() => uniqueVendors(obligations), [obligations])
@@ -390,10 +389,13 @@ export function ObligationListPage() {
                           {due > 0 && status !== 'paid' ? (
                             <button
                               type="button"
-                              onClick={() => setPayId(item.id)}
+                              onClick={() => {
+                                const payload = fullPaymentPayload({ ...item, total: item.amount })
+                                if (payload.amount > 0) void addObligationPayment(item.id, payload)
+                              }}
                               className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
                             >
-                              {t('docs.recordPayment')}
+                              {t('invoiceList.statusPaid')}
                             </button>
                           ) : null}
                           <Link
@@ -443,15 +445,6 @@ export function ObligationListPage() {
         >
           <iframe title="obligation-list-preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
         </Modal>
-      ) : null}
-
-      {payId ? (
-        <PaymentModal
-          doc={{ ...((obligations.find((item) => item.id === payId) || {}) as Obligation), total: obligations.find((item) => item.id === payId)?.amount }}
-          currency={currency}
-          onClose={() => setPayId(null)}
-          onSave={(payment) => addObligationPayment(payId, payment).then(() => undefined)}
-        />
       ) : null}
     </div>
   )

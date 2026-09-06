@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Wallet, X } from 'lucide-react'
+import { FileText, LayoutDashboard, LogOut, Menu, MoreHorizontal, Plus, Wallet, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -11,7 +11,7 @@ const NAV = [
   { to: '/app', end: true, icon: FileText, key: 'nav.invoices', id: 'invoices' },
   { to: '/app/obligations', end: false, icon: Wallet, key: 'nav.obligations', id: 'obligations' },
   { to: '/app/overview', end: false, icon: LayoutDashboard, key: 'nav.overview', id: 'overview' },
-  { to: '/app/profile', end: true, icon: Settings, key: 'nav.profile', id: 'settings' },
+  { to: '/app/profile', end: false, icon: MoreHorizontal, key: 'nav.more', id: 'more' },
 ] as const
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -25,7 +25,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     (pathname.startsWith('/app/statement') && !search.includes('from=overview'))
   const obligationsActive = pathname.startsWith('/app/obligations')
   const overviewActive = pathname.startsWith('/app/overview') || search.includes('from=overview')
-  const settingsActive = pathname.startsWith('/app/profile') || pathname.startsWith('/app/upgrade')
+  const moreActive =
+    pathname.startsWith('/app/profile') ||
+    pathname.startsWith('/app/upgrade') ||
+    pathname.startsWith('/app/clients') ||
+    pathname.startsWith('/app/items')
 
   return (
     <div className="flex h-full flex-col">
@@ -50,8 +54,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                     ? obligationsActive
                     : item.id === 'overview'
                       ? overviewActive
-                      : item.id === 'settings'
-                        ? settingsActive
+                      : item.id === 'more'
+                        ? moreActive
                         : isActive
               return cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition',

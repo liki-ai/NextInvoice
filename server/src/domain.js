@@ -120,14 +120,22 @@ function companySnapshot(profile) {
 }
 
 function clientSnapshot(client) {
-  if (!client) return { fullName: '', address: '', phone: '', email: '', businessId: '' }
+  if (!client) return { fullName: '', firstName: '', lastName: '', address: '', phone: '', email: '', businessId: '', notes: '', measurements: {}, photos: [] }
+  const firstName = String(client.firstName || '').trim()
+  const lastName = String(client.lastName || '').trim()
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || String(client.fullName || '').trim()
   return {
     id: client.id || '',
-    fullName: String(client.fullName || '').trim(),
+    firstName,
+    lastName,
+    fullName,
     address: String(client.address || '').trim(),
     phone: String(client.phone || '').trim(),
     email: String(client.email || '').trim(),
     businessId: String(client.businessId || client.nui || '').trim(),
+    notes: String(client.notes || '').trim(),
+    measurements: client.measurements && typeof client.measurements === 'object' ? client.measurements : {},
+    photos: Array.isArray(client.photos) ? client.photos : [],
   }
 }
 

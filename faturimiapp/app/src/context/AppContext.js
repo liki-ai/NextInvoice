@@ -27,6 +27,7 @@ export function AppProvider({ children }) {
   const [invoices, setInvoices] = useState([]);
   const [obligations, setObligations] = useState([]);
   const [clients, setClients] = useState([]);
+  const [catalogItems, setCatalogItems] = useState([]);
   const [plan, setPlan] = useState(DEFAULT_PLAN);
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -44,6 +45,7 @@ export function AppProvider({ children }) {
         storedObligations,
         storedPlan,
         storedClients,
+        storedItems,
         storedToken,
         storedUser,
         storedQueue,
@@ -56,6 +58,7 @@ export function AppProvider({ children }) {
         getJson(KEYS.OBLIGATIONS, []),
         getJson(KEYS.PLAN, DEFAULT_PLAN),
         getJson(KEYS.CLIENTS, []),
+        getJson(KEYS.ITEMS, []),
         getJson(KEYS.AUTH_TOKEN, null),
         getJson(KEYS.AUTH_USER, null),
         getJson(KEYS.SYNC_QUEUE, []),
@@ -67,6 +70,7 @@ export function AppProvider({ children }) {
       setInvoices(storedInvoices);
       setObligations(Array.isArray(storedObligations) ? storedObligations : []);
       setClients(Array.isArray(storedClients) ? storedClients : []);
+      setCatalogItems(Array.isArray(storedItems) ? storedItems : []);
       setPlan(normalizePlan(storedPlan));
       setToken(storedToken);
       setUser(storedUser);
@@ -104,6 +108,10 @@ export function AppProvider({ children }) {
     if (Array.isArray(snap.clients)) {
       setClients(snap.clients);
       await setJson(KEYS.CLIENTS, snap.clients);
+    }
+    if (Array.isArray(snap.items)) {
+      setCatalogItems(snap.items);
+      await setJson(KEYS.ITEMS, snap.items);
     }
     if (snap.profile) {
       const next = { ...DEFAULT_COMPANY_PROFILE, ...snap.profile };
@@ -167,6 +175,7 @@ export function AppProvider({ children }) {
     const changes = [];
     if (companyProfile) changes.push({ collection: 'profile', op: 'upsert', id: 'profile', body: companyProfile });
     for (const client of clients) changes.push({ collection: 'clients', op: 'upsert', id: client.id, body: client });
+    for (const item of catalogItems) changes.push({ collection: 'items', op: 'upsert', id: item.id, body: item });
     for (const inv of invoices) changes.push({ collection: 'invoices', op: 'upsert', id: inv.id, body: inv });
     for (const item of obligations) changes.push({ collection: 'obligations', op: 'upsert', id: item.id, body: item });
     for (const change of changes) {
@@ -179,7 +188,7 @@ export function AppProvider({ children }) {
     setMigratedUserId(nextUser.id);
     const snap = await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync');
     await applySnapshot(snap);
-  }, [migratedUserId, companyProfile, clients, invoices, obligations, settings.apiBaseUrl, applySnapshot, persistSync]);
+  }, [migratedUserId, companyProfile, clients, catalogItems, invoices, obligations, settings.apiBaseUrl, applySnapshot, persistSync]);
 
   const login = useCallback(async (email, password) => {
     const res = await apiRequest(settings.apiBaseUrl, null, '/api/auth/login', {
@@ -194,10 +203,10 @@ export function AppProvider({ children }) {
     await persistSync({ status: 'synced', lastSyncedAt: new Date().toISOString(), error: null });
   }, [settings.apiBaseUrl, migrateLocalIfNeeded, persistSync]);
 
-  const signup = useCallback(async (email, password) => {
+  const signup = useCallback(async (email, password, extras = {}) => {
     const res = await apiRequest(settings.apiBaseUrl, null, '/api/auth/signup', {
       method: 'POST',
-      body: { email, password, language: settings.language },
+      body: { email, password, language: settings.language, industry: extras.industry },
     });
     setToken(res.token);
     setUser(res.user);
@@ -412,12 +421,56 @@ export function AppProvider({ children }) {
   }, [token, enqueue]);
 
   const updateClient = useCallback(async (id, partial) => {
+    let saved = null;
     setClients((prev) => {
       const next = prev.map((item) => (item.id === id ? { ...item, ...partial } : item));
+      saved = next.find((item) => item.id === id);
       setJson(KEYS.CLIENTS, next);
       return next;
     });
     if (token) await enqueue({ collection: 'clients', op: 'upsert', id, body: partial });
+    return saved;
+  }, [token, enqueue]);
+
+  const deleteClient = useCallback(async (id) => {
+    setClients((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      setJson(KEYS.CLIENTS, next);
+      return next;
+    });
+    if (token) await enqueue({ collection: 'clients', op: 'delete', id });
+  }, [token, enqueue]);
+
+  const addCatalogItem = useCallback(async (item) => {
+    const saved = { ...item, id: item.id || generateId(), createdAt: new Date().toISOString() };
+    setCatalogItems((prev) => {
+      const next = [saved, ...prev.filter((row) => row.id !== saved.id)];
+      setJson(KEYS.ITEMS, next);
+      return next;
+    });
+    if (token) await enqueue({ collection: 'items', op: 'upsert', id: saved.id, body: saved });
+    return saved;
+  }, [token, enqueue]);
+
+  const updateCatalogItem = useCallback(async (id, partial) => {
+    let saved = null;
+    setCatalogItems((prev) => {
+      const next = prev.map((item) => (item.id === id ? { ...item, ...partial } : item));
+      saved = next.find((item) => item.id === id);
+      setJson(KEYS.ITEMS, next);
+      return next;
+    });
+    if (token) await enqueue({ collection: 'items', op: 'upsert', id, body: partial });
+    return saved;
+  }, [token, enqueue]);
+
+  const deleteCatalogItem = useCallback(async (id) => {
+    setCatalogItems((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      setJson(KEYS.ITEMS, next);
+      return next;
+    });
+    if (token) await enqueue({ collection: 'items', op: 'delete', id });
   }, [token, enqueue]);
 
   const value = useMemo(
@@ -445,6 +498,11 @@ export function AppProvider({ children }) {
       clients,
       addClient,
       updateClient,
+      deleteClient,
+      catalogItems,
+      addCatalogItem,
+      updateCatalogItem,
+      deleteCatalogItem,
       plan,
       usage,
       setPlanFromPurchase,
@@ -481,6 +539,11 @@ export function AppProvider({ children }) {
       clients,
       addClient,
       updateClient,
+      deleteClient,
+      catalogItems,
+      addCatalogItem,
+      updateCatalogItem,
+      deleteCatalogItem,
       plan,
       usage,
       setPlanFromPurchase,

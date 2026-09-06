@@ -7,6 +7,7 @@ const KEYS = {
   OBLIGATIONS: '@nextinvoice/obligations',
   PLAN: '@nextinvoice/plan',
   CLIENTS: '@nextinvoice/clients',
+  ITEMS: '@nextinvoice/items',
   AUTH_TOKEN: '@nextinvoice/authToken',
   AUTH_USER: '@nextinvoice/authUser',
   SYNC_QUEUE: '@nextinvoice/syncQueue',

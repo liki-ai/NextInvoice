@@ -15,8 +15,8 @@ import {
   invoiceStatus,
 } from '../../lib/invoice'
 import { daysOverdue, formatMoneyList, isOverdue, remainingOf, totalsByCurrency } from '../../lib/document'
-import { PaymentModal } from '../../components/PaymentModal'
 import { localizeCompanyProfile } from '../../lib/companySamples'
+import { fullPaymentPayload, invoiceBalanceText } from '../../lib/invoiceBalance'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
   if (filter === 'paid') {
@@ -36,7 +36,7 @@ export function InvoiceListPage() {
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
-  const [payId, setPayId] = useState<string | null>(null)
+  const [balanceId, setBalanceId] = useState<string | null>(null)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
   const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
@@ -297,6 +297,7 @@ export function InvoiceListPage() {
                   const status = invoiceStatus(item)
                   const late = daysOverdue(item)
                   const due = remainingOf(item)
+                  const canPay = due > 0 && status !== 'cancelled' && status !== 'draft'
                   return (
                   <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${status === 'cancelled' ? 'opacity-60' : ''}`}>
                     <td className="px-5 py-4">
@@ -310,7 +311,14 @@ export function InvoiceListPage() {
                       <div className="font-semibold">{item.date}</div>
                       <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
                       <div className="mt-1 flex flex-wrap gap-1">
-                        <span
+                        <button
+                          type="button"
+                          disabled={!canPay || busyId === item.id}
+                          onClick={() => {
+                            if (!canPay) return
+                            const payload = fullPaymentPayload(item)
+                            if (payload.amount > 0) void addInvoicePayment(item.id, payload)
+                          }}
                           className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                             status === 'paid'
                               ? 'bg-[#E7F4EA] text-[#2E7D32]'
@@ -321,8 +329,8 @@ export function InvoiceListPage() {
                                   : 'bg-[#C0503A] text-white'
                           }`}
                         >
-                          {statusLabel(status)}
-                        </span>
+                          {status === 'paid' || canPay ? t('invoiceList.statusPaid') : statusLabel(status)}
+                        </button>
                         {late > 0 ? (
                           <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
                             {t('docs.overdueDays', { days: late })}
@@ -337,14 +345,13 @@ export function InvoiceListPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
-                        {status !== 'cancelled' && status !== 'draft' && due > 0 ? (
+                        {status !== 'cancelled' && status !== 'draft' ? (
                           <button
                             type="button"
-                            disabled={busyId === item.id}
-                            onClick={() => setPayId(item.id)}
+                            onClick={() => setBalanceId(item.id)}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
                           >
-                            {t('docs.recordPayment')}
+                            {t('balance.send')}
                           </button>
                         ) : null}
                         {status === 'draft' ? (
@@ -407,15 +414,49 @@ export function InvoiceListPage() {
         </Modal>
       ) : null}
 
-      {payId ? (
-        <PaymentModal
-          doc={invoices.find((item) => item.id === payId) || { total: 0 }}
-          currency={invoices.find((item) => item.id === payId)?.currency || currency}
-          onClose={() => setPayId(null)}
-          onSave={async (payment) => {
-            await addInvoicePayment(payId, payment)
-          }}
-        />
+      {balanceId ? (
+        <Modal
+          title={t('balance.title')}
+          onClose={() => setBalanceId(null)}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setBalanceId(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  const inv = invoices.find((item) => item.id === balanceId)
+                  const text = invoiceBalanceText(inv, t, formatMoney, inv?.currency || currency)
+                  try {
+                    await navigator.clipboard.writeText(text)
+                  } catch {
+                    // ignore clipboard failures
+                  }
+                  if (typeof navigator.share === 'function') {
+                    try {
+                      await navigator.share({ text })
+                    } catch {
+                      // user cancelled share
+                    }
+                  }
+                  setBalanceId(null)
+                }}
+              >
+                {t('common.send')}
+              </Button>
+            </>
+          }
+        >
+          <pre className="whitespace-pre-wrap p-6 text-sm leading-6">
+            {invoiceBalanceText(
+              invoices.find((item) => item.id === balanceId),
+              t,
+              formatMoney,
+              invoices.find((item) => item.id === balanceId)?.currency || currency,
+            )}
+          </pre>
+        </Modal>
       ) : null}
     </div>
   )
