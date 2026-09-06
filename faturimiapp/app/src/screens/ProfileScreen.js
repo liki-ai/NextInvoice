@@ -111,33 +111,7 @@ export default function ProfileScreen({ navigation }) {
         </View>
       </View>
 
-      <Section title={t('profile.languageSectionTitle')} style={{ marginTop: spacing.md }}>
-        {[
-          { value: 'sq', label: t('profile.languageSq') },
-          { value: 'en', label: t('profile.languageEn') },
-          { value: 'it', label: t('profile.languageIt') },
-        ].map((opt) => {
-          const active = settings.language === opt.value;
-          return (
-            <Pressable key={opt.value} onPress={() => setLanguage(opt.value)} style={[styles.langRow, active && styles.langRowActive]}>
-              <Text style={active ? styles.langTextActive : styles.langText}>{opt.label}</Text>
-            </Pressable>
-          );
-        })}
-      </Section>
-
-      <Section title={t('billing.title')} style={{ marginTop: spacing.md }}>
-        <Text style={typography.body}>
-          {t('billing.current')}: {plan?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
-        </Text>
-        <Button
-          title={plan?.plan === 'premium' ? t('billing.manageStore') : t('billing.ctaIap')}
-          onPress={() => navigation.navigate('Subscribe')}
-          style={{ marginTop: spacing.sm }}
-        />
-      </Section>
-
-      <Section title={t('profile.importSectionTitle')}>
+      <Section title={t('profile.importSectionTitle')} style={{ marginTop: spacing.md }}>
         <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.importDescription')}</Text>
         <Button
           title={importing ? t('profile.importing') : t('profile.importButton')}
@@ -197,7 +171,30 @@ export default function ProfileScreen({ navigation }) {
 
       <Button title={t('common.save')} onPress={handleSave} />
 
-      <Section title={token && user ? t('docs.logout') : t('docs.login')} style={{ marginTop: spacing.lg }}>
+      <View style={styles.bottomMeta}>
+        <View style={styles.langLine}>
+          {[
+            { value: 'sq', label: 'SQ' },
+            { value: 'en', label: 'EN' },
+            { value: 'it', label: 'IT' },
+          ].map((opt) => {
+            const active = settings.language === opt.value;
+            return (
+              <Pressable key={opt.value} onPress={() => setLanguage(opt.value)} style={[styles.langChip, active && styles.langChipActive]}>
+                <Text style={active ? styles.langChipTextActive : styles.langChipText}>{opt.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable style={styles.planRow} onPress={() => navigation.navigate('Subscribe')}>
+          <Text style={styles.planText}>
+            {t('billing.current')}: {plan?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
+          </Text>
+          <Text style={styles.planCta}>{plan?.plan === 'premium' ? t('billing.manageStore') : t('billing.ctaIap')}</Text>
+        </Pressable>
+      </View>
+
+      <Section title={token && user ? t('docs.logout') : t('docs.login')} style={{ marginTop: spacing.sm }}>
         {token && user ? (
           <Button title={t('docs.logout')} variant="secondary" onPress={() => void logout()} />
         ) : (
@@ -288,16 +285,32 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 12, fontWeight: '700', color: colors.text },
   chipTextActive: { fontSize: 12, fontWeight: '700', color: '#fff' },
-  langRow: {
+  bottomMeta: { marginTop: spacing.lg, gap: 10 },
+  langLine: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    overflow: 'hidden',
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
-    marginBottom: 8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
   },
-  langRowActive: { borderColor: colors.primary, backgroundColor: colors.primary },
-  langText: { fontSize: 16, fontWeight: '600', color: colors.text },
-  langTextActive: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  langChip: { paddingHorizontal: 10, paddingVertical: 6 },
+  langChipActive: { backgroundColor: colors.primary },
+  langChipText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: colors.textMuted },
+  langChipTextActive: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: '#fff' },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  planText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text },
+  planCta: { fontSize: 12, fontWeight: '800', color: colors.primary },
 });

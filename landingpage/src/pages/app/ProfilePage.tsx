@@ -135,34 +135,6 @@ export function ProfilePage() {
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="space-y-6">
           <Card>
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('profile.languageSectionTitle')}</h2>
-            <p className="mt-2 text-sm leading-6 text-brand-ink/55">{t('profile.languageHint')}</p>
-            <LanguagePicker
-              variant="full"
-              showLabel={false}
-              className="mt-4"
-              onChange={(code) => {
-                if (form) void saveProfile({ ...stripSampleCompanyFields(form), language: code })
-              }}
-            />
-          </Card>
-          <Card>
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('profile.account')}</h2>
-            <p className="mt-3 text-sm font-medium">{user?.email}</p>
-            <p className="mt-2 text-sm text-brand-ink/55">
-              {t('billing.current')}:{' '}
-              <span className="font-semibold text-brand-ink">
-                {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
-              </span>
-            </p>
-            {user?.plan !== 'premium' ? (
-              <p className="mt-2 text-sm leading-6 text-brand-ink/55">{t('billing.freeHint')}</p>
-            ) : null}
-            <Link to="/app/upgrade" className="mt-4 inline-flex text-sm font-semibold text-brand hover:underline">
-              {user?.plan === 'premium' ? t('billing.manage') : t('billing.cta')}
-            </Link>
-          </Card>
-          <Card>
             <h2 className="font-semibold">{t('docs.backup')}</h2>
             <p className="mt-2 text-sm leading-6 text-brand-ink/55">{t('docs.checksum')}</p>
             <div className="mt-4 flex flex-col gap-2">
@@ -259,7 +231,20 @@ export function ProfilePage() {
         </Card>
       </div>
 
-      <div className="mt-10 flex justify-end">
+      <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <LanguagePicker
+            onChange={(code) => {
+              if (form) void saveProfile({ ...stripSampleCompanyFields(form), language: code })
+            }}
+          />
+          <Link
+            to="/app/upgrade"
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink/70 hover:border-brand/30 hover:text-brand"
+          >
+            {t('billing.current')}: {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
+          </Link>
+        </div>
         <button
           type="button"
           onClick={() => {

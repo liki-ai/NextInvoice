@@ -70,15 +70,22 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
       <div className="mt-auto border-t border-white/10 px-4 py-4">
         <p className="truncate px-2 text-xs text-white/50">{user?.email}</p>
-        <div className="mt-3 flex items-center justify-between gap-2 px-1">
-          <LanguagePicker variant="dark" />
+        <div className="mt-3 space-y-2 px-1">
+          <LanguagePicker variant="dark" className="self-start" />
+          <NavLink
+            to="/app/upgrade"
+            onClick={onNavigate}
+            className="block truncate text-[11px] font-semibold text-white/55 hover:text-white"
+          >
+            {t('billing.current')}: {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
+          </NavLink>
           <button
             type="button"
             onClick={() => {
               logout()
               navigate('/')
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-white/55 hover:bg-white/8 hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-lg px-0 py-1 text-xs font-semibold text-white/55 hover:text-white"
           >
             <LogOut className="h-3.5 w-3.5" />
             {t('nav.logout')}
