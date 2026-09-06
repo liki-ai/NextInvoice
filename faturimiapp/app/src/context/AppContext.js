@@ -409,6 +409,24 @@ export function AppProvider({ children }) {
     if (token) await enqueue({ collection: 'obligations', op: 'payment', id, body: saved, opId: saved.opId });
   }, [token, enqueue]);
 
+  const voidObligationPayment = useCallback(async (id, paymentId, reason) => {
+    setObligations((prev) => {
+      const next = prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              payments: (item.payments || []).map((payment) =>
+                payment.id === paymentId ? { ...payment, voidedAt: new Date().toISOString(), voidReason: reason } : payment,
+              ),
+            }
+          : item,
+      );
+      setJson(KEYS.OBLIGATIONS, next);
+      return next;
+    });
+    if (token) await enqueue({ collection: 'obligations', op: 'voidPayment', id, body: { paymentId, reason } });
+  }, [token, enqueue]);
+
   const addClient = useCallback(async (client) => {
     const saved = { ...client, id: client.id || generateId(), createdAt: new Date().toISOString() };
     setClients((prev) => {
@@ -495,6 +513,7 @@ export function AppProvider({ children }) {
       updateObligation,
       deleteObligation,
       addObligationPayment,
+      voidObligationPayment,
       clients,
       addClient,
       updateClient,
@@ -536,6 +555,7 @@ export function AppProvider({ children }) {
       updateObligation,
       deleteObligation,
       addObligationPayment,
+      voidObligationPayment,
       clients,
       addClient,
       updateClient,

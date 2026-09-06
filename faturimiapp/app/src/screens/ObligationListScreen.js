@@ -5,14 +5,14 @@ import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { formatMoney } from '../utils/money';
-import SwipeableRow from '../components/SwipeableRow';
+import SwipeableRow, { useLockRowPress } from '../components/SwipeableRow';
 import ProofBlock from '../components/ProofBlock';
 import { sharePaidObligationsPdf } from '../pdf/generateInvoicePdf';
 import { buildPaidObligationsHtml, formatStatementFileDate } from '../pdf/invoiceTemplate';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import PdfPreviewModal from '../components/PdfPreviewModal';
 import SyncBanner from '../components/SyncBanner';
-import { daysOverdue, isOverdue, paymentStatus, remainingOf } from '../utils/document';
+import { daysOverdue, isOverdue, paymentStatus, remainingOf, togglePaid } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
 
 const CATEGORY_KEYS = {
@@ -22,6 +22,30 @@ const CATEGORY_KEYS = {
   tax: 'obligations.categoryTax',
   other: 'obligations.categoryOther',
 };
+
+function PaidChip({ status, paidItem, t, onToggle }) {
+  const { lock } = useLockRowPress();
+  return (
+    <Pressable
+      onPress={() => {
+        lock();
+        onToggle();
+      }}
+      hitSlop={8}
+      accessibilityHint={paidItem ? t('invoiceDetail.statusUnpaid') : t('invoiceList.tapToMarkPaid')}
+      style={[styles.statusChip, paidItem ? styles.statusPaid : status === 'partial' ? styles.statusPartial : styles.statusUnpaid]}
+    >
+      <Ionicons
+        name={paidItem ? 'checkmark-circle' : 'ellipse-outline'}
+        size={16}
+        color={paidItem ? colors.success : status === 'partial' ? '#8A6D00' : '#fff'}
+      />
+      <Text style={paidItem ? styles.statusPaidText : status === 'partial' ? styles.statusPartialText : styles.statusUnpaidText}>
+        {paidItem ? t('invoiceDetail.statusPaid') : status === 'partial' ? t('docs.statusPartial') : t('invoiceDetail.statusPaid')}
+      </Text>
+    </Pressable>
+  );
+}
 
 function sendCopy(filter, t) {
   if (filter === 'paid') {
@@ -34,7 +58,7 @@ function sendCopy(filter, t) {
 }
 
 export default function ObligationListScreen({ navigation }) {
-  const { obligations, invoices, companyProfile, updateObligation, deleteObligation, addObligationPayment } = useApp();
+  const { obligations, invoices, companyProfile, updateObligation, deleteObligation, addObligationPayment, voidObligationPayment } = useApp();
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('all');
   const [sharing, setSharing] = useState(false);
@@ -113,6 +137,8 @@ export default function ObligationListScreen({ navigation }) {
       <View style={{ paddingHorizontal: spacing.md }}>
         <SyncBanner />
       </View>
+
+      {obligations.length > 0 ? (
         <View style={styles.totals}>
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>{t('obligations.unpaidTotal')}</Text>
@@ -193,6 +219,7 @@ export default function ObligationListScreen({ navigation }) {
                 markPaid: t('invoiceDetail.statusPaid'),
                 markUnpaid: t('invoiceDetail.statusUnpaid'),
               }}
+              onPress={() => navigation.navigate('ObligationForm', { obligationId: item.id })}
               onEdit={() => navigation.navigate('ObligationForm', { obligationId: item.id })}
               onDelete={() => {
                 Alert.alert(t('obligations.deleteConfirmTitle'), t('obligations.deleteConfirmMessage'), [
@@ -205,15 +232,16 @@ export default function ObligationListScreen({ navigation }) {
                 ]);
               }}
               onTogglePaid={() => {
-                if (due <= 0) return;
-                const payload = fullPaymentPayload({ ...item, total: item.amount });
-                if (payload.amount > 0) void addObligationPayment(item.id, payload);
+                const doc = { ...item, total: item.amount };
+                void togglePaid(doc, {
+                  addPayment: addObligationPayment,
+                  voidPayment: voidObligationPayment,
+                  setStatus: (next) => updateObligation(item.id, { status: next }),
+                  payload: fullPaymentPayload(doc),
+                });
               }}
             >
-              <Pressable
-                style={styles.card}
-                onPress={() => navigation.navigate('ObligationForm', { obligationId: item.id })}
-              >
+              <View style={styles.card}>
                 <View style={styles.cardRow}>
                   <Text style={styles.vendor}>{item.vendor}</Text>
                   <Text style={styles.amount}>{formatMoney(paidItem ? Number(item.amount) || 0 : due, currency)}</Text>
@@ -224,31 +252,27 @@ export default function ObligationListScreen({ navigation }) {
                 <Text style={styles.category}>{t(CATEGORY_KEYS[item.category] || CATEGORY_KEYS.other)}</Text>
                 <View style={styles.cardRow}>
                   <Text style={typography.muted}>{item.date}</Text>
-                  <Pressable
-                    onPress={() => {
-                      if (due <= 0) return;
-                      const payload = fullPaymentPayload({ ...item, total: item.amount });
-                      if (payload.amount > 0) void addObligationPayment(item.id, payload);
+                  <PaidChip
+                    status={status}
+                    paidItem={paidItem}
+                    t={t}
+                    onToggle={() => {
+                      const doc = { ...item, total: item.amount };
+                      void togglePaid(doc, {
+                        addPayment: addObligationPayment,
+                        voidPayment: voidObligationPayment,
+                        setStatus: (next) => updateObligation(item.id, { status: next }),
+                        payload: fullPaymentPayload(doc),
+                      });
                     }}
-                    hitSlop={8}
-                    accessibilityHint={paidItem ? undefined : t('invoiceList.tapToMarkPaid')}
-                    style={[styles.statusChip, paidItem ? styles.statusPaid : styles.statusUnpaid]}
-                  >
-                    <Ionicons
-                      name={paidItem ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={16}
-                      color={paidItem ? colors.success : '#fff'}
-                    />
-                    <Text style={paidItem ? styles.statusPaidText : styles.statusUnpaidText}>
-                      {paidItem ? t('invoiceDetail.statusPaid') : t('invoiceDetail.statusPaid')}
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
                 {related ? <Text style={styles.related}>{related.number}</Text> : null}
+                {late > 0 ? <Text style={styles.overdue}>{t('docs.overdueDays', { days: late })}</Text> : null}
                 <View style={styles.proofRow}>
                   <ProofBlock item={item} t={t} onChange={(proof) => void updateObligation(item.id, proof)} />
                 </View>
-              </Pressable>
+              </View>
             </SwipeableRow>
           );
         }}
@@ -351,8 +375,11 @@ const styles = StyleSheet.create({
   },
   statusUnpaid: { backgroundColor: colors.danger },
   statusPaid: { backgroundColor: '#E7F4EA' },
+  statusPartial: { backgroundColor: '#FFF4D6' },
   statusUnpaidText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   statusPaidText: { color: colors.success, fontWeight: '800', fontSize: 12 },
+  statusPartialText: { color: '#8A6D00', fontWeight: '800', fontSize: 12 },
+  overdue: { marginTop: 4, color: colors.danger, fontSize: 11, fontWeight: '700' },
   proofRow: { marginTop: 8 },
   proofChip: {
     alignSelf: 'flex-start',

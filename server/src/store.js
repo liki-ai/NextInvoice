@@ -422,6 +422,7 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
   const lifecycle = current.lifecycle || 'issued';
   if (!options.allowIssuedEdit && lifecycle === 'issued') {
     partial = {
+      ...(partial.status !== undefined ? { status: partial.status } : {}),
       ...(partial.dueDate !== undefined ? { dueDate: partial.dueDate } : {}),
       ...(partial.notes !== undefined ? { notes: partial.notes } : {}),
       ...(partial.proofUri !== undefined ? { proofUri: partial.proofUri } : {}),

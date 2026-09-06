@@ -154,6 +154,27 @@ export function formatMoneyList(rows: { currency: string; amount: number }[], fo
   return rows.map((row) => formatMoney(row.amount, row.currency)).join(' · ')
 }
 
+export async function togglePaid(
+  doc: { id: string; lifecycle?: string; status?: string; total?: unknown; amount?: unknown; payments?: Payment[] | null },
+  opts: {
+    addPayment: (id: string, payment: { amount: number; date: string; method?: string; note?: string }) => Promise<unknown>
+    voidPayment: (id: string, paymentId: string, reason: string) => Promise<unknown>
+    setStatus?: (status: 'unpaid') => Promise<unknown>
+    payload: { amount: number; date: string; method?: string; note?: string }
+  },
+) {
+  const status = paymentStatus(doc)
+  if (status === 'cancelled' || status === 'draft') return
+  if (status === 'paid') {
+    for (const item of activePayments(doc.payments)) {
+      await opts.voidPayment(doc.id, item.id, 'unpaid')
+    }
+    if (opts.setStatus) await opts.setStatus('unpaid')
+    return
+  }
+  if (opts.payload.amount > 0) await opts.addPayment(doc.id, opts.payload)
+}
+
 export function todayInputValue(date = new Date()) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')

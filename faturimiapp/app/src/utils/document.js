@@ -96,6 +96,19 @@ export function todayInputValue(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+export async function togglePaid(doc, { addPayment, voidPayment, setStatus, payload }) {
+  const status = paymentStatus(doc);
+  if (status === 'cancelled' || status === 'draft') return;
+  if (status === 'paid') {
+    for (const item of activePayments(doc?.payments)) {
+      await voidPayment(doc.id, item.id, 'unpaid');
+    }
+    if (setStatus) await setStatus('unpaid');
+    return;
+  }
+  if (payload?.amount > 0) await addPayment(doc.id, payload);
+}
+
 export function pdfCompany(invoice, liveProfile) {
   return invoice?.companySnapshot || liveProfile;
 }

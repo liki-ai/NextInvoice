@@ -231,31 +231,42 @@ export function ProfilePage() {
         </Card>
       </div>
 
-      <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="mt-10 space-y-5">
+        <div className="max-w-md">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('profile.languageSectionTitle')}</h2>
           <LanguagePicker
+            variant="full"
+            showLabel={false}
+            className="mt-3"
             onChange={(code) => {
               if (form) void saveProfile({ ...stripSampleCompanyFields(form), language: code })
             }}
           />
-          <Link
-            to="/app/upgrade"
-            className="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink/70 hover:border-brand/30 hover:text-brand"
-          >
-            {t('billing.current')}: {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
-          </Link>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            logout()
-            navigate('/')
-          }}
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-ink/55 hover:bg-white hover:text-brand-ink"
-        >
-          <LogOut className="h-4 w-4" />
-          {t('nav.logout')}
-        </button>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-brand-ink/55">
+              {t('billing.current')}:{' '}
+              <span className="font-semibold text-brand-ink">
+                {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
+              </span>
+            </p>
+            <Link to="/app/upgrade" className="mt-2 inline-flex text-sm font-semibold text-brand hover:underline">
+              {user?.plan === 'premium' ? t('billing.manage') : t('billing.cta')}
+            </Link>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logout()
+              navigate('/')
+            }}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-ink/55 hover:bg-white hover:text-brand-ink"
+          >
+            <LogOut className="h-4 w-4" />
+            {t('nav.logout')}
+          </button>
+        </div>
       </div>
     </div>
   )

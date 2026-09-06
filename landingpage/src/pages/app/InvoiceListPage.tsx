@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileText, Pencil, Plus, Search, Send, Trash2 } from 'lucide-react'
+import { FileText, Pencil, Plus, Search, Send, Trash2, Circle, CheckCircle2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { Button, Modal } from '../../components/ui'
+import { PaymentModal } from '../../components/PaymentModal'
 import {
   buildInvoiceListHtml,
   clientUnpaidSummaries,
@@ -14,9 +15,9 @@ import {
   invoiceListFileName,
   invoiceStatus,
 } from '../../lib/invoice'
-import { daysOverdue, formatMoneyList, isOverdue, remainingOf, totalsByCurrency } from '../../lib/document'
+import { daysOverdue, formatMoneyList, isOverdue, remainingOf, totalsByCurrency, togglePaid } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
-import { fullPaymentPayload, invoiceBalanceText } from '../../lib/invoiceBalance'
+import { fullPaymentPayload } from '../../lib/invoiceBalance'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
   if (filter === 'paid') {
@@ -29,14 +30,14 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
 }
 
 export function InvoiceListPage() {
-  const { invoices, loading, profile, removeInvoice, addInvoicePayment } = useAppData()
+  const { invoices, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue'>('all')
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
-  const [balanceId, setBalanceId] = useState<string | null>(null)
+  const [payId, setPayId] = useState<string | null>(null)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
   const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
@@ -313,13 +314,17 @@ export function InvoiceListPage() {
                       <div className="mt-1 flex flex-wrap gap-1">
                         <button
                           type="button"
-                          disabled={!canPay || busyId === item.id}
+                          disabled={busyId === item.id || status === 'cancelled' || status === 'draft'}
                           onClick={() => {
-                            if (!canPay) return
-                            const payload = fullPaymentPayload(item)
-                            if (payload.amount > 0) void addInvoicePayment(item.id, payload)
+                            if (status === 'cancelled' || status === 'draft') return
+                            void togglePaid(item, {
+                              addPayment: addInvoicePayment,
+                              voidPayment: voidInvoicePayment,
+                              setStatus: (next) => updateInvoice(item.id, { status: next }),
+                              payload: fullPaymentPayload(item),
+                            })
                           }}
-                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                             status === 'paid'
                               ? 'bg-[#E7F4EA] text-[#2E7D32]'
                               : status === 'partial'
@@ -329,7 +334,20 @@ export function InvoiceListPage() {
                                   : 'bg-[#C0503A] text-white'
                           }`}
                         >
-                          {status === 'paid' || canPay ? t('invoiceList.statusPaid') : statusLabel(status)}
+                          {status !== 'draft' && status !== 'cancelled' ? (
+                            status === 'paid' ? (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <Circle className="h-3.5 w-3.5" />
+                            )
+                          ) : null}
+                          {status === 'paid'
+                            ? t('invoiceList.statusPaid')
+                            : status === 'partial'
+                              ? t('docs.statusPartial')
+                              : status === 'cancelled' || status === 'draft'
+                                ? statusLabel(status)
+                                : t('invoiceList.statusPaid')}
                         </button>
                         {late > 0 ? (
                           <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
@@ -345,13 +363,13 @@ export function InvoiceListPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
-                        {status !== 'cancelled' && status !== 'draft' ? (
+                        {canPay ? (
                           <button
                             type="button"
-                            onClick={() => setBalanceId(item.id)}
+                            onClick={() => setPayId(item.id)}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
                           >
-                            {t('balance.send')}
+                            {t('docs.payPartial')}
                           </button>
                         ) : null}
                         {status === 'draft' ? (
@@ -414,49 +432,13 @@ export function InvoiceListPage() {
         </Modal>
       ) : null}
 
-      {balanceId ? (
-        <Modal
-          title={t('balance.title')}
-          onClose={() => setBalanceId(null)}
-          footer={
-            <>
-              <Button type="button" variant="secondary" onClick={() => setBalanceId(null)}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                type="button"
-                onClick={async () => {
-                  const inv = invoices.find((item) => item.id === balanceId)
-                  const text = invoiceBalanceText(inv, t, formatMoney, inv?.currency || currency)
-                  try {
-                    await navigator.clipboard.writeText(text)
-                  } catch {
-                    // ignore clipboard failures
-                  }
-                  if (typeof navigator.share === 'function') {
-                    try {
-                      await navigator.share({ text })
-                    } catch {
-                      // user cancelled share
-                    }
-                  }
-                  setBalanceId(null)
-                }}
-              >
-                {t('common.send')}
-              </Button>
-            </>
-          }
-        >
-          <pre className="whitespace-pre-wrap p-6 text-sm leading-6">
-            {invoiceBalanceText(
-              invoices.find((item) => item.id === balanceId),
-              t,
-              formatMoney,
-              invoices.find((item) => item.id === balanceId)?.currency || currency,
-            )}
-          </pre>
-        </Modal>
+      {payId ? (
+        <PaymentModal
+          doc={invoices.find((item) => item.id === payId) || {}}
+          currency={invoices.find((item) => item.id === payId)?.currency || currency}
+          onClose={() => setPayId(null)}
+          onSave={(payment) => addInvoicePayment(payId, payment)}
+        />
       ) : null}
     </div>
   )

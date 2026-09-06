@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, FormField } from './ui';
 import { remainingOf, todayInputValue } from '../utils/document';
@@ -14,6 +14,15 @@ export default function PaymentModal({ visible, doc, currency, onClose, onSave }
   const [method, setMethod] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    const due = remainingOf(doc || {});
+    setAmount(due ? String(due) : '');
+    setDate(todayInputValue());
+    setMethod('');
+    setNote('');
+  }, [visible, doc?.id]);
 
   const submit = async () => {
     const value = Number(String(amount).replace(',', '.'));

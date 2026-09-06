@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Paperclip, Pencil, Plus, Search, Send, Trash2, Wallet } from 'lucide-react'
+import { Paperclip, Pencil, Plus, Search, Send, Trash2, Wallet, Circle, CheckCircle2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -15,7 +15,7 @@ import { localizeCompanyProfile } from '../../lib/companySamples'
 import { obligationStatus, uniqueVendors, vendorSummaries } from '../../lib/obligation'
 import type { Obligation } from '../../lib/obligation'
 import { Button, Modal } from '../../components/ui'
-import { daysOverdue, isOverdue, remainingOf } from '../../lib/document'
+import { daysOverdue, isOverdue, remainingOf, togglePaid } from '../../lib/document'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 
 const MAX_PROOF_BYTES = 4 * 1024 * 1024
@@ -55,7 +55,7 @@ async function openProof(item: Obligation) {
 }
 
 export function ObligationListPage() {
-  const { obligations, invoices, loading, profile, updateObligation, removeObligation, addObligationPayment } = useAppData()
+  const { obligations, invoices, loading, profile, updateObligation, removeObligation, addObligationPayment, voidObligationPayment } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue'>('all')
@@ -331,13 +331,24 @@ export function ObligationListPage() {
                         <div className="font-semibold">{item.date}</div>
                         <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
                         <div className="mt-1 flex flex-wrap gap-1">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const doc = { ...item, total: item.amount }
+                              void togglePaid(doc, {
+                                addPayment: addObligationPayment,
+                                voidPayment: voidObligationPayment,
+                                setStatus: (next) => updateObligation(item.id, { status: next }),
+                                payload: fullPaymentPayload(doc),
+                              })
+                            }}
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                               status === 'paid' ? 'bg-[#E7F4EA] text-[#2E7D32]' : status === 'partial' ? 'bg-[#FFF4D6] text-[#8A6D00]' : 'bg-[#C0503A] text-white'
                             }`}
                           >
-                            {status === 'paid' ? t('invoiceList.statusPaid') : status === 'partial' ? t('docs.statusPartial') : t('invoiceList.statusUnpaid')}
-                          </span>
+                            {status === 'paid' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+                            {status === 'paid' ? t('invoiceList.statusPaid') : status === 'partial' ? t('docs.statusPartial') : t('invoiceList.statusPaid')}
+                          </button>
                           {late > 0 ? (
                             <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
                               {t('docs.overdueDays', { days: late })}
