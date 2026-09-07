@@ -34,6 +34,18 @@ export function paymentStatus(doc) {
   return 'unpaid';
 }
 
+export function visiblePaymentStatus(doc) {
+  const status = paymentStatus(doc);
+  return status === 'draft' ? 'unpaid' : status;
+}
+
+export function isInvoiceSent(doc) {
+  if (doc?.sent === false) return false;
+  if (doc?.sentAt || doc?.sent === true) return true;
+  if (doc?.lifecycle === 'draft') return false;
+  return true;
+}
+
 export function remainingOf(doc) {
   const status = paymentStatus(doc);
   if (status === 'cancelled' || status === 'draft') return 0;

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Eye, Plus, Trash2 } from 'lucide-react'
+import { Eye, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { Button, Card, Field, Modal, Select, TextArea } from '../../components/ui'
+import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
 import {
   buildInvoiceHtml,
   computeTotals,
+  downloadHtmlAsPdf,
   formatDateForInvoice,
   formatMoney,
   generateId,
@@ -18,7 +19,7 @@ import {
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { localizeCompanyProfile } from '../../lib/companySamples'
-import { clientDisplayName } from '../../lib/client'
+import { clientDisplayName, clientMatchesQuery, composeClient, frequentClients } from '../../lib/client'
 import { invoiceLineFromCatalog } from '../../lib/catalog'
 
 function emptyItem(): InvoiceItem {
@@ -34,6 +35,20 @@ export function InvoiceFormPage() {
   const existing = invoiceId ? invoices.find((inv) => inv.id === invoiceId) : null
   const isEditing = Boolean(invoiceId)
   const location = useLocation()
+  const persistedIdRef = useRef(invoiceId || '')
+  const skipAutosaveRef = useRef(false)
+  const persistLock = useRef<Promise<unknown> | null>(null)
+  const formRef = useRef({
+    client: existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' },
+    clientId: existing?.clientId || '',
+    invoiceNumber: existing?.number || '',
+    date: existing?.date || '',
+    dueDate: existing?.dueDate || '',
+    items: existing?.items || [],
+    discount: String(existing?.discount ?? '0'),
+    notes: existing?.notes || '',
+    canSaveOnly: true,
+  })
 
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [aiText, setAiText] = useState('')
@@ -123,10 +138,82 @@ export function InvoiceFormPage() {
 
   const currency = profile?.currency || 'EUR'
   const { subtotal, total } = computeTotals(items, discount)
-  const issued = existing && existing.lifecycle !== 'draft'
+  const issued = Boolean(existing && existing.lifecycle !== 'draft')
+  const canSaveOnly = !issued
   const [correctReason, setCorrectReason] = useState('')
-  const saveLabel = issued ? t('docs.correct') : isEditing ? t('newInvoice.saveChanges') : t('docs.issue')
+  const saveLabel = issued ? t('docs.correct') : t('newInvoice.saveAndShare')
   const [savingDraft, setSavingDraft] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const [pickerQuery, setPickerQuery] = useState('')
+  const [addForm, setAddForm] = useState({ fullName: '', address: '', phone: '', email: '', businessId: '' })
+  const [activeItemId, setActiveItemId] = useState(items[0]?.id || '')
+
+  useEffect(() => {
+    if (invoiceId) persistedIdRef.current = invoiceId
+  }, [invoiceId])
+
+  formRef.current = {
+    client,
+    clientId,
+    invoiceNumber,
+    date,
+    dueDate,
+    items,
+    discount,
+    notes,
+    canSaveOnly,
+  }
+
+  const persistDraft = useCallback(async () => {
+    if (skipAutosaveRef.current) return null
+    if (persistLock.current) await persistLock.current
+    const snap = formRef.current
+    if (!snap.canSaveOnly) return null
+    if (!snap.client?.fullName?.trim() && !snap.clientId) return null
+    let release: (() => void) | undefined
+    persistLock.current = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    try {
+      const validItems = (snap.items || []).filter((it) => String(it.description || '').trim() && toNumber(it.unitPrice) >= 0)
+      const totals = computeTotals(validItems, snap.discount)
+      const payload = {
+        number: snap.invoiceNumber,
+        date: snap.date,
+        dueDate: snap.dueDate,
+        client: { ...snap.client, id: snap.clientId },
+        clientId: snap.clientId,
+        items: validItems,
+        discount: snap.discount,
+        notes: snap.notes,
+        subtotal: totals.subtotal,
+        total: totals.total,
+        lifecycle: 'draft' as const,
+        sent: false as const,
+      }
+      if (persistedIdRef.current) {
+        await updateInvoice(persistedIdRef.current, payload)
+        return persistedIdRef.current
+      }
+      const saved = await createInvoice(payload)
+      persistedIdRef.current = saved.id
+      return saved.id
+    } catch {
+      return null
+    } finally {
+      persistLock.current = null
+      release?.()
+    }
+  }, [createInvoice, updateInvoice])
+
+  useEffect(() => {
+    if (!canSaveOnly || !clientId) return
+    const timer = window.setTimeout(() => {
+      void persistDraft()
+    }, 700)
+    return () => window.clearTimeout(timer)
+  }, [canSaveOnly, clientId, client, items, discount, notes, invoiceNumber, date, dueDate, persistDraft])
 
   const draft = useMemo(
     () => ({
@@ -206,6 +293,37 @@ export function InvoiceFormPage() {
     }
   }
 
+  const selectedClient = clientId ? clients.find((item) => item.id === clientId) : null
+  const suggestedClients = useMemo(() => {
+    if (client.fullName.trim()) return clients.filter((item) => clientMatchesQuery(item, client.fullName)).slice(0, 8)
+    return frequentClients(clients, invoices, 8)
+  }, [clients, invoices, client.fullName])
+  const pickerClients = useMemo(
+    () => clients.filter((item) => clientMatchesQuery(item, pickerQuery)),
+    [clients, pickerQuery],
+  )
+
+  function applyClient(item: (typeof clients)[number]) {
+    setClientId(item.id)
+    setClient({
+      fullName: clientDisplayName(item) || item.fullName || '',
+      address: item.address || '',
+      phone: item.phone || '',
+      email: item.email || '',
+      businessId: item.businessId || '',
+    })
+    setPickerOpen(false)
+  }
+
+  function applyCatalogItem(catalogItem: (typeof catalogItems)[number], targetId?: string) {
+    setItems((prev) => {
+      const line = invoiceLineFromCatalog(catalogItem)
+      const target = prev.find((it) => it.id === (targetId || activeItemId)) || prev.find((it) => !String(it.description || '').trim())
+      if (!target) return prev
+      return prev.map((it) => (it.id === target.id ? { ...line, id: target.id } : it))
+    })
+  }
+
   async function persistClient() {
     if (!client.fullName.trim()) return clientId
     if (clientId) return clientId
@@ -227,23 +345,44 @@ export function InvoiceFormPage() {
       setError(t('docs.correctReason'))
       return
     }
+    skipAutosaveRef.current = true
+    if (persistLock.current) await persistLock.current
     setSaving(true)
     setError('')
     try {
       const savedClientId = await persistClient()
-      const payload = { ...invoice, clientId: savedClientId, lifecycle: asDraft ? ('draft' as const) : ('issued' as const) }
+      const sharing = !asDraft && canSaveOnly
+      const payload = {
+        ...invoice,
+        clientId: savedClientId,
+        lifecycle: 'issued' as const,
+        sent: sharing ? true : asDraft ? false : existing?.sent !== false,
+        sentAt: sharing ? new Date().toISOString() : asDraft ? undefined : existing?.sentAt,
+      }
+      let savedId = persistedIdRef.current || invoiceId
       if (issued && invoiceId) {
         await correctInvoice(invoiceId, { items: payload.items, discount: payload.discount, notes: payload.notes, reason: correctReason.trim() })
-        navigate(`/app/invoices/${invoiceId}`)
-      } else if (isEditing && invoiceId) {
-        await updateInvoice(invoiceId, payload)
-        if (!asDraft) await issueInvoice(invoiceId)
-        navigate(`/app/invoices/${invoiceId}`)
+        savedId = invoiceId
+      } else if (savedId) {
+        await updateInvoice(savedId, payload)
+        if (canSaveOnly) await issueInvoice(savedId)
       } else {
         const saved = await createInvoice(payload)
-        navigate(`/app/invoices/${saved.id}`)
+        savedId = saved.id
+        persistedIdRef.current = saved.id
       }
+      if (sharing && profile) {
+        const html = buildInvoiceHtml({
+          company: localizeCompanyProfile(profile, t),
+          client,
+          invoice: { ...payload, number: invoice.number },
+          pdfLabels: dict.pdf,
+        })
+        downloadHtmlAsPdf(html, `${invoice.number}.pdf`)
+      }
+      navigate(savedId ? `/app/invoices/${savedId}` : '/app')
     } catch (err) {
+      skipAutosaveRef.current = false
       const message = err instanceof Error ? err.message : t('common.error')
       setError(message)
       if (message.toLowerCase().includes('free plan') || message.toLowerCase().includes('upgrade')) {
@@ -303,48 +442,69 @@ export function InvoiceFormPage() {
         <div className="space-y-6">
           <Card>
             <h2 className="mb-4 font-semibold">{t('newInvoice.clientSectionTitle')}</h2>
-            <Select
-              label={t('docs.pickClient')}
-              value={clientId}
-              onChange={(e) => {
-                const id = e.target.value
-                setClientId(id)
-                const match = clients.find((item) => item.id === id)
-                if (match) {
-                  setClient({
-                    fullName: clientDisplayName(match) || match.fullName || '',
-                    address: match.address || '',
-                    phone: match.phone || '',
-                    email: match.email || '',
-                    businessId: match.businessId || '',
-                  })
-                }
-              }}
-            >
-              <option value="">{t('docs.newClient')}</option>
-              {clients.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {clientDisplayName(item)}{item.phone ? ` · ${item.phone}` : ''}
-                </option>
-              ))}
-            </Select>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <Field
-                  label={t('newInvoice.fullName')}
-                  value={client.fullName}
-                  placeholder={t('newInvoice.phFullName')}
-                  onChange={(e) => {
-                    setClientId('')
-                    setClient((c) => ({ ...c, fullName: e.target.value }))
-                  }}
-                />
-              </div>
-              <Field label={t('newInvoice.address')} value={client.address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setClient((c) => ({ ...c, address: e.target.value }))} />
-              <Field label={t('newInvoice.phone')} value={client.phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))} />
-              <Field label={t('docs.email')} value={client.email || ''} onChange={(e) => setClient((c) => ({ ...c, email: e.target.value }))} />
-              <Field label={t('docs.businessId')} value={client.businessId || ''} onChange={(e) => setClient((c) => ({ ...c, businessId: e.target.value }))} />
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button type="button" onClick={() => { setPickerQuery(''); setPickerOpen(true) }} className="inline-flex items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand">
+                <Users className="h-4 w-4" />
+                {t('newInvoice.selectClient')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddForm({ fullName: client.fullName, address: '', phone: '', email: '', businessId: '' })
+                  setAddOpen(true)
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand"
+              >
+                <UserPlus className="h-4 w-4" />
+                {t('docs.addClient')}
+              </button>
             </div>
+            <Field
+              label={t('newInvoice.fullName')}
+              value={client.fullName}
+              placeholder={t('newInvoice.phFullName')}
+              onChange={(e) => {
+                const v = e.target.value
+                if (selectedClient && clientDisplayName(selectedClient) !== v) {
+                  setClientId('')
+                  setClient({ fullName: v, address: '', phone: '', email: '', businessId: '' })
+                  return
+                }
+                setClient((c) => ({ ...c, fullName: v }))
+              }}
+            />
+            {!clientId && suggestedClients.length > 0 ? (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {suggestedClients.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => applyClient(item)}
+                    className="rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+                  >
+                    {clientDisplayName(item)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {clientId && (client.address || client.phone || client.email || client.businessId) ? (
+              <div className="rounded-xl border border-brand-ink/8 bg-[#F7FAFB] p-3 text-sm text-brand-ink/80">
+                {client.address ? (
+                  <p className="flex items-start gap-2">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-ink/40" />
+                    {client.address}
+                  </p>
+                ) : null}
+                {client.phone ? (
+                  <p className="mt-1 flex items-start gap-2">
+                    <Phone className="mt-0.5 h-4 w-4 shrink-0 text-brand-ink/40" />
+                    {client.phone}
+                  </p>
+                ) : null}
+                {client.email ? <p className="mt-1 pl-6">{client.email}</p> : null}
+                {client.businessId ? <p className="mt-1 pl-6">{client.businessId}</p> : null}
+              </div>
+            ) : null}
           </Card>
 
           <Card className="overflow-hidden p-0">
@@ -358,21 +518,6 @@ export function InvoiceFormPage() {
                 <Plus className="h-4 w-4" /> {t('newInvoice.addItem')}
               </button>
             </div>
-            {catalogItems.length > 0 ? (
-              <div className="flex flex-wrap gap-2 border-b border-brand-ink/8 px-6 py-3">
-                <span className="w-full text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('items.pick')}</span>
-                {catalogItems.slice(0, 12).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setItems((prev) => [...prev, invoiceLineFromCatalog(item)])}
-                    className="rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
-                  >
-                    {item.description}
-                  </button>
-                ))}
-              </div>
-            ) : null}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-sm">
                 <thead className="bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
@@ -385,10 +530,42 @@ export function InvoiceFormPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => (
+                  {items.map((item) => {
+                    const typing = Boolean(String(item.description || '').trim())
+                    const suggestions =
+                      typing || item.id === activeItemId || items.length === 1
+                        ? catalogItems
+                            .filter((row) =>
+                              String(item.description || '').trim()
+                                ? String(row.description || '').toLowerCase().includes(String(item.description || '').toLowerCase())
+                                : true,
+                            )
+                            .slice(0, 8)
+                        : []
+                    return (
                     <tr key={item.id} className="border-t border-brand-ink/5">
                       <td className="px-4 py-2">
-                        <input className={inputClass} value={item.description} placeholder={t('newInvoice.phItemDescription')} onChange={(e) => updateItem(item.id, 'description', e.target.value)} />
+                        <input
+                          className={inputClass}
+                          value={item.description}
+                          placeholder={t('newInvoice.phItemDescription')}
+                          onFocus={() => setActiveItemId(item.id)}
+                          onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                        />
+                        {suggestions.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {suggestions.map((catalogItem) => (
+                              <button
+                                key={catalogItem.id}
+                                type="button"
+                                onClick={() => applyCatalogItem(catalogItem, item.id)}
+                                className="rounded-lg bg-[#EEF5F7] px-2 py-1 text-[11px] font-semibold text-brand hover:bg-brand/10"
+                              >
+                                {catalogItem.description}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2">
                         <input className={inputClass} value={String(item.quantity)} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} />
@@ -407,7 +584,8 @@ export function InvoiceFormPage() {
                         ) : null}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -443,30 +621,107 @@ export function InvoiceFormPage() {
             {issued ? <Field label={t('docs.correctReason')} value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} /> : null}
             {error ? <p className="mt-4 text-sm text-[#C0503A]">{error}</p> : null}
             <div className="mt-5 flex flex-col gap-2">
-              <Button type="button" variant="secondary" onClick={() => (validate() ? setPreview(true) : null)}>
-                <Eye className="h-4 w-4" />
-                {t('newInvoice.preview')}
-              </Button>
-              {!issued ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={saving || savingDraft}
-                  onClick={() => {
-                    setSavingDraft(true)
-                    void onSave(true)
-                  }}
-                >
-                  {savingDraft ? t('common.loading') : t('docs.saveDraft')}
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => (validate() ? setPreview(true) : null)}>
+                  <Eye className="h-4 w-4" />
+                  {t('newInvoice.preview')}
                 </Button>
-              ) : null}
+                {canSaveOnly ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="flex-1"
+                    disabled={saving || savingDraft}
+                    onClick={() => {
+                      setSavingDraft(true)
+                      void onSave(true)
+                    }}
+                  >
+                    {savingDraft ? t('common.loading') : t('docs.saveDraft')}
+                  </Button>
+                ) : null}
+              </div>
               <Button type="button" disabled={saving} onClick={() => void onSave(false)}>
                 {saving ? t('common.loading') : saveLabel}
+                {!issued ? <Send className="h-4 w-4" /> : null}
               </Button>
             </div>
           </Card>
         </div>
       </div>
+
+      {pickerOpen ? (
+        <Modal title={t('docs.pickClient')} onClose={() => setPickerOpen(false)}>
+          <div className="p-6">
+            <input
+              className={inputClass}
+              value={pickerQuery}
+              placeholder={t('newInvoice.searchClients')}
+              onChange={(e) => setPickerQuery(e.target.value)}
+            />
+            <div className="mt-4 space-y-1">
+              {pickerClients.length === 0 ? <p className="py-8 text-center text-sm text-brand-ink/50">{t('newInvoice.noMatchingClients')}</p> : null}
+              {pickerClients.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => applyClient(item)}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm hover:bg-brand/5',
+                    clientId === item.id && 'bg-[#EEF5F7] font-semibold text-brand',
+                  )}
+                >
+                  <span>
+                    {clientDisplayName(item)}
+                    {item.phone ? <span className="block text-xs font-normal text-brand-ink/45">{item.phone}</span> : null}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {addOpen ? (
+        <Modal
+          title={t('docs.addClient')}
+          onClose={() => setAddOpen(false)}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setAddOpen(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  const payload = composeClient(addForm)
+                  if (!payload.fullName) {
+                    setError(t('clients.validationName'))
+                    return
+                  }
+                  if (!payload.phone) {
+                    setError(t('clients.validationPhone'))
+                    return
+                  }
+                  const saved = await createClient(payload as Parameters<typeof createClient>[0])
+                  applyClient(saved)
+                  setAddOpen(false)
+                }}
+              >
+                {t('common.save')}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-1 p-6">
+            <Field label={t('newInvoice.fullName')} value={addForm.fullName} placeholder={t('newInvoice.phFullName')} onChange={(e) => setAddForm((c) => ({ ...c, fullName: e.target.value }))} />
+            <Field label={t('newInvoice.address')} value={addForm.address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setAddForm((c) => ({ ...c, address: e.target.value }))} />
+            <Field label={t('newInvoice.phone')} value={addForm.phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setAddForm((c) => ({ ...c, phone: e.target.value }))} />
+            <Field label={`${t('docs.email')} (${t('common.optional')})`} value={addForm.email} onChange={(e) => setAddForm((c) => ({ ...c, email: e.target.value }))} />
+            <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={addForm.businessId} onChange={(e) => setAddForm((c) => ({ ...c, businessId: e.target.value }))} />
+          </div>
+        </Modal>
+      ) : null}
 
       {preview ? (
         <Modal
@@ -479,6 +734,7 @@ export function InvoiceFormPage() {
               </Button>
               <Button type="button" disabled={saving} onClick={() => void onSave(false)}>
                 {saveLabel}
+                {!issued ? <Send className="h-4 w-4" /> : null}
               </Button>
             </>
           }

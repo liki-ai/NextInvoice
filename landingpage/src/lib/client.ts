@@ -24,9 +24,14 @@ export function splitClientName(client?: { firstName?: string; lastName?: string
 }
 
 export function composeClient(fields: Record<string, unknown>) {
-  const firstName = String(fields.firstName || '').trim()
-  const lastName = String(fields.lastName || '').trim()
+  let firstName = String(fields.firstName || '').trim()
+  let lastName = String(fields.lastName || '').trim()
   const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || String(fields.fullName || '').trim()
+  if (fullName && !firstName && !lastName) {
+    const split = splitClientName({ fullName })
+    firstName = split.firstName
+    lastName = split.lastName
+  }
   return {
     ...fields,
     firstName,
@@ -35,8 +40,34 @@ export function composeClient(fields: Record<string, unknown>) {
     phone: String(fields.phone || '').trim(),
     email: String(fields.email || '').trim(),
     address: String(fields.address || '').trim(),
+    businessId: String(fields.businessId || '').trim(),
     notes: String(fields.notes || '').trim(),
     measurements: (fields.measurements as Record<string, string>) || {},
     photos: Array.isArray(fields.photos) ? fields.photos : [],
   }
+}
+
+export function clientMatchesQuery(client: { firstName?: string; lastName?: string; fullName?: string; phone?: string; email?: string; address?: string; businessId?: string }, query: string) {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return true
+  return [clientDisplayName(client), client.phone, client.email, client.address, client.businessId]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .includes(q)
+}
+
+export function frequentClients<T extends { id: string; firstName?: string; lastName?: string; fullName?: string }>(
+  clients: T[],
+  invoices: { clientId?: string; client?: { id?: string } }[],
+  limit = 8,
+) {
+  const counts: Record<string, number> = {}
+  invoices.forEach((inv) => {
+    const id = inv.clientId || inv.client?.id
+    if (id) counts[id] = (counts[id] || 0) + 1
+  })
+  return [...clients]
+    .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || clientDisplayName(a).localeCompare(clientDisplayName(b)))
+    .slice(0, limit)
 }

@@ -246,6 +246,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
           subtotal: totals.subtotal,
           total: totals.total,
           lifecycle: 'draft',
+          sent: false,
         };
         if (persistedIdRef.current) {
           await updateInvoice(persistedIdRef.current, payload);
@@ -347,7 +348,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
   };
 
   const handleSave = async (asDraft = false) => {
-    const invoice = buildPayload(!asDraft);
+    const invoice = buildPayload(true);
     if (!invoice) {
       setSavingDraft(false);
       return;
@@ -367,16 +368,23 @@ export default function NewInvoiceScreen({ navigation, route }) {
         savedClientId = savedClient.id;
         setClientId(savedClientId);
       }
-      const payload = { ...invoice, clientId: savedClientId, lifecycle: asDraft ? 'draft' : 'issued' };
+      const sharing = !asDraft && canAutosaveDraft;
+      const payload = {
+        ...invoice,
+        clientId: savedClientId,
+        lifecycle: 'issued',
+        sent: sharing ? true : asDraft ? false : existing?.sent !== false,
+        sentAt: sharing ? new Date().toISOString() : asDraft ? null : existing?.sentAt || null,
+      };
       const existingId = persistedIdRef.current || invoiceId;
       if (existingId) {
         await updateInvoice(existingId, payload);
-        if (!asDraft && canAutosaveDraft) await issueInvoice(existingId);
+        if (canAutosaveDraft) await issueInvoice(existingId);
       } else {
         const saved = await addInvoice(payload);
         persistedIdRef.current = saved.id;
       }
-      if (!asDraft && canAutosaveDraft) {
+      if (sharing) {
         await shareInvoicePdf({
           company: localizeCompanyProfile(companyProfile, t),
           client,
@@ -477,7 +485,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
               setClient((c) => ({ ...c, fullName: v }));
             }}
           />
-          {suggestedClients.length > 0 ? (
+          {suggestedClients.length > 0 && !clientId ? (
             <ScrollView
               horizontal
               nestedScrollEnabled
@@ -671,7 +679,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
               }}
             >
               <Ionicons name="document-outline" size={18} color={colors.primary} />
-              <Text style={styles.sideButtonText}>{savingDraft ? t('common.loading') : t('docs.saveDraft')}</Text>
+              <Text style={styles.sideButtonText}>{savingDraft ? t('common.loading') : t('common.save')}</Text>
             </Pressable>
           ) : null}
         </View>

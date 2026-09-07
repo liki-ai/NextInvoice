@@ -35,6 +35,8 @@ export type Invoice = {
   cancelReason?: string
   cancelledAt?: string
   issuedAt?: string
+  sent?: boolean
+  sentAt?: string
   createdAt?: string
   updatedAt?: string
   proofUri?: string

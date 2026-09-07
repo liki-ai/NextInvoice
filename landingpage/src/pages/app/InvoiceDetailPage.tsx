@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { Eye, Pencil, Send, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal } from '../../components/ui'
 import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, invoiceStatus } from '../../lib/invoice'
-import { activePayments, daysOverdue, remainingOf, reminderText } from '../../lib/document'
+import { activePayments, daysOverdue, isInvoiceSent, remainingOf, reminderText, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 import { ProofField } from '../../components/ProofField'
@@ -26,6 +26,8 @@ export function InvoiceDetailPage() {
   const client = invoice?.clientSnapshot || invoice?.client
   const currency = invoice?.currency || company?.currency || 'EUR'
   const status = invoice ? invoiceStatus(invoice) : 'unpaid'
+  const visible = invoice ? visiblePaymentStatus(invoice) : 'unpaid'
+  const sent = invoice ? isInvoiceSent(invoice) : false
   const late = invoice ? daysOverdue(invoice) : 0
   const due = invoice ? remainingOf(invoice) : 0
 
@@ -99,6 +101,7 @@ export function InvoiceDetailPage() {
       pdfLabels: { ...dict.pdf, amountDue: t('docs.amountDue'), amountPaid: t('docs.amountPaid') },
     })
     downloadHtmlAsPdf(doc, `${current.number}.pdf`)
+    void updateInvoice(current.id, { sent: true, sentAt: new Date().toISOString() })
   }
 
   async function onCopyReminder() {
@@ -123,9 +126,29 @@ export function InvoiceDetailPage() {
           <p className="mt-1 text-sm text-brand-ink/55">
             {t('newInvoice.dueDate')}: {invoice.dueDate || dict.pdf.onReceipt}
           </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span className="rounded-full bg-brand-ink/8 px-2.5 py-1 text-xs font-semibold">
-              {status === 'paid' ? t('invoiceList.statusPaid') : status === 'partial' ? t('docs.statusPartial') : status === 'draft' ? t('docs.statusDraft') : status === 'cancelled' ? t('docs.statusCancelled') : t('invoiceList.statusUnpaid')}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${sent ? 'bg-[#EEF5F7] text-brand' : 'bg-brand-ink/8 text-brand-ink/55'}`}>
+              <Send className="h-3 w-3" />
+              {sent ? t('docs.sent') : t('docs.notSent')}
+            </span>
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                visible === 'paid'
+                  ? 'bg-[#E7F4EA] text-[#2E7D32]'
+                  : visible === 'partial'
+                    ? 'border border-[#E8B84A] bg-[#FFF6E5] text-[#8A5A00]'
+                    : visible === 'cancelled'
+                      ? 'bg-brand-ink/8 text-brand-ink/55'
+                      : 'bg-[#C0503A] text-white'
+              }`}
+            >
+              {visible === 'paid'
+                ? t('invoiceList.statusPaid')
+                : visible === 'partial'
+                  ? t('docs.statusPartial')
+                  : visible === 'cancelled'
+                    ? t('docs.statusCancelled')
+                    : t('invoiceList.statusUnpaid')}
             </span>
             {late > 0 ? <span className="rounded-full bg-[#F8E8E4] px-2.5 py-1 text-xs font-semibold text-[#C0503A]">{t('docs.overdueDays', { days: late })}</span> : null}
           </div>

@@ -12,11 +12,25 @@ import SwipeableRow, { useLockRowPress } from '../components/SwipeableRow';
 import PdfPreviewModal from '../components/PdfPreviewModal';
 import SyncBanner from '../components/SyncBanner';
 import PaymentModal from '../components/PaymentModal';
-import { daysOverdue, isOverdue, paymentStatus, remainingOf, togglePaid } from '../utils/document';
+import { daysOverdue, isInvoiceSent, isOverdue, paymentStatus, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
 
-function PaidChip({ status, paid, late, t, onToggle }) {
+function PaidChip({ status, paid, late, remaining, currency, t, onToggle }) {
   const { lock } = useLockRowPress();
+  const visible = status === 'draft' ? 'unpaid' : status;
+  const isPartial = visible === 'partial';
+  const isPaid = visible === 'paid';
+  const isCancelled = visible === 'cancelled';
+  const label = isPaid
+    ? t('invoiceDetail.statusPaid')
+    : isPartial
+      ? t('docs.statusPartial')
+      : isCancelled
+        ? t('docs.statusCancelled')
+        : t('invoiceDetail.statusUnpaid');
+  const iconName = isPaid ? 'checkmark-circle' : isPartial ? 'pie-chart' : isCancelled ? null : 'ellipse-outline';
+  const iconColor = isPaid ? colors.success : isPartial ? '#8A5A00' : '#fff';
+
   return (
     <View style={{ alignItems: 'flex-end' }}>
       <Pressable
@@ -25,49 +39,38 @@ function PaidChip({ status, paid, late, t, onToggle }) {
           onToggle();
         }}
         hitSlop={8}
-        accessibilityHint={paid ? t('invoiceDetail.statusUnpaid') : t('invoiceList.tapToMarkPaid')}
+        accessibilityHint={isPaid ? t('invoiceDetail.statusUnpaid') : t('invoiceList.tapToMarkPaid')}
         style={[
           styles.statusChip,
-          paid
+          isPaid
             ? styles.statusPaid
-            : status === 'partial'
+            : isPartial
               ? styles.statusPartial
-              : status === 'draft'
-                ? styles.statusDraft
-                : status === 'cancelled'
-                  ? styles.statusCancelled
-                  : styles.statusUnpaid,
+              : isCancelled
+                ? styles.statusCancelled
+                : styles.statusUnpaid,
         ]}
       >
-        {status !== 'draft' && status !== 'cancelled' ? (
-          <Ionicons
-            name={paid ? 'checkmark-circle' : 'ellipse-outline'}
-            size={16}
-            color={paid ? colors.success : status === 'partial' ? '#8A6D00' : '#fff'}
-          />
-        ) : null}
+        {iconName ? <Ionicons name={iconName} size={15} color={iconColor} /> : null}
         <Text
           style={
-            paid
+            isPaid
               ? styles.statusPaidText
-              : status === 'partial'
+              : isPartial
                 ? styles.statusPartialText
-                : status === 'draft' || status === 'cancelled'
-                  ? styles.statusDraftText
+                : isCancelled
+                  ? styles.statusMutedText
                   : styles.statusUnpaidText
           }
         >
-          {paid
-            ? t('invoiceDetail.statusPaid')
-            : status === 'draft'
-              ? t('docs.statusDraft')
-              : status === 'cancelled'
-                ? t('docs.statusCancelled')
-                : status === 'partial'
-                  ? t('docs.statusPartial')
-                  : t('invoiceDetail.statusPaid')}
+          {label}
         </Text>
       </Pressable>
+      {isPartial && remaining > 0 ? (
+        <Text style={styles.partialDue}>
+          {t('docs.remaining')}: {formatMoney(remaining, currency)}
+        </Text>
+      ) : null}
       {late > 0 ? <Text style={styles.overdue}>{t('docs.overdueDays', { days: late })}</Text> : null}
     </View>
   );
@@ -84,7 +87,7 @@ function sendCopy(filter, t) {
 }
 
 export default function InvoiceListScreen({ navigation }) {
-  const { invoices, companyProfile, usage, deleteInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice } = useApp();
+  const { invoices, companyProfile, usage, deleteInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice } = useApp();
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState('all');
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -239,10 +242,26 @@ export default function InvoiceListScreen({ navigation }) {
         }
         renderItem={({ item }) => {
           const status = paymentStatus(item);
-          const paid = status === 'paid';
+          const visible = visiblePaymentStatus(item);
+          const paid = visible === 'paid';
           const late = daysOverdue(item);
-          const due = remainingOf(item);
-          const canPay = due > 0 && status !== 'cancelled' && status !== 'draft';
+          const due = remainingOf(item) || (status === 'draft' ? Number(item.total) || 0 : 0);
+          const sent = isInvoiceSent(item);
+          const canPay = due > 0 && visible !== 'cancelled';
+          const markPaidOrUnpaid = () => {
+            const run = (doc) =>
+              togglePaid(doc, {
+                addPayment: addInvoicePayment,
+                voidPayment: voidInvoicePayment,
+                setStatus: (next) => updateInvoice(doc.id, { status: next }),
+                payload: fullPaymentPayload(doc),
+              });
+            if (item.lifecycle === 'draft') {
+              void issueInvoice(item.id).then(() => run({ ...item, lifecycle: 'issued' }));
+              return;
+            }
+            void run(item);
+          };
           return (
             <SwipeableRow
               paid={paid}
@@ -268,18 +287,15 @@ export default function InvoiceListScreen({ navigation }) {
                   },
                 ]);
               }}
-              onPartialPay={canPay ? () => setPayId(item.id) : undefined}
-              onTogglePaid={
-                paid
-                  ? () =>
-                      void togglePaid(item, {
-                        addPayment: addInvoicePayment,
-                        voidPayment: voidInvoicePayment,
-                        setStatus: (next) => updateInvoice(item.id, { status: next }),
-                        payload: fullPaymentPayload(item),
-                      })
+              onPartialPay={
+                canPay
+                  ? () => {
+                      if (item.lifecycle === 'draft') void issueInvoice(item.id).then(() => setPayId(item.id));
+                      else setPayId(item.id);
+                    }
                   : undefined
               }
+              onTogglePaid={paid ? markPaidOrUnpaid : undefined}
             >
               <View style={styles.card}>
               <View style={styles.cardRow}>
@@ -293,21 +309,26 @@ export default function InvoiceListScreen({ navigation }) {
               </View>
               <View style={styles.subRow}>
                 <Text style={typography.muted}>{item.dueDate || t('pdf.onReceipt')}</Text>
-                <PaidChip
-                  status={status}
-                  paid={paid}
-                  late={late}
-                  t={t}
-                  onToggle={() => {
-                    if (status === 'cancelled' || status === 'draft') return;
-                    void togglePaid(item, {
-                      addPayment: addInvoicePayment,
-                      voidPayment: voidInvoicePayment,
-                      setStatus: (next) => updateInvoice(item.id, { status: next }),
-                      payload: fullPaymentPayload(item),
-                    });
-                  }}
-                />
+                <View style={styles.statusCluster}>
+                  <Ionicons
+                    name={sent ? 'send' : 'send-outline'}
+                    size={14}
+                    color={sent ? colors.primary : colors.textMuted}
+                    accessibilityLabel={sent ? t('docs.sent') : t('docs.notSent')}
+                  />
+                  <PaidChip
+                    status={visible}
+                    paid={paid}
+                    late={late}
+                    remaining={due}
+                    currency={item.currency || currency}
+                    t={t}
+                    onToggle={() => {
+                      if (visible === 'cancelled') return;
+                      markPaidOrUnpaid();
+                    }}
+                  />
+                </View>
               </View>
               </View>
             </SwipeableRow>
@@ -422,6 +443,7 @@ const styles = StyleSheet.create({
   filterText: { color: colors.textMuted, fontWeight: '700', fontSize: 12 },
   filterTextActive: { color: '#fff' },
   subRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  statusCluster: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -447,14 +469,18 @@ const styles = StyleSheet.create({
   },
   statusUnpaid: { backgroundColor: colors.danger },
   statusPaid: { backgroundColor: '#E7F4EA' },
-  statusPartial: { backgroundColor: '#FFF4D6' },
-  statusDraft: { backgroundColor: '#EEF2F3' },
+  statusPartial: {
+    backgroundColor: '#FFF6E5',
+    borderWidth: 1,
+    borderColor: '#E8B84A',
+  },
   statusCancelled: { backgroundColor: '#F3F4F4' },
-  statusDraftText: { color: colors.textMuted, fontWeight: '800', fontSize: 12 },
+  statusMutedText: { color: colors.textMuted, fontWeight: '800', fontSize: 12 },
   overdue: { marginTop: 4, color: colors.danger, fontSize: 11, fontWeight: '700' },
+  partialDue: { marginTop: 4, color: '#8A5A00', fontSize: 11, fontWeight: '700' },
   statusUnpaidText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   statusPaidText: { color: colors.success, fontWeight: '800', fontSize: 12 },
-  statusPartialText: { color: '#8A6D00', fontWeight: '800', fontSize: 12 },
+  statusPartialText: { color: '#8A5A00', fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.lg },
   emptyText: { marginTop: spacing.sm, textAlign: 'center', color: colors.textMuted, fontSize: 15 },
   fab: {

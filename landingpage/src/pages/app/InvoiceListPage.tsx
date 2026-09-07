@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileText, Pencil, Plus, Search, Send, Trash2, Circle, CheckCircle2 } from 'lucide-react'
+import { FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -15,7 +15,7 @@ import {
   invoiceListFileName,
   invoiceStatus,
 } from '../../lib/invoice'
-import { daysOverdue, formatMoneyList, isOverdue, remainingOf, totalsByCurrency, togglePaid } from '../../lib/document'
+import { daysOverdue, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 
@@ -30,7 +30,7 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
 }
 
 export function InvoiceListPage() {
-  const { invoices, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice } = useAppData()
+  const { invoices, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue'>('all')
@@ -94,10 +94,9 @@ export function InvoiceListPage() {
     }
   }
 
-  function statusLabel(status: ReturnType<typeof invoiceStatus>) {
+  function statusLabel(status: ReturnType<typeof visiblePaymentStatus>) {
     if (status === 'paid') return t('invoiceList.statusPaid')
     if (status === 'partial') return t('docs.statusPartial')
-    if (status === 'draft') return t('docs.statusDraft')
     if (status === 'cancelled') return t('docs.statusCancelled')
     return t('invoiceList.statusUnpaid')
   }
@@ -296,59 +295,71 @@ export function InvoiceListPage() {
               <tbody>
                 {filtered.map((item) => {
                   const status = invoiceStatus(item)
+                  const visible = visiblePaymentStatus(item)
                   const late = daysOverdue(item)
-                  const due = remainingOf(item)
-                  const canPay = due > 0 && status !== 'cancelled' && status !== 'draft'
+                  const due = remainingOf(item) || (status === 'draft' ? Number(item.total) || 0 : 0)
+                  const sent = isInvoiceSent(item)
+                  const canPay = due > 0 && visible !== 'cancelled'
+                  const markPaidOrUnpaid = () => {
+                    const run = (doc: typeof item) =>
+                      togglePaid(doc, {
+                        addPayment: addInvoicePayment,
+                        voidPayment: voidInvoicePayment,
+                        setStatus: (next) => updateInvoice(doc.id, { status: next }),
+                        payload: fullPaymentPayload(doc),
+                      })
+                    if (item.lifecycle === 'draft') {
+                      void issueInvoice(item.id).then(() => run({ ...item, lifecycle: 'issued' }))
+                      return
+                    }
+                    void run(item)
+                  }
                   return (
-                  <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${status === 'cancelled' ? 'opacity-60' : ''}`}>
+                  <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''}`}>
                     <td className="px-5 py-4">
-                      <Link to={`/app/invoices/${item.id}`} className="font-semibold text-brand hover:underline">
+                      <Link to={status === 'draft' ? `/app/invoices/${item.id}/edit` : `/app/invoices/${item.id}`} className="font-semibold text-brand hover:underline">
                         {item.number}
                       </Link>
-                      {status === 'draft' ? <div className="text-xs text-brand-ink/40">{t('docs.draft')}</div> : null}
                     </td>
                     <td className="px-5 py-4">{item.client?.fullName}</td>
                     <td className="px-5 py-4 text-brand-ink/60">
                       <div className="font-semibold">{item.date}</div>
                       <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
-                      <div className="mt-1 flex flex-wrap gap-1">
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span title={sent ? t('docs.sent') : t('docs.notSent')} className={sent ? 'text-brand' : 'text-brand-ink/35'}>
+                          <Send className="h-3.5 w-3.5" strokeWidth={sent ? 2.5 : 1.75} />
+                        </span>
                         <button
                           type="button"
-                          disabled={busyId === item.id || status === 'cancelled' || status === 'draft'}
+                          disabled={busyId === item.id || visible === 'cancelled'}
                           onClick={() => {
-                            if (status === 'cancelled' || status === 'draft') return
-                            void togglePaid(item, {
-                              addPayment: addInvoicePayment,
-                              voidPayment: voidInvoicePayment,
-                              setStatus: (next) => updateInvoice(item.id, { status: next }),
-                              payload: fullPaymentPayload(item),
-                            })
+                            if (visible === 'cancelled') return
+                            markPaidOrUnpaid()
                           }}
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            status === 'paid'
+                            visible === 'paid'
                               ? 'bg-[#E7F4EA] text-[#2E7D32]'
-                              : status === 'partial'
-                                ? 'bg-[#FFF4D6] text-[#8A6D00]'
-                                : status === 'cancelled'
+                              : visible === 'partial'
+                                ? 'border border-[#E8B84A] bg-[#FFF6E5] text-[#8A5A00]'
+                                : visible === 'cancelled'
                                   ? 'bg-brand-ink/10 text-brand-ink/55'
                                   : 'bg-[#C0503A] text-white'
                           }`}
                         >
-                          {status !== 'draft' && status !== 'cancelled' ? (
-                            status === 'paid' ? (
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            ) : (
-                              <Circle className="h-3.5 w-3.5" />
-                            )
-                          ) : null}
-                          {status === 'paid'
-                            ? t('invoiceList.statusPaid')
-                            : status === 'partial'
-                              ? t('docs.statusPartial')
-                              : status === 'cancelled' || status === 'draft'
-                                ? statusLabel(status)
-                                : t('invoiceList.statusPaid')}
+                          {visible === 'paid' ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : visible === 'partial' ? (
+                            <PieChart className="h-3.5 w-3.5" />
+                          ) : visible === 'cancelled' ? null : (
+                            <Circle className="h-3.5 w-3.5" />
+                          )}
+                          {statusLabel(visible)}
                         </button>
+                        {visible === 'partial' && due > 0 ? (
+                          <span className="text-[11px] font-semibold text-[#8A5A00]">
+                            {t('docs.remaining')}: {formatMoney(due, item.currency || currency)}
+                          </span>
+                        ) : null}
                         {late > 0 ? (
                           <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
                             {t('docs.overdueDays', { days: late })}
@@ -359,14 +370,16 @@ export function InvoiceListPage() {
                     <td className="px-5 py-4 text-brand-ink/60">{t('invoiceList.itemsCount', { count: item.items?.length || 0 })}</td>
                     <td className="px-5 py-4 text-right font-semibold">
                       {formatMoney(status === 'cancelled' || status === 'draft' ? Number(item.total) || 0 : due, item.currency || currency)}
-                      {status === 'partial' ? <div className="text-xs font-normal text-brand-ink/40">{t('docs.remaining')}</div> : null}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
                         {canPay ? (
                           <button
                             type="button"
-                            onClick={() => setPayId(item.id)}
+                            onClick={() => {
+                              if (item.lifecycle === 'draft') void issueInvoice(item.id).then(() => setPayId(item.id))
+                              else setPayId(item.id)
+                            }}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
                           >
                             {t('docs.payPartial')}

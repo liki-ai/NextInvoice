@@ -3,13 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Camera } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { Button, Card, Field, TextArea } from '../../components/ui'
-import {
-  MEASUREMENT_FIELDS,
-  composeClient,
-  isFashionIndustry,
-  splitClientName,
-} from '../../lib/client'
+import { Button, Card, Field } from '../../components/ui'
+import { MEASUREMENT_FIELDS, clientDisplayName, composeClient, isFashionIndustry } from '../../lib/client'
 import { fileToProof, isImageProof, proofSource } from '../../lib/proof'
 import type { ClientRecord } from '../../lib/document'
 
@@ -20,14 +15,12 @@ export function ClientFormPage() {
   const navigate = useNavigate()
   const existing = clientId ? clients.find((item) => item.id === clientId) : null
   const fashion = isFashionIndustry(profile)
-  const split = splitClientName(existing || {})
 
-  const [firstName, setFirstName] = useState(split.firstName)
-  const [lastName, setLastName] = useState(split.lastName)
+  const [fullName, setFullName] = useState(clientDisplayName(existing || {}))
   const [phone, setPhone] = useState(existing?.phone || '')
   const [email, setEmail] = useState(existing?.email || '')
   const [address, setAddress] = useState(existing?.address || '')
-  const [notes, setNotes] = useState(existing?.notes || '')
+  const [businessId, setBusinessId] = useState(existing?.businessId || '')
   const [measurements, setMeasurements] = useState<Record<string, string>>(existing?.measurements || {})
   const [photos, setPhotos] = useState(existing?.photos || [])
   const [viewPhoto, setViewPhoto] = useState<(typeof photos)[number] | null>(null)
@@ -37,16 +30,16 @@ export function ClientFormPage() {
   const payload = useMemo(
     () =>
       composeClient({
-        firstName,
-        lastName,
+        fullName,
         phone,
         email,
         address,
-        notes: fashion ? '' : notes,
-        measurements: fashion ? measurements : {},
-        photos: fashion ? photos : [],
+        businessId,
+        notes: existing?.notes || '',
+        measurements: fashion ? measurements : existing?.measurements || {},
+        photos: fashion ? photos : existing?.photos || [],
       }),
-    [firstName, lastName, phone, email, address, notes, measurements, photos, fashion],
+    [fullName, phone, email, address, businessId, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
   )
 
   async function persist(thenInvoice: boolean) {
@@ -84,12 +77,16 @@ export function ClientFormPage() {
       <Card className="mt-8 max-w-2xl">
         <h2 className="mb-4 font-semibold">{t('clients.bio')}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('clients.firstName')} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          <Field label={t('clients.lastName')} value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          <Field label={t('newInvoice.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <div className="sm:col-span-2">
+            <Field label={t('newInvoice.fullName')} value={fullName} placeholder={t('newInvoice.phFullName')} onChange={(e) => setFullName(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Field label={t('newInvoice.address')} value={address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setAddress(e.target.value)} />
+          </div>
+          <Field label={t('newInvoice.phone')} value={phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setPhone(e.target.value)} />
           <Field label={`${t('docs.email')} (${t('common.optional')})`} value={email} onChange={(e) => setEmail(e.target.value)} />
           <div className="sm:col-span-2">
-            <Field label={`${t('newInvoice.address')} (${t('common.optional')})`} value={address} onChange={(e) => setAddress(e.target.value)} />
+            <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={businessId} onChange={(e) => setBusinessId(e.target.value)} />
           </div>
         </div>
 
@@ -137,16 +134,7 @@ export function ClientFormPage() {
               </label>
             </div>
           </div>
-        ) : (
-          <div className="mt-6">
-            <TextArea
-              label={`${t('clients.notes')} (${t('common.optional')})`}
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
-        )}
+        ) : null}
 
         {error ? <p className="mt-4 text-sm text-[#C0503A]">{error}</p> : null}
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">

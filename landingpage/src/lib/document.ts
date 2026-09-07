@@ -71,6 +71,24 @@ export function paymentStatus(doc: {
   return 'unpaid'
 }
 
+export function visiblePaymentStatus(doc: {
+  lifecycle?: string
+  status?: string
+  total?: unknown
+  amount?: unknown
+  payments?: Payment[] | null
+}): Exclude<DocStatus, 'draft'> {
+  const status = paymentStatus(doc)
+  return status === 'draft' ? 'unpaid' : status
+}
+
+export function isInvoiceSent(doc: { sent?: boolean; sentAt?: string; lifecycle?: string }) {
+  if (doc?.sent === false) return false
+  if (doc?.sentAt || doc?.sent === true) return true
+  if (doc?.lifecycle === 'draft') return false
+  return true
+}
+
 export function remainingOf(doc: {
   amountDue?: number
   lifecycle?: string

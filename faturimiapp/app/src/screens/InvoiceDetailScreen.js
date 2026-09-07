@@ -11,7 +11,7 @@ import { formatMoney } from '../utils/money';
 import { buildInvoiceHtml } from '../pdf/invoiceTemplate';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
-import { daysOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, reminderText } from '../utils/document';
+import { daysOverdue, isInvoiceSent, paymentStatus, pdfClient, pdfCompany, remainingOf, reminderText, visiblePaymentStatus } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
 import ProofBlock from '../components/ProofBlock';
 
@@ -25,6 +25,8 @@ export default function InvoiceDetailScreen({ route, navigation }) {
 
   const invoice = useMemo(() => invoices.find((inv) => inv.id === invoiceId), [invoices, invoiceId]);
   const status = invoice ? paymentStatus(invoice) : 'unpaid';
+  const visible = invoice ? visiblePaymentStatus(invoice) : 'unpaid';
+  const sent = invoice ? isInvoiceSent(invoice) : false;
   const company = invoice ? pdfCompany(invoice, localizeCompanyProfile(companyProfile, t)) : companyProfile;
   const client = invoice ? pdfClient(invoice) : null;
   const currency = invoice?.currency || company?.currency || 'EUR';
@@ -74,6 +76,7 @@ export default function InvoiceDetailScreen({ route, navigation }) {
         invoice,
         pdfLabels: t('pdf'),
       });
+      if (invoice?.id) await updateInvoice(invoice.id, { sent: true, sentAt: new Date().toISOString() });
     } catch (err) {
       Alert.alert(t('common.error'), err.message);
     } finally {
@@ -135,7 +138,24 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           <Text style={typography.muted}>{t('newInvoice.date')}: {invoice.date}</Text>
           <Text style={typography.muted}>{t('pdf.dueDateLabel')}: {invoice.dueDate || t('pdf.onReceipt')}</Text>
           {late > 0 ? <Text style={[typography.muted, { color: colors.danger }]}>{t('docs.overdueDays', { days: late })}</Text> : null}
-          <Text style={typography.muted}>{status === 'paid' ? t('invoiceDetail.statusPaid') : status === 'partial' ? t('docs.statusPartial') : status === 'draft' ? t('docs.statusDraft') : status === 'cancelled' ? t('docs.statusCancelled') : t('invoiceDetail.statusUnpaid')}</Text>
+          <View style={styles.statusLine}>
+            <Ionicons
+              name={sent ? 'send' : 'send-outline'}
+              size={14}
+              color={sent ? colors.primary : colors.textMuted}
+            />
+            <Text style={typography.muted}>{sent ? t('docs.sent') : t('docs.notSent')}</Text>
+            <Text style={typography.muted}>·</Text>
+            <Text style={typography.muted}>
+              {visible === 'paid'
+                ? t('invoiceDetail.statusPaid')
+                : visible === 'partial'
+                  ? t('docs.statusPartial')
+                  : visible === 'cancelled'
+                    ? t('docs.statusCancelled')
+                    : t('invoiceDetail.statusUnpaid')}
+            </Text>
+          </View>
         </Section>
 
         <Section title={t('newInvoice.clientSectionTitle')}>
@@ -281,6 +301,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  statusLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
   },
   deleteLink: {
     alignSelf: 'center',
