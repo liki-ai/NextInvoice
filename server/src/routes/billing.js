@@ -36,6 +36,11 @@ router.post('/checkout', authRequired, async (req, res) => {
         error: 'Stripe is not configured. Set STRIPE_SECRET_KEY and STRIPE_PRICE_ID.',
       });
     }
+    if (!String(price).startsWith('price_')) {
+      return res.status(503).json({
+        error: 'STRIPE_PRICE_ID must be a recurring Price ID starting with price_, not a Product or SKU id.',
+      });
+    }
 
     const user = findUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Account not found.' });
@@ -67,6 +72,12 @@ router.post('/checkout', authRequired, async (req, res) => {
     return res.json({ url: session.url, sessionId: session.id });
   } catch (err) {
     console.error('[billing/checkout]', err);
+    const msg = String(err?.message || '');
+    if (/no such (price|sku|product)/i.test(msg) || err?.code === 'resource_missing') {
+      return res.status(503).json({
+        error: 'Stripe price was not found. Set STRIPE_PRICE_ID to a live/test recurring price_… ID.',
+      });
+    }
     return res.status(500).json({ error: err.message || 'Could not start checkout.' });
   }
 });

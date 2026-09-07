@@ -10,19 +10,35 @@ import { IAP_PRODUCT_ID, IAP_PRODUCT_IDS } from '../billing/products';
 import { validatePurchaseOnServer } from '../billing/validatePurchase';
 import { FREE_MONTHLY_LIMIT } from '../storage/plan';
 
+function isSkuMissingError(err) {
+  const code = err?.code;
+  const msg = String(err?.message || '');
+  return (
+    code === ErrorCode.SkuNotFound ||
+    code === ErrorCode.ItemUnavailable ||
+    code === ErrorCode.QueryProduct ||
+    code === ErrorCode.EmptySkuList ||
+    /sku not found/i.test(msg)
+  );
+}
+
 export default function SubscribeScreen({ navigation }) {
-  const { settings, plan, setPlanFromPurchase, clearPlan, invoices } = useApp();
+  const { settings, plan, setPlanFromPurchase, clearPlan, invoices, token, refreshAccountPlan } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+
+  const skuMissingMessage = t('billing.skuMissing', { sku: IAP_PRODUCT_ID });
 
   const handleValidated = useCallback(
     async (purchase) => {
       setBusy(true);
       setStatus(t('billing.validating'));
       try {
-        const verified = await validatePurchaseOnServer(settings.apiBaseUrl, purchase);
+        const verified = await validatePurchaseOnServer(settings.apiBaseUrl, purchase, token);
         if (!verified?.active) {
           await clearPlan();
           throw new Error(t('billing.inactive'));
@@ -34,6 +50,7 @@ export default function SubscribeScreen({ navigation }) {
           expiresAt: verified.expiresAt,
           platform: verified.platform,
         });
+        if (token) await refreshAccountPlan().catch(() => {});
         setStatus(t('billing.success'));
         Alert.alert(t('common.success'), t('billing.success'));
       } catch (err) {
@@ -44,11 +61,12 @@ export default function SubscribeScreen({ navigation }) {
         setBusy(false);
       }
     },
-    [settings.apiBaseUrl, setPlanFromPurchase, clearPlan, t],
+    [settings.apiBaseUrl, setPlanFromPurchase, clearPlan, t, token, refreshAccountPlan],
   );
 
   const {
     connected,
+    products,
     subscriptions,
     fetchProducts,
     requestPurchase,
@@ -64,31 +82,69 @@ export default function SubscribeScreen({ navigation }) {
     },
     onPurchaseError: (error) => {
       if (error?.code === ErrorCode.UserCancelled) return;
+      if (isSkuMissingError(error)) return;
       Alert.alert(t('common.error'), error?.message || t('billing.purchaseFailed'));
     },
   });
 
   useEffect(() => {
-    if (!connected) return;
-    fetchProducts({ skus: IAP_PRODUCT_IDS, type: 'subs' }).catch(() => {});
-  }, [connected, fetchProducts]);
+    if (!token) return;
+    void refreshAccountPlan().catch(() => {});
+  }, [token, refreshAccountPlan]);
 
-  const subscription = subscriptions.find((s) => s.id === IAP_PRODUCT_ID) || subscriptions[0];
+  useEffect(() => {
+    if (!connected) {
+      setCatalogLoaded(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setCatalogLoaded(false);
+      setCatalogError('');
+      try {
+        await fetchProducts({ skus: IAP_PRODUCT_IDS, type: 'subs' });
+      } catch (err) {
+        if (!cancelled && isSkuMissingError(err) === false) {
+          setCatalogError(err?.message || skuMissingMessage);
+        }
+      }
+      try {
+        await fetchProducts({ skus: IAP_PRODUCT_IDS, type: 'in-app' });
+      } catch {
+        // in-app is only a fallback if the Apple product was created as a one-time IAP
+      }
+      if (!cancelled) setCatalogLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, fetchProducts, skuMissingMessage]);
+
+  const subscription =
+    subscriptions.find((s) => IAP_PRODUCT_IDS.includes(s.id)) ||
+    products.find((p) => IAP_PRODUCT_IDS.includes(p.id));
   const priceLabel = subscription?.displayPrice || t('billing.premiumPrice');
   const isPremium = plan?.plan === 'premium';
+  const skuError = subscription ? '' : catalogError || (catalogLoaded ? skuMissingMessage : '');
+  const canBuy = connected && catalogLoaded && Boolean(subscription);
 
   const onBuy = async () => {
     if (!connected) {
       Alert.alert(t('common.error'), t('billing.storeUnavailable'));
       return;
     }
+    if (!subscription) {
+      Alert.alert(t('common.error'), skuError || skuMissingMessage);
+      return;
+    }
     setBusy(true);
     setStatus(t('billing.purchasing'));
     try {
+      const sku = subscription.id || IAP_PRODUCT_ID;
       if (Platform.OS === 'ios') {
         await requestPurchase({
-          request: { apple: { sku: IAP_PRODUCT_ID } },
-          type: 'subs',
+          request: { apple: { sku } },
+          type: subscription.type === 'in-app' ? 'in-app' : 'subs',
         });
       } else {
         const offer = subscription?.subscriptionOfferDetailsAndroid?.[0];
@@ -98,8 +154,8 @@ export default function SubscribeScreen({ navigation }) {
         await requestPurchase({
           request: {
             google: {
-              skus: [IAP_PRODUCT_ID],
-              subscriptionOffers: [{ sku: IAP_PRODUCT_ID, offerToken: offer.offerToken }],
+              skus: [sku],
+              subscriptionOffers: [{ sku, offerToken: offer.offerToken }],
             },
           },
           type: 'subs',
@@ -107,7 +163,10 @@ export default function SubscribeScreen({ navigation }) {
       }
     } catch (err) {
       if (err?.code !== ErrorCode.UserCancelled) {
-        Alert.alert(t('common.error'), err.message || t('billing.purchaseFailed'));
+        Alert.alert(
+          t('common.error'),
+          isSkuMissingError(err) ? skuMissingMessage : err.message || t('billing.purchaseFailed'),
+        );
       }
     } finally {
       setBusy(false);
@@ -119,6 +178,13 @@ export default function SubscribeScreen({ navigation }) {
     setBusy(true);
     setStatus(t('billing.restoring'));
     try {
+      if (token) {
+        const account = await refreshAccountPlan();
+        if (account?.plan === 'premium') {
+          Alert.alert(t('billing.restoreTitle'), t('billing.success'));
+          return;
+        }
+      }
       const purchases = await getAvailablePurchases();
       const owned = (purchases || []).filter((p) => IAP_PRODUCT_IDS.includes(p.productId));
       if (!owned.length) {
@@ -160,15 +226,15 @@ export default function SubscribeScreen({ navigation }) {
         ) : (
           <Button
             title={busy ? t('common.loading') : t('billing.ctaIap')}
-            onPress={onBuy}
-            disabled={busy || !connected}
+            onPress={() => void onBuy()}
+            disabled={busy || !canBuy}
             style={{ marginTop: spacing.md }}
           />
         )}
         <Button
           title={t('billing.restore')}
           variant="secondary"
-          onPress={onRestore}
+          onPress={() => void onRestore()}
           disabled={busy}
           style={{ marginTop: spacing.sm }}
         />
@@ -181,6 +247,9 @@ export default function SubscribeScreen({ navigation }) {
           </Pressable>
         ) : null}
         {status ? <Text style={[typography.muted, { marginTop: spacing.sm }]}>{status}</Text> : null}
+        {skuError && !isPremium ? (
+          <Text style={[styles.warn, { marginTop: spacing.md }]}>{skuError}</Text>
+        ) : null}
         <Text style={[typography.muted, { marginTop: spacing.md, fontSize: 12 }]}>{t('billing.iapNote')}</Text>
       </Section>
 
@@ -204,5 +273,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
   },
+  warn: { color: '#C0503A', fontSize: 13, lineHeight: 18 },
   link: { color: colors.primary, fontWeight: '700', fontSize: 14 },
 });

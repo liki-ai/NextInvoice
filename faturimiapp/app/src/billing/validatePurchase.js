@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { IAP_PRODUCT_ID } from './products';
 
-export async function validatePurchaseOnServer(apiBaseUrl, purchase) {
+export async function validatePurchaseOnServer(apiBaseUrl, purchase, token) {
   const base = String(apiBaseUrl || '').replace(/\/+$/, '');
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   const body = {
@@ -12,9 +12,12 @@ export async function validatePurchaseOnServer(apiBaseUrl, purchase) {
     packageName: purchase.packageNameAndroid || 'com.lirim123.nextinvoice',
   };
 
-  const res = await fetch(`${base}/api/billing/iap/validate`, {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const path = token ? '/api/billing/iap/verify' : '/api/billing/iap/validate';
+  const res = await fetch(`${base}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));

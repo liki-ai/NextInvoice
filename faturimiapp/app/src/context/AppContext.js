@@ -201,6 +201,16 @@ export function AppProvider({ children }) {
     await setJson(KEYS.AUTH_TOKEN, res.token);
     await setJson(KEYS.AUTH_USER, res.user);
     await migrateLocalIfNeeded(res.user, res.token);
+    if (res.user?.plan === 'premium') {
+      const next = normalizePlan({
+        plan: 'premium',
+        platform: res.user.billingSource || 'server',
+        expiresAt: res.user.planExpiresAt || null,
+        updatedAt: new Date().toISOString(),
+      });
+      setPlan(next);
+      await setJson(KEYS.PLAN, next);
+    }
     await persistSync({ status: 'synced', lastSyncedAt: new Date().toISOString(), error: null });
   }, [settings.apiBaseUrl, migrateLocalIfNeeded, persistSync]);
 
@@ -214,6 +224,16 @@ export function AppProvider({ children }) {
     await setJson(KEYS.AUTH_TOKEN, res.token);
     await setJson(KEYS.AUTH_USER, res.user);
     await migrateLocalIfNeeded(res.user, res.token);
+    if (res.user?.plan === 'premium') {
+      const next = normalizePlan({
+        plan: 'premium',
+        platform: res.user.billingSource || 'server',
+        expiresAt: res.user.planExpiresAt || null,
+        updatedAt: new Date().toISOString(),
+      });
+      setPlan(next);
+      await setJson(KEYS.PLAN, next);
+    }
     await persistSync({ status: 'synced', lastSyncedAt: new Date().toISOString(), error: null });
   }, [settings.apiBaseUrl, settings.language, migrateLocalIfNeeded, persistSync]);
 
@@ -264,6 +284,27 @@ export function AppProvider({ children }) {
       }),
     [persistPlan],
   );
+
+  const refreshAccountPlan = useCallback(async () => {
+    if (!token) return null;
+    const res = await apiRequest(settings.apiBaseUrl, token, '/api/billing/me');
+    const account = res?.user || null;
+    if (account) {
+      setUser(account);
+      await setJson(KEYS.AUTH_USER, account);
+      if (account.plan === 'premium') {
+        await persistPlan({
+          plan: 'premium',
+          productId: plan?.productId || null,
+          originalTransactionId: plan?.originalTransactionId || null,
+          expiresAt: account.planExpiresAt || plan?.expiresAt || null,
+          platform: account.billingSource || plan?.platform || 'server',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+    return account;
+  }, [token, settings.apiBaseUrl, persistPlan, plan]);
 
   const clearPlan = useCallback(async () => persistPlan(DEFAULT_PLAN), [persistPlan]);
 
@@ -569,6 +610,7 @@ export function AppProvider({ children }) {
       plan,
       usage,
       setPlanFromPurchase,
+      refreshAccountPlan,
       clearPlan,
       token,
       user,
@@ -612,6 +654,7 @@ export function AppProvider({ children }) {
       plan,
       usage,
       setPlanFromPurchase,
+      refreshAccountPlan,
       clearPlan,
       token,
       user,
