@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Eye, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { Camera, Eye, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
@@ -39,6 +39,7 @@ export function InvoiceFormPage() {
   const skipAutosaveRef = useRef(false)
   const persistLock = useRef<Promise<unknown> | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef({
     client: existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' },
     clientId: existing?.clientId || '',
@@ -302,9 +303,12 @@ export function InvoiceFormPage() {
     setExtracting(true)
     setError('')
     try {
-      const form = new FormData()
-      form.append('file', file)
-      if (aiText.trim()) form.append('text', aiText.trim())
+      const image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(reader.error || new Error('photo'))
+        reader.readAsDataURL(file)
+      })
       const result = await api<{
         fullName?: string
         address?: string
@@ -314,7 +318,7 @@ export function InvoiceFormPage() {
         items?: { description?: string; quantity?: string | number; unitPrice?: string | number }[]
       }>('/api/extract-client', {
         method: 'POST',
-        form,
+        body: { text: aiText.trim(), image },
       })
       await applyExtracted(result)
     } catch {
@@ -322,6 +326,7 @@ export function InvoiceFormPage() {
     } finally {
       setExtracting(false)
       if (photoInputRef.current) photoInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
     }
   }
 
@@ -493,10 +498,25 @@ export function InvoiceFormPage() {
             <Button type="button" disabled={!aiText.trim() || extracting} onClick={() => void extractClient()}>
               {extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
             </Button>
+            <Button type="button" variant="secondary" disabled={extracting} onClick={() => cameraInputRef.current?.click()}>
+              <Camera className="h-4 w-4" />
+              {t('newInvoice.aiTakePhoto')}
+            </Button>
             <Button type="button" variant="secondary" disabled={extracting} onClick={() => photoInputRef.current?.click()}>
               <ImagePlus className="h-4 w-4" />
-              {t('newInvoice.aiUploadPhoto')}
+              {t('newInvoice.aiChoosePhoto')}
             </Button>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void extractFromPhoto(file)
+              }}
+            />
             <input
               ref={photoInputRef}
               type="file"

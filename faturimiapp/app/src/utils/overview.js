@@ -36,7 +36,7 @@ function paymentStatus(doc) {
   if (doc?.lifecycle === 'draft') return 'draft'
   const totalCents = toCents(doc?.total ?? doc?.amount ?? 0)
   const paidCents = (doc?.payments || []).filter((item) => !item.voidedAt).reduce((sum, item) => sum + toCents(item.amount), 0)
-  if (doc?.status === 'paid' && paidCents === 0 && totalCents > 0) return 'paid'
+  if (doc?.status === 'paid' && paidCents === 0) return 'paid'
   if (totalCents > 0 && paidCents >= totalCents) return 'paid'
   if (paidCents > 0) return 'partial'
   return 'unpaid'

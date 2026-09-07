@@ -13,6 +13,11 @@ export function formatMoney(amount, currency) {
   return `${value.toFixed(2)}${currencySymbol(currency)}`;
 }
 
+export function formatAmountShort(amount) {
+  const cents = Math.round((Number(amount) || 0) * 100);
+  return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
+}
+
 export function toNumber(value) {
   const n = parseFloat(String(value).replace(',', '.'));
   return Number.isFinite(n) ? n : 0;

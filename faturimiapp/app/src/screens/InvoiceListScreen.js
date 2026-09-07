@@ -1,22 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
-import { formatMoney } from '../utils/money';
+import { formatAmountShort, formatMoney } from '../utils/money';
 import { buildInvoiceListHtml, formatStatementFileDate } from '../pdf/invoiceTemplate';
 import { shareInvoiceListPdf, shareInvoicePdf } from '../pdf/generateInvoicePdf';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import SwipeableRow, { useLockRowPress } from '../components/SwipeableRow';
 import PdfPreviewModal from '../components/PdfPreviewModal';
-import SyncBanner from '../components/SyncBanner';
 import PaymentModal from '../components/PaymentModal';
 import SentButton from '../components/SentButton';
-import { daysOverdue, isInvoiceSent, isOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
+import { daysOverdue, documentTotals, isInvoiceSent, isOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
 
-function PaidChip({ status, paid, late, remaining, currency, t, onToggle }) {
+function PaidChip({ status, late, paidAmount, remaining, t, loading, onToggle }) {
   const { lock } = useLockRowPress();
   const visible = status === 'draft' ? 'unpaid' : status;
   const isPartial = visible === 'partial';
@@ -25,20 +24,23 @@ function PaidChip({ status, paid, late, remaining, currency, t, onToggle }) {
   const label = isPaid
     ? t('invoiceDetail.statusPaid')
     : isPartial
-      ? t('docs.statusPartial')
+      ? `${t('invoiceDetail.statusPaid')} ${formatAmountShort(paidAmount)} (-${formatAmountShort(remaining)})`
       : isCancelled
         ? t('docs.statusCancelled')
         : t('invoiceDetail.statusUnpaid');
   const iconName = isPaid ? 'checkmark-circle' : isPartial ? 'pie-chart' : isCancelled ? null : 'ellipse-outline';
   const iconColor = isPaid ? colors.success : isPartial ? '#8A5A00' : '#fff';
+  const spinnerColor = isPaid || isPartial ? iconColor : '#fff';
 
   return (
     <View style={{ alignItems: 'flex-end' }}>
       <Pressable
         onPress={() => {
+          if (loading || isCancelled) return;
           lock();
           onToggle();
         }}
+        disabled={loading || isCancelled}
         hitSlop={8}
         accessibilityHint={isPaid ? t('invoiceDetail.statusUnpaid') : t('invoiceList.tapToMarkPaid')}
         style={[
@@ -52,32 +54,33 @@ function PaidChip({ status, paid, late, remaining, currency, t, onToggle }) {
                 : styles.statusUnpaid,
         ]}
       >
-        {iconName ? <Ionicons name={iconName} size={15} color={iconColor} /> : null}
-        <Text
-          style={
-            isPaid
-              ? styles.statusPaidText
-              : isPartial
-                ? styles.statusPartialText
-                : isCancelled
-                  ? styles.statusMutedText
-                  : styles.statusUnpaidText
-          }
-        >
-          {label}
-        </Text>
+        {loading ? (
+          <ActivityIndicator size="small" color={spinnerColor} />
+        ) : (
+          <>
+            {iconName ? <Ionicons name={iconName} size={15} color={iconColor} /> : null}
+            <Text
+              style={
+                isPaid
+                  ? styles.statusPaidText
+                  : isPartial
+                    ? styles.statusPartialText
+                    : isCancelled
+                      ? styles.statusMutedText
+                      : styles.statusUnpaidText
+              }
+            >
+              {label}
+            </Text>
+          </>
+        )}
       </Pressable>
-      {isPartial && remaining > 0 ? (
-        <Text style={styles.partialDue}>
-          {t('docs.remaining')}: {formatMoney(remaining, currency)}
-        </Text>
-      ) : null}
       {late > 0 ? <Text style={styles.overdue}>{t('docs.overdueDays', { days: late })}</Text> : null}
     </View>
   );
 }
 
-function StatusCluster({ sent, sending, onSend, status, paid, late, remaining, currency, t, onToggle }) {
+function StatusCluster({ sent, sending, paying, onSend, status, late, paidAmount, remaining, t, onToggle }) {
   const { lock } = useLockRowPress();
   return (
     <View style={styles.statusCluster}>
@@ -91,7 +94,15 @@ function StatusCluster({ sent, sending, onSend, status, paid, late, remaining, c
           onSend();
         }}
       />
-      <PaidChip status={status} paid={paid} late={late} remaining={remaining} currency={currency} t={t} onToggle={onToggle} />
+      <PaidChip
+        status={status}
+        late={late}
+        paidAmount={paidAmount}
+        remaining={remaining}
+        t={t}
+        loading={paying}
+        onToggle={onToggle}
+      />
     </View>
   );
 }
@@ -114,6 +125,7 @@ export default function InvoiceListScreen({ navigation }) {
   const [sharing, setSharing] = useState(false);
   const [payId, setPayId] = useState(null);
   const [sendingId, setSendingId] = useState(null);
+  const [payingId, setPayingId] = useState(null);
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
   const send = sendCopy(statusFilter, t);
@@ -206,9 +218,6 @@ export default function InvoiceListScreen({ navigation }) {
           </Pressable>
         ) : null}
       </View>
-      <View style={{ paddingHorizontal: spacing.md }}>
-        <SyncBanner />
-      </View>
 
       {limitReached ? (
         <Pressable style={styles.limitBanner} onPress={() => navigation.navigate('Subscribe')}>
@@ -285,10 +294,13 @@ export default function InvoiceListScreen({ navigation }) {
           const visible = visiblePaymentStatus(item);
           const paid = visible === 'paid';
           const late = daysOverdue(item);
+          const totals = documentTotals(item);
           const due = remainingOf(item) || (status === 'draft' ? Number(item.total) || 0 : 0);
           const sent = isInvoiceSent(item);
           const canPay = due > 0 && visible !== 'cancelled';
           const markPaidOrUnpaid = async () => {
+            if (payingId || sendingId) return;
+            setPayingId(item.id);
             try {
               let doc = item;
               if (item.lifecycle === 'draft') {
@@ -303,6 +315,8 @@ export default function InvoiceListScreen({ navigation }) {
               });
             } catch (err) {
               Alert.alert(t('common.error'), err.message);
+            } finally {
+              setPayingId(null);
             }
           };
           return (
@@ -345,7 +359,7 @@ export default function InvoiceListScreen({ navigation }) {
               <View style={styles.card}>
               <View style={styles.cardRow}>
                 <Text style={styles.invoiceNumber}>{item.number}</Text>
-                <Text style={styles.invoiceTotal}>{formatMoney(status === 'cancelled' || status === 'draft' ? Number(item.total) || 0 : due, item.currency || currency)}</Text>
+                <Text style={styles.invoiceTotal}>{formatMoney(Number(item.total) || 0, item.currency || currency)}</Text>
               </View>
               <Text style={styles.clientName}>{item.client?.fullName}</Text>
               <View style={styles.cardRow}>
@@ -357,12 +371,12 @@ export default function InvoiceListScreen({ navigation }) {
                 <StatusCluster
                     sent={sent}
                     sending={sendingId === item.id}
+                    paying={payingId === item.id}
                     onSend={() => void onShareInvoice(item)}
                     status={visible}
-                    paid={paid}
                     late={late}
+                    paidAmount={Number(item.total) || totals.total}
                     remaining={due}
-                    currency={item.currency || currency}
                     t={t}
                     onToggle={() => {
                       if (visible === 'cancelled') return;
@@ -506,6 +520,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
+    minHeight: 28,
+    minWidth: 72,
+    justifyContent: 'center',
   },
   statusUnpaid: { backgroundColor: colors.danger },
   statusPaid: { backgroundColor: '#E7F4EA' },
@@ -517,7 +534,6 @@ const styles = StyleSheet.create({
   statusCancelled: { backgroundColor: '#F3F4F4' },
   statusMutedText: { color: colors.textMuted, fontWeight: '800', fontSize: 12 },
   overdue: { marginTop: 4, color: colors.danger, fontSize: 11, fontWeight: '700' },
-  partialDue: { marginTop: 4, color: '#8A5A00', fontSize: 11, fontWeight: '700' },
   statusUnpaidText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   statusPaidText: { color: colors.success, fontWeight: '800', fontSize: 12 },
   statusPartialText: { color: '#8A5A00', fontWeight: '800', fontSize: 12 },

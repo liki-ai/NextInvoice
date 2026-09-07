@@ -65,7 +65,7 @@ export function paymentStatus(doc: {
   const totals = documentTotals(doc)
   const totalCents = toCents(doc?.total ?? doc?.amount ?? 0)
   const paidCents = toCents(totals.amountPaid)
-  if (doc?.status === 'paid' && paidCents === 0 && totalCents > 0) return 'paid'
+  if (doc?.status === 'paid' && paidCents === 0) return 'paid'
   if (totalCents > 0 && totals.amountDue === 0) return 'paid'
   if (paidCents > 0) return 'partial'
   return 'unpaid'
@@ -177,7 +177,7 @@ export async function togglePaid(
   opts: {
     addPayment: (id: string, payment: { amount: number; date: string; method?: string; note?: string }) => Promise<unknown>
     voidPayment: (id: string, paymentId: string, reason: string) => Promise<unknown>
-    setStatus?: (status: 'unpaid') => Promise<unknown>
+    setStatus?: (status: 'unpaid' | 'paid') => Promise<unknown>
     payload: { amount: number; date: string; method?: string; note?: string }
   },
 ) {
@@ -190,7 +190,11 @@ export async function togglePaid(
     if (opts.setStatus) await opts.setStatus('unpaid')
     return
   }
-  if (opts.payload.amount > 0) await opts.addPayment(doc.id, opts.payload)
+  if (opts.payload.amount > 0) {
+    await opts.addPayment(doc.id, opts.payload)
+    return
+  }
+  if (opts.setStatus) await opts.setStatus('paid')
 }
 
 export function todayInputValue(date = new Date()) {

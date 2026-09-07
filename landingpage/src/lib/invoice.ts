@@ -86,6 +86,11 @@ export function formatMoney(amount: number, currency: string) {
   return `${value.toFixed(2)}${currencySymbol(currency)}`
 }
 
+export function formatAmountShort(amount: number) {
+  const cents = Math.round((Number(amount) || 0) * 100)
+  return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2)
+}
+
 export function toNumber(value: unknown) {
   const n = parseFloat(String(value ?? '').replace(',', '.'))
   return Number.isFinite(n) ? n : 0
@@ -655,7 +660,7 @@ export function buildInvoiceListHtml({
               : status === 'draft'
                 ? pdfLabels.statusDraft || 'Draft'
                 : pdfLabels.statusUnpaid || 'Unpaid'
-      const amount = status === 'cancelled' || status === 'draft' ? Number(item.total) || 0 : remainingOf(item as Invoice)
+      const amount = Number(item.total) || 0
       return `<tr>
         <td>${escapeHtml(item.number || '')}</td>
         <td>${escapeHtml(item.client?.fullName || '')}</td>

@@ -34,7 +34,7 @@ import {
   invoiceClientFields,
 } from '../utils/client';
 import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../utils/catalog';
-import { pickImageFile } from '../utils/proof';
+import { pickImageFile, takePhotoFile } from '../utils/proof';
 
 function emptyItem() {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' };
@@ -83,6 +83,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
     addInvoice,
     updateInvoice,
     issueInvoice,
+    correctInvoice,
     addClient,
   } = useApp();
   const { t } = useTranslation();
@@ -326,7 +327,14 @@ export default function NewInvoiceScreen({ navigation, route }) {
     try {
       const result = await extractInvoiceInfo(settings.apiBaseUrl, {
         text: aiText.trim(),
-        file: photo,
+        file: photo
+          ? {
+              uri: photo.uri,
+              name: photo.name || 'photo.jpg',
+              mimeType: photo.mimeType || 'image/jpeg',
+              data: photo.data,
+            }
+          : null,
       });
       const extractedClient = {
         fullName: result.fullName || '',
@@ -348,19 +356,37 @@ export default function NewInvoiceScreen({ navigation, route }) {
       }
       Alert.alert(t('common.success'), t('newInvoice.aiExtractSuccess'));
     } catch (err) {
-      Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
+      const detail = String(err?.message || '').trim();
+      Alert.alert(
+        t('common.error'),
+        detail && !detail.startsWith('Request failed')
+          ? `${t('newInvoice.aiExtractError')}\n${detail}`
+          : t('newInvoice.aiExtractError'),
+      );
     } finally {
       setExtracting(false);
     }
   };
 
   const handleExtractPhoto = async () => {
-    const picked = await pickImageFile(t);
-    if (!picked?.proofUri) return;
+    const picked = await takePhotoFile(t);
+    if (!picked?.proofUri && !picked?.proofData) return;
     await handleExtract({
       uri: picked.proofUri,
       name: picked.proofName || 'photo.jpg',
       mimeType: picked.proofMime || 'image/jpeg',
+      data: picked.proofData,
+    });
+  };
+
+  const handleExtractGallery = async () => {
+    const picked = await pickImageFile(t);
+    if (!picked?.proofUri && !picked?.proofData) return;
+    await handleExtract({
+      uri: picked.proofUri,
+      name: picked.proofName || 'photo.jpg',
+      mimeType: picked.proofMime || 'image/jpeg',
+      data: picked.proofData,
     });
   };
 
@@ -408,7 +434,15 @@ export default function NewInvoiceScreen({ navigation, route }) {
         sentAt: sharing ? new Date().toISOString() : asDraft ? null : existing?.sentAt || null,
       };
       const existingId = persistedIdRef.current || invoiceId;
-      if (existingId) {
+      const isIssuedEdit = Boolean(existing?.lifecycle && existing.lifecycle !== 'draft');
+      if (existingId && isIssuedEdit) {
+        await correctInvoice(existingId, {
+          items: payload.items,
+          discount: payload.discount,
+          notes: payload.notes,
+          reason: t('newInvoice.saveChanges'),
+        });
+      } else if (existingId) {
         await updateInvoice(existingId, payload);
         if (canAutosaveDraft) await issueInvoice(existingId);
       } else {
@@ -493,7 +527,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
                 style={{ flex: 1 }}
               />
               <Button
-                title={t('newInvoice.aiUploadPhoto')}
+                title={t('newInvoice.aiTakePhoto')}
                 onPress={() => void handleExtractPhoto()}
                 loading={extracting}
                 disabled={extracting}
@@ -502,6 +536,9 @@ export default function NewInvoiceScreen({ navigation, route }) {
                 icon={<Ionicons name="camera-outline" size={18} color={colors.primary} />}
               />
             </View>
+            <Pressable onPress={() => void handleExtractGallery()} disabled={extracting} style={styles.galleryLink}>
+              <Text style={styles.galleryLinkText}>{t('newInvoice.aiChoosePhoto')}</Text>
+            </Pressable>
           </Section>
         )}
 
@@ -805,6 +842,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
+  galleryLink: { marginTop: 8, alignSelf: 'flex-start', paddingVertical: 4 },
+  galleryLinkText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
   chipRow: {
     flexDirection: 'row',
     gap: 8,

@@ -28,7 +28,7 @@ export function paymentStatus(doc) {
   const totals = documentTotals(doc);
   const totalCents = toCents(doc?.total ?? doc?.amount ?? 0);
   const paidCents = toCents(totals.amountPaid);
-  if (doc?.status === 'paid' && paidCents === 0 && totalCents > 0) return 'paid';
+  if (doc?.status === 'paid' && paidCents === 0) return 'paid';
   if (totalCents > 0 && totals.amountDue === 0) return 'paid';
   if (paidCents > 0) return 'partial';
   return 'unpaid';
@@ -118,7 +118,11 @@ export async function togglePaid(doc, { addPayment, voidPayment, setStatus, payl
     if (setStatus) await setStatus('unpaid');
     return;
   }
-  if (payload?.amount > 0) await addPayment(doc.id, payload);
+  if (payload?.amount > 0) {
+    await addPayment(doc.id, payload);
+    return;
+  }
+  if (setStatus) await setStatus('paid');
 }
 
 export function pdfCompany(invoice, liveProfile) {

@@ -7,13 +7,21 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "plugins": [
-      "expo-iap"
+      "expo-iap",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NextInvoice needs access to your photos so you can import invoices and payment proof.",
+          "cameraPermission": "NextInvoice needs the camera to photograph handwritten invoices and notes."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lirim123.nextinvoice",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "NextInvoice needs access to your photos so you can import invoices and payment proof.",
+        "NSCameraUsageDescription": "NextInvoice needs the camera to photograph handwritten invoices and notes.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "buildNumber": "42"

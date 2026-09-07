@@ -36,6 +36,11 @@ function normalizeExtractedQuantity(value: unknown) {
   return Number.isInteger(n) ? String(n) : String(n)
 }
 
+function normalizeExtractedPrice(value: unknown) {
+  const match = String(value ?? '').replace(',', '.').match(/-?\d+(?:\.\d+)?/)
+  return match ? match[0] : ''
+}
+
 function matchCatalogItem(catalogItems: CatalogItem[], description: string) {
   const q = String(description || '').trim().toLowerCase()
   if (!q) return null
@@ -58,7 +63,7 @@ export function invoiceLinesFromExtract(
     const description = String(row?.description || '').trim()
     if (!description) continue
     const catalog = matchCatalogItem(catalogItems, description)
-    const priceFromPhoto = String(row?.unitPrice ?? '').trim()
+    const priceFromPhoto = normalizeExtractedPrice(row?.unitPrice)
     lines.push({
       id: crypto.randomUUID(),
       description: catalog?.description || description,

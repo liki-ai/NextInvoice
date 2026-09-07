@@ -37,25 +37,38 @@ const INVOICE_SCHEMA = {
 
 const EXTRACT_INSTRUCTIONS =
   'Extract the CLIENT/customer (the buyer, not the seller): full name, address, phone, email and business ID. ' +
-  'Also extract line items when present: item/service name, quantity and unit price. ' +
+  'Also extract line items when present: item/service name, quantity and unit price as a number only (no currency word). ' +
   'If quantity is not clearly stated, use "1". ' +
+  'Handwritten notes often start with the person name, then city, then phone, then items and prices (e.g. "Fustan 80 euro"). ' +
+  'A city such as Prishtinë belongs in address, not in the name. Keep the written person name even if it looks unusual. ' +
   'The source may be Albanian, English or Italian, typed or handwritten, a note, screenshot, order or invoice. ' +
   'If a field is genuinely not present, return an empty string for it (and an empty items array if there are no items). Do not invent data.';
+
+function imageFromBody(body) {
+  const raw = typeof body?.image === 'string' ? body.image.trim() : '';
+  if (!raw) return '';
+  if (raw.startsWith('data:image/')) return raw;
+  if (/^[A-Za-z0-9+/=]+$/.test(raw.slice(0, 80))) return `data:image/jpeg;base64,${raw}`;
+  return '';
+}
 
 router.post('/extract-client', upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
-    if (!file && !text) {
+    const image = imageFromBody(req.body);
+    if (!file && !text && !image) {
       return res.status(400).json({ error: 'Provide text or an image file.' });
     }
 
     const content = [];
-    if (file) {
+    if (image) {
+      content.push({ type: 'input_image', image_url: image, detail: 'high' });
+    } else if (file) {
       const base64 = file.buffer.toString('base64');
       const mimeType = file.mimetype || 'image/jpeg';
       if (mimeType.startsWith('image/')) {
-        content.push({ type: 'input_image', image_url: `data:${mimeType};base64,${base64}` });
+        content.push({ type: 'input_image', image_url: `data:${mimeType};base64,${base64}`, detail: 'high' });
       } else {
         content.push({
           type: 'input_file',

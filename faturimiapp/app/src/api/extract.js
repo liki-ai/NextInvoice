@@ -3,8 +3,25 @@ function joinUrl(base, path) {
   return `${trimmedBase}${path}`;
 }
 
+async function parseExtractResponse(response) {
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error((data && data.error) || `Request failed with status ${response.status}`);
+  }
+  return data;
+}
+
 export async function extractInvoiceInfo(apiBaseUrl, { text, file } = {}) {
-  let response;
+  const image = file?.data && String(file.data).startsWith('data:image') ? file.data : '';
+  if (image) {
+    const response = await fetch(joinUrl(apiBaseUrl, '/api/extract-client'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text || '', image }),
+    });
+    return parseExtractResponse(response);
+  }
+
   if (file?.uri) {
     const form = new FormData();
     form.append('file', {
@@ -13,23 +30,19 @@ export async function extractInvoiceInfo(apiBaseUrl, { text, file } = {}) {
       type: file.mimeType || 'image/jpeg',
     });
     if (text) form.append('text', text);
-    response = await fetch(joinUrl(apiBaseUrl, '/api/extract-client'), {
+    const response = await fetch(joinUrl(apiBaseUrl, '/api/extract-client'), {
       method: 'POST',
       body: form,
     });
-  } else {
-    response = await fetch(joinUrl(apiBaseUrl, '/api/extract-client'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text || '' }),
-    });
+    return parseExtractResponse(response);
   }
 
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error((data && data.error) || `Request failed with status ${response.status}`);
-  }
-  return data;
+  const response = await fetch(joinUrl(apiBaseUrl, '/api/extract-client'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text || '' }),
+  });
+  return parseExtractResponse(response);
 }
 
 export async function extractClientInfo(apiBaseUrl, text) {
@@ -50,9 +63,5 @@ export async function extractCompanyInfo(apiBaseUrl, file) {
     body: form,
   });
 
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error((data && data.error) || `Request failed with status ${response.status}`);
-  }
-  return data;
+  return parseExtractResponse(response);
 }

@@ -422,11 +422,11 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
   const lifecycle = current.lifecycle || 'issued';
   if (!options.allowIssuedEdit && lifecycle === 'issued') {
     partial = {
-      ...(partial.status !== undefined ? { status: partial.status } : {}),
       ...(partial.dueDate !== undefined ? { dueDate: partial.dueDate } : {}),
       ...(partial.notes !== undefined ? { notes: partial.notes } : {}),
       ...(partial.sent !== undefined ? { sent: partial.sent } : {}),
       ...(partial.sentAt !== undefined ? { sentAt: partial.sentAt } : {}),
+      ...(partial.status === 'paid' || partial.status === 'unpaid' ? { status: partial.status } : {}),
       ...(partial.proofUri !== undefined ? { proofUri: partial.proofUri } : {}),
       ...(partial.proofName !== undefined ? { proofName: partial.proofName } : {}),
       ...(partial.proofMime !== undefined ? { proofMime: partial.proofMime } : {}),

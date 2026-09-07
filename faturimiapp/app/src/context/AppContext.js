@@ -6,6 +6,7 @@ import { generateId } from '../utils/id';
 import { I18nProvider } from '../i18n/I18nContext';
 import { planUsage } from '../storage/plan';
 import { apiRequest } from '../api/client';
+import { money } from '../utils/document';
 
 const AppContext = createContext(null);
 
@@ -331,6 +332,46 @@ export function AppProvider({ children }) {
     if (token) await enqueue({ collection: 'invoices', op: 'issue', id, body: {} });
   }, [token, enqueue]);
 
+  const correctInvoice = useCallback(async (id, body) => {
+    setInvoices((prev) => {
+      const next = prev.map((inv) => {
+        if (inv.id !== id) return inv;
+        const items = body.items ?? inv.items;
+        const discount = body.discount === undefined ? inv.discount : body.discount;
+        const notes = body.notes === undefined ? inv.notes : body.notes;
+        const subtotal = (items || []).reduce(
+          (sum, item) => sum + money(item.quantity) * money(item.unitPrice),
+          0,
+        );
+        const total = Math.max(money(subtotal) - money(discount), 0);
+        return {
+          ...inv,
+          items,
+          discount,
+          notes,
+          subtotal: money(subtotal),
+          total: money(total),
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      setJson(KEYS.INVOICES, next);
+      return next;
+    });
+    if (token) {
+      await enqueue({
+        collection: 'invoices',
+        op: 'correct',
+        id,
+        body: {
+          items: body.items,
+          discount: body.discount,
+          notes: body.notes,
+          reason: body.reason,
+        },
+      });
+    }
+  }, [token, enqueue]);
+
   const cancelInvoice = useCallback(async (id, reason) => {
     setInvoices((prev) => {
       const next = prev.map((inv) =>
@@ -507,6 +548,7 @@ export function AppProvider({ children }) {
       updateInvoice,
       deleteInvoice,
       issueInvoice,
+      correctInvoice,
       cancelInvoice,
       addInvoicePayment,
       voidInvoicePayment,
@@ -549,6 +591,7 @@ export function AppProvider({ children }) {
       updateInvoice,
       deleteInvoice,
       issueInvoice,
+      correctInvoice,
       cancelInvoice,
       addInvoicePayment,
       voidInvoicePayment,

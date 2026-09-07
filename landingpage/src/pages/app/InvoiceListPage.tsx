@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2 } from 'lucide-react'
+import { FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -12,11 +12,12 @@ import {
   clientUnpaidSummaries,
   downloadHtmlAsPdf,
   formatMoney,
+  formatAmountShort,
   formatStatementFileDate,
   invoiceListFileName,
   invoiceStatus,
 } from '../../lib/invoice'
-import { daysOverdue, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
+import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 
@@ -94,6 +95,14 @@ export function InvoiceListPage() {
     } finally {
       setBusyId(null)
     }
+  }
+
+  function paidChipLabel(item: (typeof invoices)[number], status: ReturnType<typeof visiblePaymentStatus>) {
+    if (status === 'partial') {
+      const totals = documentTotals(item)
+      return `${t('invoiceList.statusPaid')} ${formatAmountShort(Number(item.total) || totals.total)} (-${formatAmountShort(totals.amountDue)})`
+    }
+    return statusLabel(status)
   }
 
   async function onShareInvoice(item: (typeof invoices)[number]) {
@@ -322,7 +331,11 @@ export function InvoiceListPage() {
                   const due = remainingOf(item) || (status === 'draft' ? Number(item.total) || 0 : 0)
                   const sent = isInvoiceSent(item)
                   const canPay = due > 0 && visible !== 'cancelled'
+                  const paying = busyId === item.id
+                  const sending = sendingId === item.id
                   const markPaidOrUnpaid = async () => {
+                    if (paying || sending) return
+                    setBusyId(item.id)
                     try {
                       let doc = item
                       if (item.lifecycle === 'draft') {
@@ -337,6 +350,8 @@ export function InvoiceListPage() {
                       })
                     } catch (err) {
                       window.alert(err instanceof Error ? err.message : t('common.error'))
+                    } finally {
+                      setBusyId(null)
                     }
                   }
                   return (
@@ -354,23 +369,29 @@ export function InvoiceListPage() {
                         <button
                           type="button"
                           title={sent ? t('docs.sent') : t('docs.notSent')}
-                          disabled={sendingId === item.id}
+                          disabled={sending}
                           onClick={() => void onShareInvoice(item)}
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          className={`inline-flex min-h-[26px] min-w-[88px] items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                             sent ? 'bg-brand text-white' : 'border border-brand-ink/12 bg-[#F3F4F4] text-brand-ink/55'
                           }`}
                         >
-                          <Send className="h-3.5 w-3.5" strokeWidth={sent ? 2.5 : 1.75} />
-                          {sent ? t('docs.sent') : t('docs.notSent')}
+                          {sending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Send className="h-3.5 w-3.5" strokeWidth={sent ? 2.5 : 1.75} />
+                              {sent ? t('docs.sent') : t('docs.notSent')}
+                            </>
+                          )}
                         </button>
                         <button
                           type="button"
-                          disabled={busyId === item.id || visible === 'cancelled'}
+                          disabled={paying || visible === 'cancelled'}
                           onClick={() => {
                             if (visible === 'cancelled') return
                             markPaidOrUnpaid()
                           }}
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          className={`inline-flex min-h-[26px] min-w-[72px] items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                             visible === 'paid'
                               ? 'bg-[#E7F4EA] text-[#2E7D32]'
                               : visible === 'partial'
@@ -380,20 +401,21 @@ export function InvoiceListPage() {
                                   : 'bg-[#C0503A] text-white'
                           }`}
                         >
-                          {visible === 'paid' ? (
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                          ) : visible === 'partial' ? (
-                            <PieChart className="h-3.5 w-3.5" />
-                          ) : visible === 'cancelled' ? null : (
-                            <Circle className="h-3.5 w-3.5" />
+                          {paying ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              {visible === 'paid' ? (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              ) : visible === 'partial' ? (
+                                <PieChart className="h-3.5 w-3.5" />
+                              ) : visible === 'cancelled' ? null : (
+                                <Circle className="h-3.5 w-3.5" />
+                              )}
+                              {paidChipLabel(item, visible)}
+                            </>
                           )}
-                          {statusLabel(visible)}
                         </button>
-                        {visible === 'partial' && due > 0 ? (
-                          <span className="text-[11px] font-semibold text-[#8A5A00]">
-                            {t('docs.remaining')}: {formatMoney(due, item.currency || currency)}
-                          </span>
-                        ) : null}
                         {late > 0 ? (
                           <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
                             {t('docs.overdueDays', { days: late })}
@@ -403,7 +425,7 @@ export function InvoiceListPage() {
                     </td>
                     <td className="px-5 py-4 text-brand-ink/60">{t('invoiceList.itemsCount', { count: item.items?.length || 0 })}</td>
                     <td className="px-5 py-4 text-right font-semibold">
-                      {formatMoney(status === 'cancelled' || status === 'draft' ? Number(item.total) || 0 : due, item.currency || currency)}
+                      {formatMoney(Number(item.total) || 0, item.currency || currency)}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">

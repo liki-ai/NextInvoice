@@ -41,19 +41,41 @@ export function proofSource(item) {
   return item?.proofData || item?.data || item?.proofUri || item?.uri || '';
 }
 
+const IMAGE_PICK_OPTIONS = {
+  mediaTypes: ['images'],
+  quality: 0.55,
+  exif: false,
+};
+
+function jpegProofName(name) {
+  const base = String(name || 'photo').replace(/\.[a-zA-Z0-9]+$/, '');
+  return `${base || 'photo'}.jpg`;
+}
+
+async function copyPickedImage(asset) {
+  return copyLocalProof(asset.uri, jpegProofName(asset.fileName), 'image/jpeg');
+}
+
 export async function pickImageFile(t) {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     Alert.alert(t('common.error'), t('obligations.proofPermission'));
     return null;
   }
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
-    quality: 0.7,
-  });
+  const result = await ImagePicker.launchImageLibraryAsync(IMAGE_PICK_OPTIONS);
   if (result.canceled || !result.assets?.[0]) return null;
-  const asset = result.assets[0];
-  return copyLocalProof(asset.uri, asset.fileName || 'photo.jpg', asset.mimeType || 'image/jpeg');
+  return copyPickedImage(result.assets[0]);
+}
+
+export async function takePhotoFile(t) {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert(t('common.error'), t('newInvoice.aiCameraPermission'));
+    return null;
+  }
+  const result = await ImagePicker.launchCameraAsync(IMAGE_PICK_OPTIONS);
+  if (result.canceled || !result.assets?.[0]) return null;
+  return copyPickedImage(result.assets[0]);
 }
 
 export async function pickProof(t) {

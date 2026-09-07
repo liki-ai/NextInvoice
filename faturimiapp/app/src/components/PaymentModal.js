@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, FormField } from './ui';
+import { Button, FormField, SegmentedControl } from './ui';
 import { remainingOf, todayInputValue } from '../utils/document';
 import { formatMoney } from '../utils/money';
 import { colors, spacing, typography } from '../theme';
@@ -14,7 +14,7 @@ export default function PaymentModal({ visible, doc, currency, onClose, onSave }
   const remaining = remainingOf(doc || {}) || (doc?.lifecycle === 'draft' ? Number(doc?.total) || 0 : 0);
   const [amount, setAmount] = useState(remaining ? String(remaining) : '');
   const [date, setDate] = useState(todayInputValue());
-  const [method, setMethod] = useState('');
+  const [method, setMethod] = useState('cash');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -23,7 +23,7 @@ export default function PaymentModal({ visible, doc, currency, onClose, onSave }
     const due = remainingOf(doc || {}) || (doc?.lifecycle === 'draft' ? Number(doc?.total) || 0 : 0);
     setAmount(due ? String(due) : '');
     setDate(todayInputValue());
-    setMethod('');
+    setMethod('cash');
     setNote('');
   }, [visible, doc?.id]);
 
@@ -57,7 +57,17 @@ export default function PaymentModal({ visible, doc, currency, onClose, onSave }
             </Text>
             <FormField label={t('docs.amount')} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
             <FormField label={t('docs.date')} value={date} onChangeText={setDate} />
-            <FormField label={t('docs.method')} value={method} onChangeText={setMethod} />
+            <View style={styles.methodWrap}>
+              <Text style={typography.label}>{t('docs.method')}</Text>
+              <SegmentedControl
+                options={[
+                  { value: 'cash', label: t('docs.methodCash') },
+                  { value: 'bank', label: t('docs.methodBank') },
+                ]}
+                value={method}
+                onChange={setMethod}
+              />
+            </View>
             <FormField label={t('docs.note')} value={note} onChangeText={setNote} />
             <Button title={saving ? t('common.loading') : t('docs.recordPayment')} onPress={submit} loading={saving} />
             <Pressable onPress={onClose} style={{ marginTop: spacing.md }}>
@@ -80,5 +90,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   body: { paddingBottom: spacing.lg },
+  methodWrap: { marginBottom: spacing.sm, gap: 10 },
   cancel: { textAlign: 'center', color: colors.primary, fontWeight: '700' },
 });
