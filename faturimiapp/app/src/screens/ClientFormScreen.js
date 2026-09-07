@@ -8,9 +8,9 @@ import { colors, radius, spacing, typography } from '../theme';
 import { Button, FormField, Section } from '../components/ui';
 import {
   MEASUREMENT_FIELDS,
+  clientDisplayName,
   composeClient,
   isFashionIndustry,
-  splitClientName,
 } from '../utils/client';
 import { pickImageFile, proofSource } from '../utils/proof';
 
@@ -21,14 +21,12 @@ export default function ClientFormScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const existing = clientId ? clients.find((item) => item.id === clientId) : null;
   const fashion = isFashionIndustry(companyProfile);
-  const split = splitClientName(existing || {});
 
-  const [firstName, setFirstName] = useState(split.firstName);
-  const [lastName, setLastName] = useState(split.lastName);
+  const [fullName, setFullName] = useState(clientDisplayName(existing || {}));
   const [phone, setPhone] = useState(existing?.phone || '');
   const [email, setEmail] = useState(existing?.email || '');
   const [address, setAddress] = useState(existing?.address || '');
-  const [notes, setNotes] = useState(existing?.notes || '');
+  const [businessId, setBusinessId] = useState(existing?.businessId || '');
   const [measurements, setMeasurements] = useState(existing?.measurements || {});
   const [photos, setPhotos] = useState(existing?.photos || []);
   const [viewPhoto, setViewPhoto] = useState(null);
@@ -37,16 +35,16 @@ export default function ClientFormScreen({ navigation, route }) {
   const payload = useMemo(
     () =>
       composeClient({
-        firstName,
-        lastName,
+        fullName,
         phone,
         email,
         address,
-        notes: fashion ? '' : notes,
-        measurements: fashion ? measurements : {},
-        photos: fashion ? photos : [],
+        businessId,
+        notes: existing?.notes || '',
+        measurements: fashion ? measurements : existing?.measurements || {},
+        photos: fashion ? photos : existing?.photos || [],
       }),
-    [firstName, lastName, phone, email, address, notes, measurements, photos, fashion],
+    [fullName, phone, email, address, businessId, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
   );
 
   const persist = async (thenInvoice) => {
@@ -76,9 +74,15 @@ export default function ClientFormScreen({ navigation, route }) {
       keyboardShouldPersistTaps="handled"
     >
       <Section title={t('clients.bio')}>
-        <FormField label={t('clients.firstName')} value={firstName} onChangeText={setFirstName} />
-        <FormField label={t('clients.lastName')} value={lastName} onChangeText={setLastName} />
-        <FormField label={t('newInvoice.phone')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+        <FormField label={t('newInvoice.fullName')} value={fullName} onChangeText={setFullName} placeholder={t('newInvoice.phFullName')} />
+        <FormField label={t('newInvoice.address')} value={address} onChangeText={setAddress} placeholder={t('newInvoice.phAddress')} />
+        <FormField
+          label={t('newInvoice.phone')}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          placeholder={t('newInvoice.phPhone')}
+        />
         <FormField
           label={`${t('docs.email')} (${t('common.optional')})`}
           value={email}
@@ -86,7 +90,11 @@ export default function ClientFormScreen({ navigation, route }) {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <FormField label={`${t('newInvoice.address')} (${t('common.optional')})`} value={address} onChangeText={setAddress} />
+        <FormField
+          label={`${t('docs.businessId')} (${t('common.optional')})`}
+          value={businessId}
+          onChangeText={setBusinessId}
+        />
         {fashion ? (
           <>
             <Text style={[typography.label, { marginTop: spacing.sm }]}>{t('clients.measurements')}</Text>
@@ -116,15 +124,7 @@ export default function ClientFormScreen({ navigation, route }) {
               </Pressable>
             </View>
           </>
-        ) : (
-          <FormField
-            label={`${t('clients.notes')} (${t('common.optional')})`}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-          />
-        )}
+        ) : null}
       </Section>
       <Button title={saving ? t('common.loading') : t('common.save')} onPress={() => void persist(false)} />
       <Button

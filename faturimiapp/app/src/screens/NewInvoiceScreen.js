@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -18,6 +18,7 @@ import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { Button, FormField, Section, SegmentedControl } from '../components/ui';
+import { AddClientSheet, ClientPickerSheet } from '../components/ClientSheets';
 import { generateInvoiceNumber, formatDateForInvoice } from '../utils/invoiceNumber';
 import { buildInvoiceHtml, computeTotals } from '../pdf/invoiceTemplate';
 import { formatMoney, toNumber } from '../utils/money';
@@ -25,7 +26,12 @@ import { generateId } from '../utils/id';
 import { extractClientInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 import { localizeCompanyProfile } from '../storage/companySamples';
-import { clientDisplayName } from '../utils/client';
+import {
+  clientDisplayName,
+  clientMatchesQuery,
+  frequentClients,
+  invoiceClientFields,
+} from '../utils/client';
 import { invoiceLineFromCatalog } from '../utils/catalog';
 
 function emptyItem() {
@@ -40,6 +46,7 @@ function clientFromInvoice(invoice) {
   return {
     fullName: invoice?.client?.fullName || '',
     address: invoice?.client?.address || '',
+    phone: invoice?.client?.phone || '',
     email: invoice?.client?.email || '',
     businessId: invoice?.client?.businessId || '',
   };
@@ -55,14 +62,33 @@ function itemsFromInvoice(invoice) {
   }));
 }
 
+function catalogSuggestions(catalogItems, query) {
+  const q = String(query || '').trim().toLowerCase();
+  const list = q
+    ? catalogItems.filter((item) => String(item.description || '').toLowerCase().includes(q))
+    : catalogItems;
+  return list.slice(0, 8);
+}
+
 export default function NewInvoiceScreen({ navigation, route }) {
   const invoiceId = route?.params?.invoiceId;
-  const { invoices, clients, catalogItems, companyProfile, settings, addInvoice, updateInvoice, addClient } = useApp();
+  const {
+    invoices,
+    clients,
+    catalogItems,
+    companyProfile,
+    settings,
+    addInvoice,
+    updateInvoice,
+    issueInvoice,
+    addClient,
+  } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   const existing = invoiceId ? invoices.find((inv) => inv.id === invoiceId) : null;
   const isEditing = Boolean(invoiceId);
+  const canAutosaveDraft = !isEditing || existing?.lifecycle === 'draft';
 
   const [mode, setMode] = useState('manual');
   const [aiText, setAiText] = useState('');
@@ -80,6 +106,14 @@ export default function NewInvoiceScreen({ navigation, route }) {
   const [showNotes, setShowNotes] = useState(() => Boolean(existing?.notes));
   const [saving, setSaving] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [activeItemId, setActiveItemId] = useState(() => (existing?.items?.[0]?.id ? existing.items[0].id : null));
+
+  const persistedIdRef = useRef(existing?.id || invoiceId || null);
+  const skipLeaveGuard = useRef(false);
+  const formRef = useRef({});
+  const persistLock = useRef(false);
 
   useEffect(() => {
     const id = route?.params?.clientId;
@@ -87,16 +121,24 @@ export default function NewInvoiceScreen({ navigation, route }) {
     const found = clients.find((item) => item.id === id);
     if (!found) return;
     setClientId(found.id);
-    setClient({
-      fullName: clientDisplayName(found),
-      address: found.address || '',
-      phone: found.phone || '',
-      email: found.email || '',
-      businessId: found.businessId || '',
-    });
+    setClient(invoiceClientFields(found));
   }, [route?.params?.clientId, clients]);
 
   const { subtotal, total } = computeTotals(items, discount);
+
+  const applyClient = (item) => {
+    setClientId(item.id);
+    setClient(invoiceClientFields(item));
+  };
+
+  const suggestedClients = useMemo(() => {
+    const query = client.fullName;
+    if (query.trim()) return clients.filter((item) => clientMatchesQuery(item, query)).slice(0, 8);
+    return frequentClients(clients, invoices, 8);
+  }, [clients, invoices, client.fullName]);
+
+  const selectedClient = clientId ? clients.find((item) => item.id === clientId) : null;
+  const showClientCard = Boolean(clientId) && Boolean(client.address || client.phone || client.email || client.businessId);
 
   const updateItem = (id, field, value) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
@@ -106,7 +148,24 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
   };
 
-  const addItem = () => setItems((prev) => [...prev, emptyItem()]);
+  const addItem = () => {
+    const next = emptyItem();
+    setItems((prev) => [...prev, next]);
+    setActiveItemId(next.id);
+  };
+
+  const applyCatalogItem = (catalogItem, targetId) => {
+    setItems((prev) => {
+      const line = invoiceLineFromCatalog(catalogItem, generateId);
+      const target =
+        prev.find((it) => it.id === targetId) ||
+        prev.find((it) => it.id === activeItemId) ||
+        prev.find((it) => !String(it.description || '').trim()) ||
+        null;
+      if (!target) return prev;
+      return prev.map((it) => (it.id === target.id ? { ...line, id: target.id } : it));
+    });
+  };
 
   const resetForm = () => {
     setClient(emptyClient());
@@ -122,15 +181,16 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setShowNotes(false);
     setMode('manual');
     setPreviewVisible(false);
+    persistedIdRef.current = null;
   };
 
-  const buildDraftInvoice = () => {
+  const buildPayload = (requireItems) => {
     if (!client.fullName.trim()) {
-      Alert.alert(t('common.error'), t('newInvoice.validationClient'));
+      if (requireItems) Alert.alert(t('common.error'), t('newInvoice.validationClient'));
       return null;
     }
     const validItems = items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
-    if (validItems.length === 0) {
+    if (requireItems && validItems.length === 0) {
       Alert.alert(t('common.error'), t('newInvoice.validationItems'));
       return null;
     }
@@ -148,6 +208,90 @@ export default function NewInvoiceScreen({ navigation, route }) {
       total: totals.total,
     };
   };
+
+  formRef.current = {
+    client,
+    clientId,
+    invoiceNumber,
+    date,
+    dueDate,
+    items,
+    discount,
+    notes,
+    canAutosaveDraft,
+  };
+
+  const persistDraft = useCallback(
+    async ({ silent = true } = {}) => {
+      if (persistLock.current) await persistLock.current;
+      const snap = formRef.current;
+      if (!snap.canAutosaveDraft) return null;
+      if (!snap.client?.fullName?.trim() && !snap.clientId) return null;
+      let release;
+      persistLock.current = new Promise((resolve) => {
+        release = resolve;
+      });
+      try {
+        const validItems = (snap.items || []).filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
+        const totals = computeTotals(validItems, snap.discount);
+        const payload = {
+          number: snap.invoiceNumber,
+          date: snap.date,
+          dueDate: snap.dueDate,
+          client: { ...snap.client, id: snap.clientId },
+          clientId: snap.clientId,
+          items: validItems,
+          discount: snap.discount,
+          notes: snap.notes,
+          subtotal: totals.subtotal,
+          total: totals.total,
+          lifecycle: 'draft',
+        };
+        if (persistedIdRef.current) {
+          await updateInvoice(persistedIdRef.current, payload);
+          return persistedIdRef.current;
+        }
+        const saved = await addInvoice(payload);
+        persistedIdRef.current = saved.id;
+        return saved.id;
+      } catch (err) {
+        if (!silent) {
+          if (err?.code === 'PLAN_LIMIT' || err?.message === 'PLAN_LIMIT') {
+            Alert.alert(t('billing.limitTitle'), t('newInvoice.limitReached'), [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('billing.ctaIap'), onPress: () => navigation.navigate('Subscribe') },
+            ]);
+          } else {
+            Alert.alert(t('common.error'), err.message);
+          }
+        }
+        return null;
+      } finally {
+        persistLock.current = null;
+        release?.();
+      }
+    },
+    [addInvoice, updateInvoice, navigation, t],
+  );
+
+  useEffect(() => {
+    if (!canAutosaveDraft || !clientId) return;
+    const timer = setTimeout(() => {
+      void persistDraft({ silent: true });
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [canAutosaveDraft, clientId, client, items, discount, notes, invoiceNumber, date, dueDate, persistDraft]);
+
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', (e) => {
+      if (skipLeaveGuard.current) return;
+      if (!canAutosaveDraft || !formRef.current.clientId) return;
+      e.preventDefault();
+      skipLeaveGuard.current = true;
+      void persistDraft({ silent: true }).finally(() => navigation.dispatch(e.data.action));
+    });
+    return unsub;
+  }, [navigation, canAutosaveDraft, persistDraft]);
 
   const previewHtml = useMemo(() => {
     if (!previewVisible) return '';
@@ -175,6 +319,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setExtracting(true);
     try {
       const result = await extractClientInfo(settings.apiBaseUrl, aiText);
+      setClientId('');
       setClient({
         fullName: result.fullName || '',
         address: result.address || '',
@@ -190,14 +335,23 @@ export default function NewInvoiceScreen({ navigation, route }) {
   };
 
   const handlePreview = () => {
-    const draft = buildDraftInvoice();
+    const draft = buildPayload(true);
     if (!draft) return;
     setPreviewVisible(true);
   };
 
+  const leaveAfterSave = () => {
+    skipLeaveGuard.current = true;
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('InvoicesList');
+  };
+
   const handleSave = async (asDraft = false) => {
-    const invoice = buildDraftInvoice();
-    if (!invoice) return;
+    const invoice = buildPayload(!asDraft);
+    if (!invoice) {
+      setSavingDraft(false);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -214,20 +368,25 @@ export default function NewInvoiceScreen({ navigation, route }) {
         setClientId(savedClientId);
       }
       const payload = { ...invoice, clientId: savedClientId, lifecycle: asDraft ? 'draft' : 'issued' };
-      if (isEditing) {
-        await updateInvoice(invoiceId, payload);
-        Alert.alert(t('common.success'), t('newInvoice.updatedSuccess'));
-        navigation.goBack();
+      const existingId = persistedIdRef.current || invoiceId;
+      if (existingId) {
+        await updateInvoice(existingId, payload);
+        if (!asDraft && canAutosaveDraft) await issueInvoice(existingId);
       } else {
-        await addInvoice(payload);
-        if (!asDraft) {
-          await shareInvoicePdf({ company: localizeCompanyProfile(companyProfile, t), client, invoice: payload, pdfLabels: t('pdf') });
-        }
-        Alert.alert(t('common.success'), t('newInvoice.savedSuccess'));
-        resetForm();
-        if (navigation.canGoBack()) navigation.goBack();
-        else navigation.navigate('InvoicesList');
+        const saved = await addInvoice(payload);
+        persistedIdRef.current = saved.id;
       }
+      if (!asDraft && canAutosaveDraft) {
+        await shareInvoicePdf({
+          company: localizeCompanyProfile(companyProfile, t),
+          client,
+          invoice: payload,
+          pdfLabels: t('pdf'),
+        });
+      }
+      Alert.alert(t('common.success'), isEditing ? t('newInvoice.updatedSuccess') : t('newInvoice.savedSuccess'));
+      if (!isEditing) resetForm();
+      leaveAfterSave();
     } catch (err) {
       if (err?.code === 'PLAN_LIMIT' || err?.message === 'PLAN_LIMIT') {
         Alert.alert(t('billing.limitTitle'), t('newInvoice.limitReached'), [
@@ -246,7 +405,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
     }
   };
 
-  const saveLabel = isEditing ? t('newInvoice.saveChanges') : t('docs.issue');
+  const issuedEdit = isEditing && existing?.lifecycle && existing.lifecycle !== 'draft';
+  const saveLabel = issuedEdit ? t('newInvoice.saveChanges') : t('newInvoice.saveAndShare');
 
   if (isEditing && !existing) {
     return (
@@ -257,18 +417,13 @@ export default function NewInvoiceScreen({ navigation, route }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, !isEditing && { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         onScrollBeginDrag={Keyboard.dismiss}
       >
-        {!isEditing ? <Text style={typography.title}>{t('newInvoice.title')}</Text> : null}
-
         <SegmentedControl
           value={mode}
           onChange={setMode}
@@ -299,58 +454,79 @@ export default function NewInvoiceScreen({ navigation, route }) {
         )}
 
         <Section title={t('newInvoice.clientSectionTitle')}>
-          {clients.length > 0 ? (
-            <View style={{ marginBottom: spacing.sm }}>
-              <Text style={typography.label}>{t('docs.pickClient')}</Text>
-              {clients.slice(0, 8).map((item) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => {
-                    setClientId(item.id);
-                    setClient({
-                      fullName: clientDisplayName(item),
-                      address: item.address || '',
-                      phone: item.phone || '',
-                      email: item.email || '',
-                      businessId: item.businessId || '',
-                    });
-                  }}
-                  style={{ paddingVertical: 6 }}
-                >
-                  <Text style={{ color: clientId === item.id ? colors.primary : colors.text, fontWeight: clientId === item.id ? '700' : '500' }}>
-                    {clientDisplayName(item)}{item.phone ? ` · ${item.phone}` : ''}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
+          <View style={styles.clientActions}>
+            <Pressable style={styles.optionLink} onPress={() => setPickerOpen(true)}>
+              <Ionicons name="people-outline" size={18} color={colors.primary} />
+              <Text style={styles.optionLinkText}>{t('newInvoice.selectClient')}</Text>
+            </Pressable>
+            <Pressable style={styles.optionLink} onPress={() => setAddOpen(true)}>
+              <Ionicons name="person-add-outline" size={18} color={colors.primary} />
+              <Text style={styles.optionLinkText}>{t('docs.addClient')}</Text>
+            </Pressable>
+          </View>
           <FormField
             label={t('newInvoice.fullName')}
             value={client.fullName}
             placeholder={t('newInvoice.phFullName')}
             onChangeText={(v) => {
-              setClientId('');
+              if (selectedClient && clientDisplayName(selectedClient) !== v) {
+                setClientId('');
+                setClient({ fullName: v, address: '', phone: '', email: '', businessId: '' });
+                return;
+              }
               setClient((c) => ({ ...c, fullName: v }));
             }}
           />
-          <FormField
-            label={t('newInvoice.address')}
-            value={client.address}
-            placeholder={t('newInvoice.phAddress')}
-            onChangeText={(v) => setClient((c) => ({ ...c, address: v }))}
-          />
-          <FormField
-            label={t('newInvoice.phone')}
-            value={client.phone}
-            placeholder={t('newInvoice.phPhone')}
-            onChangeText={(v) => setClient((c) => ({ ...c, phone: v }))}
-            keyboardType="phone-pad"
-            returnKeyType="done"
-            blurOnSubmit
-            onSubmitEditing={Keyboard.dismiss}
-          />
-          <FormField label={t('docs.email')} value={client.email || ''} onChangeText={(v) => setClient((c) => ({ ...c, email: v }))} />
-          <FormField label={t('docs.businessId')} value={client.businessId || ''} onChangeText={(v) => setClient((c) => ({ ...c, businessId: v }))} />
+          {suggestedClients.length > 0 ? (
+            <ScrollView
+              horizontal
+              nestedScrollEnabled
+              style={styles.chipScroll}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+              keyboardShouldPersistTaps="handled"
+            >
+              {suggestedClients.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={[styles.optionLink, clientId === item.id && styles.optionLinkActive]}
+                  onPress={() => applyClient(item)}
+                >
+                  <Text style={[styles.optionLinkText, clientId === item.id && styles.optionLinkTextActive]}>
+                    {clientDisplayName(item)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
+          {showClientCard ? (
+            <View style={styles.infoCard}>
+              {client.address ? (
+                <View style={styles.infoRow}>
+                  <Ionicons name="location-outline" size={16} color={colors.textMuted} />
+                  <Text style={styles.infoText}>{client.address}</Text>
+                </View>
+              ) : null}
+              {client.phone ? (
+                <View style={styles.infoRow}>
+                  <Ionicons name="call-outline" size={16} color={colors.textMuted} />
+                  <Text style={styles.infoText}>{client.phone}</Text>
+                </View>
+              ) : null}
+              {client.email ? (
+                <View style={styles.infoRow}>
+                  <Ionicons name="mail-outline" size={16} color={colors.textMuted} />
+                  <Text style={styles.infoText}>{client.email}</Text>
+                </View>
+              ) : null}
+              {client.businessId ? (
+                <View style={styles.infoRow}>
+                  <Ionicons name="briefcase-outline" size={16} color={colors.textMuted} />
+                  <Text style={styles.infoText}>{client.businessId}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </Section>
 
         <Section title={t('newInvoice.invoiceDetailsSectionTitle')}>
@@ -360,59 +536,71 @@ export default function NewInvoiceScreen({ navigation, route }) {
         </Section>
 
         <Section title={t('newInvoice.itemsSectionTitle')}>
-          {catalogItems.length > 0 ? (
-            <View style={{ marginBottom: spacing.sm }}>
-              <Text style={typography.label}>{t('items.pick')}</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                {catalogItems.slice(0, 12).map((item) => (
-                  <Pressable
-                    key={item.id}
-                    style={styles.optionLink}
-                    onPress={() => setItems((prev) => [...prev, invoiceLineFromCatalog(item, generateId)])}
+          {items.map((item, idx) => {
+            const typing = Boolean(item.description.trim());
+            const suggestions =
+              typing || item.id === activeItemId || items.length === 1
+                ? catalogSuggestions(catalogItems, item.description)
+                : [];
+            return (
+              <View key={item.id} style={styles.itemBlock}>
+                <View style={styles.itemHeaderRow}>
+                  <Text style={typography.label}>#{idx + 1}</Text>
+                  {items.length > 1 && (
+                    <Pressable onPress={() => removeItem(item.id)}>
+                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                    </Pressable>
+                  )}
+                </View>
+                <FormField
+                  label={t('newInvoice.itemDescription')}
+                  value={item.description}
+                  placeholder={t('newInvoice.phItemDescription')}
+                  onChangeText={(v) => updateItem(item.id, 'description', v)}
+                  onFocus={() => setActiveItemId(item.id)}
+                />
+                {suggestions.length > 0 ? (
+                  <ScrollView
+                    horizontal
+                    nestedScrollEnabled
+                    style={styles.chipScroll}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipRow}
+                    keyboardShouldPersistTaps="handled"
                   >
-                    <Text style={styles.optionLinkText}>{item.description}</Text>
-                  </Pressable>
-                ))}
+                    {suggestions.map((catalogItem) => (
+                      <Pressable
+                        key={catalogItem.id}
+                        style={styles.optionLink}
+                        onPress={() => applyCatalogItem(catalogItem, item.id)}
+                      >
+                        <Text style={styles.optionLinkText}>{catalogItem.description}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : null}
+                <View style={styles.row}>
+                  <FormField
+                    label={t('newInvoice.itemQuantity')}
+                    value={String(item.quantity)}
+                    onChangeText={(v) => updateItem(item.id, 'quantity', v)}
+                    keyboardType="numeric"
+                    containerStyle={{ flex: 1, marginRight: spacing.sm }}
+                  />
+                  <FormField
+                    label={t('newInvoice.itemUnitPrice')}
+                    value={String(item.unitPrice)}
+                    onChangeText={(v) => updateItem(item.id, 'unitPrice', v)}
+                    keyboardType="numeric"
+                    containerStyle={{ flex: 1 }}
+                  />
+                </View>
+                <Text style={typography.muted}>
+                  {t('newInvoice.itemTotal')}: {formatMoney(toNumber(item.quantity) * toNumber(item.unitPrice), companyProfile.currency)}
+                </Text>
               </View>
-            </View>
-          ) : null}
-          {items.map((item, idx) => (
-            <View key={item.id} style={styles.itemBlock}>
-              <View style={styles.itemHeaderRow}>
-                <Text style={typography.label}>#{idx + 1}</Text>
-                {items.length > 1 && (
-                  <Pressable onPress={() => removeItem(item.id)}>
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                  </Pressable>
-                )}
-              </View>
-              <FormField
-                label={t('newInvoice.itemDescription')}
-                value={item.description}
-                placeholder={t('newInvoice.phItemDescription')}
-                onChangeText={(v) => updateItem(item.id, 'description', v)}
-              />
-              <View style={styles.row}>
-                <FormField
-                  label={t('newInvoice.itemQuantity')}
-                  value={String(item.quantity)}
-                  onChangeText={(v) => updateItem(item.id, 'quantity', v)}
-                  keyboardType="numeric"
-                  containerStyle={{ flex: 1, marginRight: spacing.sm }}
-                />
-                <FormField
-                  label={t('newInvoice.itemUnitPrice')}
-                  value={String(item.unitPrice)}
-                  onChangeText={(v) => updateItem(item.id, 'unitPrice', v)}
-                  keyboardType="numeric"
-                  containerStyle={{ flex: 1 }}
-                />
-              </View>
-              <Text style={typography.muted}>
-                {t('newInvoice.itemTotal')}: {formatMoney(toNumber(item.quantity) * toNumber(item.unitPrice), companyProfile.currency)}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
 
           <View style={styles.optionLinks}>
             <Pressable style={styles.optionLink} onPress={addItem}>
@@ -470,24 +658,50 @@ export default function NewInvoiceScreen({ navigation, route }) {
         </Section>
 
         <View style={styles.actions}>
-          <Pressable style={styles.previewButton} onPress={handlePreview}>
+          <Pressable style={styles.sideButton} onPress={handlePreview}>
             <Ionicons name="eye-outline" size={18} color={colors.primary} />
-            <Text style={styles.previewButtonText}>{t('newInvoice.preview')}</Text>
+            <Text style={styles.sideButtonText}>{t('newInvoice.preview')}</Text>
           </Pressable>
+          {canAutosaveDraft ? (
+            <Pressable
+              style={styles.sideButton}
+              onPress={() => {
+                setSavingDraft(true);
+                void handleSave(true);
+              }}
+            >
+              <Ionicons name="document-outline" size={18} color={colors.primary} />
+              <Text style={styles.sideButtonText}>{savingDraft ? t('common.loading') : t('docs.saveDraft')}</Text>
+            </Pressable>
+          ) : null}
         </View>
-        {!isEditing ? (
-          <Button
-            title={savingDraft ? t('common.loading') : t('docs.saveDraft')}
-            variant="secondary"
-            onPress={() => {
-              setSavingDraft(true);
-              void handleSave(true);
-            }}
-            style={{ marginTop: spacing.sm }}
-          />
-        ) : null}
-        <Button title={saveLabel} onPress={() => void handleSave(false)} loading={saving} style={{ marginTop: spacing.sm }} />
+        <Button
+          title={saveLabel}
+          onPress={() => void handleSave(false)}
+          loading={saving}
+          icon={!issuedEdit ? <Ionicons name="send-outline" size={18} color="#fff" /> : null}
+          style={{ marginTop: spacing.sm }}
+        />
       </ScrollView>
+
+      <ClientPickerSheet
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        clients={clients}
+        selectedId={clientId}
+        onSelect={applyClient}
+        t={t}
+      />
+      <AddClientSheet
+        visible={addOpen}
+        onClose={() => setAddOpen(false)}
+        initialName={client.fullName}
+        t={t}
+        onSave={async (payload) => {
+          const saved = await addClient(payload);
+          applyClient(saved);
+        }}
+      />
 
       <Modal visible={previewVisible} animationType="slide" onRequestClose={() => setPreviewVisible(false)}>
         <View style={[styles.previewModal, { paddingTop: insets.top }]}>
@@ -515,6 +729,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
               title={saveLabel}
               onPress={() => void handleSave(false)}
               loading={saving}
+              icon={!issuedEdit ? <Ionicons name="send-outline" size={18} color="#fff" /> : null}
               style={{ flex: 1.4 }}
             />
           </View>
@@ -526,6 +741,28 @@ export default function NewInvoiceScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  clientActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: spacing.sm,
+  },
+  chipScroll: { flexGrow: 0, minHeight: 36 },
+  infoCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#F7FAFB',
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    gap: 6,
+  },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  infoText: { flex: 1, color: colors.text, fontSize: 13, lineHeight: 18 },
   itemBlock: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -556,10 +793,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: '#EEF5F7',
   },
+  optionLinkActive: {
+    backgroundColor: colors.primary,
+  },
   optionLinkText: {
     color: colors.primary,
     fontWeight: '600',
     fontSize: 13,
+  },
+  optionLinkTextActive: {
+    color: '#fff',
   },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   actions: {
@@ -567,18 +810,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  previewButton: {
+  sideButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.primary,
     backgroundColor: '#fff',
   },
-  previewButtonText: {
+  sideButtonText: {
     color: colors.primary,
     fontWeight: '700',
     fontSize: 14,

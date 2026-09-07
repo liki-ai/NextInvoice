@@ -30,9 +30,14 @@ export function splitClientName(client) {
 }
 
 export function composeClient(fields) {
-  const firstName = String(fields.firstName || '').trim();
-  const lastName = String(fields.lastName || '').trim();
+  let firstName = String(fields.firstName || '').trim();
+  let lastName = String(fields.lastName || '').trim();
   const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || String(fields.fullName || '').trim();
+  if (fullName && !firstName && !lastName) {
+    const split = splitClientName({ fullName });
+    firstName = split.firstName;
+    lastName = split.lastName;
+  }
   return {
     ...fields,
     firstName,
@@ -41,8 +46,43 @@ export function composeClient(fields) {
     phone: String(fields.phone || '').trim(),
     email: String(fields.email || '').trim(),
     address: String(fields.address || '').trim(),
+    businessId: String(fields.businessId || '').trim(),
     notes: String(fields.notes || '').trim(),
     measurements: fields.measurements || {},
     photos: Array.isArray(fields.photos) ? fields.photos : [],
+  };
+}
+
+export function clientSearchText(client) {
+  return [clientDisplayName(client), client?.phone, client?.email, client?.address, client?.businessId]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+export function clientMatchesQuery(client, query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return true;
+  return clientSearchText(client).includes(q);
+}
+
+export function frequentClients(clients, invoices, limit = 8) {
+  const counts = {};
+  (invoices || []).forEach((inv) => {
+    const id = inv.clientId || inv.client?.id;
+    if (id) counts[id] = (counts[id] || 0) + 1;
+  });
+  return [...(clients || [])]
+    .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || clientDisplayName(a).localeCompare(clientDisplayName(b)))
+    .slice(0, limit);
+}
+
+export function invoiceClientFields(client) {
+  return {
+    fullName: clientDisplayName(client),
+    address: client?.address || '',
+    phone: client?.phone || '',
+    email: client?.email || '',
+    businessId: client?.businessId || '',
   };
 }

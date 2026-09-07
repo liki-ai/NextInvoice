@@ -26,7 +26,18 @@ function PaidChip({ status, paid, late, t, onToggle }) {
         }}
         hitSlop={8}
         accessibilityHint={paid ? t('invoiceDetail.statusUnpaid') : t('invoiceList.tapToMarkPaid')}
-        style={[styles.statusChip, paid ? styles.statusPaid : status === 'partial' ? styles.statusPartial : styles.statusUnpaid]}
+        style={[
+          styles.statusChip,
+          paid
+            ? styles.statusPaid
+            : status === 'partial'
+              ? styles.statusPartial
+              : status === 'draft'
+                ? styles.statusDraft
+                : status === 'cancelled'
+                  ? styles.statusCancelled
+                  : styles.statusUnpaid,
+        ]}
       >
         {status !== 'draft' && status !== 'cancelled' ? (
           <Ionicons
@@ -35,7 +46,17 @@ function PaidChip({ status, paid, late, t, onToggle }) {
             color={paid ? colors.success : status === 'partial' ? '#8A6D00' : '#fff'}
           />
         ) : null}
-        <Text style={paid || status === 'partial' ? (status === 'partial' ? styles.statusPartialText : styles.statusPaidText) : styles.statusUnpaidText}>
+        <Text
+          style={
+            paid
+              ? styles.statusPaidText
+              : status === 'partial'
+                ? styles.statusPartialText
+                : status === 'draft' || status === 'cancelled'
+                  ? styles.statusDraftText
+                  : styles.statusUnpaidText
+          }
+        >
           {paid
             ? t('invoiceDetail.statusPaid')
             : status === 'draft'
@@ -232,7 +253,9 @@ export default function InvoiceListScreen({ navigation }) {
                 markUnpaid: t('invoiceDetail.statusUnpaid'),
                 payPartial: t('docs.payPartial'),
               }}
-              onPress={() => navigation.navigate('InvoiceDetail', { invoiceId: item.id })}
+              onPress={() =>
+                navigation.navigate(status === 'draft' ? 'EditInvoice' : 'InvoiceDetail', { invoiceId: item.id })
+              }
               onEdit={() => navigation.navigate(status === 'draft' ? 'EditInvoice' : 'InvoiceDetail', { invoiceId: item.id })}
               onDelete={() => {
                 if (status !== 'draft') return;
@@ -425,6 +448,9 @@ const styles = StyleSheet.create({
   statusUnpaid: { backgroundColor: colors.danger },
   statusPaid: { backgroundColor: '#E7F4EA' },
   statusPartial: { backgroundColor: '#FFF4D6' },
+  statusDraft: { backgroundColor: '#EEF2F3' },
+  statusCancelled: { backgroundColor: '#F3F4F4' },
+  statusDraftText: { color: colors.textMuted, fontWeight: '800', fontSize: 12 },
   overdue: { marginTop: 4, color: colors.danger, fontSize: 11, fontWeight: '700' },
   statusUnpaidText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   statusPaidText: { color: colors.success, fontWeight: '800', fontSize: 12 },
