@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -41,9 +41,28 @@ export function InvoiceListPage() {
   const [preview, setPreview] = useState(false)
   const [payId, setPayId] = useState<string | null>(null)
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [pulseId, setPulseId] = useState<string | null>(null)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
   const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
+  const addedId = searchParams.get('added')
+
+  useEffect(() => {
+    if (!addedId) return undefined
+    setStatusFilter('all')
+    setPulseId(addedId)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const timer = window.setTimeout(() => {
+      setPulseId(null)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('added')
+        return next
+      }, { replace: true })
+    }, 1600)
+    return () => window.clearTimeout(timer)
+  }, [addedId, setSearchParams])
 
   useEffect(() => {
     void api<{ plan: 'free' | 'premium'; used: number; limit: number | null }>('/api/billing/usage')
@@ -100,7 +119,7 @@ export function InvoiceListPage() {
   function paidChipLabel(item: (typeof invoices)[number], status: ReturnType<typeof visiblePaymentStatus>) {
     if (status === 'partial') {
       const totals = documentTotals(item)
-      return `${t('invoiceList.statusPaid')} ${formatAmountShort(Number(item.total) || totals.total)} (-${formatAmountShort(totals.amountDue)})`
+      return `${t('invoiceList.statusPaid')} ${formatAmountShort(totals.amountPaid)} (-${formatAmountShort(totals.amountDue)})`
     }
     return statusLabel(status)
   }
@@ -355,7 +374,7 @@ export function InvoiceListPage() {
                     }
                   }
                   return (
-                  <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''}`}>
+                  <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''} ${pulseId === item.id ? 'bg-[#EEF5F7] ring-2 ring-inset ring-brand/40' : ''}`}>
                     <td className="px-5 py-4">
                       <Link to={status === 'draft' ? `/app/invoices/${item.id}/edit` : `/app/invoices/${item.id}`} className="font-semibold text-brand hover:underline">
                         {item.number}

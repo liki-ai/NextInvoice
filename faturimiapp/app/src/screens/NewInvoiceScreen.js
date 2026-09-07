@@ -96,6 +96,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
   const [mode, setMode] = useState('manual');
   const [aiText, setAiText] = useState('');
   const [extracting, setExtracting] = useState(false);
+  const [aiCollapsed, setAiCollapsed] = useState(false);
   const [client, setClient] = useState(() => (existing ? clientFromInvoice(existing) : emptyClient()));
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices));
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()));
@@ -141,7 +142,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
   }, [clients, invoices, client.fullName]);
 
   const selectedClient = clientId ? clients.find((item) => item.id === clientId) : null;
-  const showClientCard = Boolean(clientId) && Boolean(client.address || client.phone || client.email || client.businessId);
+  const showClientCard = Boolean(client.address || client.phone || client.email || client.businessId);
 
   const updateItem = (id, field, value) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
@@ -177,6 +178,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setDate(formatDateForInvoice(new Date()));
     setDueDate('');
     setClientId('');
+    setAiCollapsed(false);
     setItems([emptyItem()]);
     setDiscount('0');
     setNotes('');
@@ -344,8 +346,16 @@ export default function NewInvoiceScreen({ navigation, route }) {
         businessId: result.businessId || '',
       };
       const match = findMatchingClient(clients, extractedClient);
-      if (match) applyClient(match);
-      else if (extractedClient.fullName.trim()) {
+      if (match) {
+        setClientId(match.id);
+        setClient({
+          fullName: clientDisplayName(match) || extractedClient.fullName,
+          address: extractedClient.address || match.address || '',
+          phone: extractedClient.phone || match.phone || '',
+          email: extractedClient.email || match.email || '',
+          businessId: extractedClient.businessId || match.businessId || '',
+        });
+      } else if (extractedClient.fullName.trim() || extractedClient.address || extractedClient.phone) {
         setClientId('');
         setClient(extractedClient);
       }
@@ -354,6 +364,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
         setItems(lines);
         setActiveItemId(lines[0].id);
       }
+      setAiCollapsed(true);
       Alert.alert(t('common.success'), t('newInvoice.aiExtractSuccess'));
     } catch (err) {
       const detail = String(err?.message || '').trim();
@@ -396,10 +407,9 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setPreviewVisible(true);
   };
 
-  const leaveAfterSave = () => {
+  const leaveAfterSave = (highlightId) => {
     skipLeaveGuard.current = true;
-    if (navigation.canGoBack()) navigation.goBack();
-    else navigation.navigate('InvoicesList');
+    navigation.navigate('InvoicesList', highlightId ? { highlightId } : undefined);
   };
 
   const handleSave = async (asDraft = false) => {
@@ -435,6 +445,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       };
       const existingId = persistedIdRef.current || invoiceId;
       const isIssuedEdit = Boolean(existing?.lifecycle && existing.lifecycle !== 'draft');
+      let savedId = existingId;
       if (existingId && isIssuedEdit) {
         await correctInvoice(existingId, {
           items: payload.items,
@@ -448,6 +459,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       } else {
         const saved = await addInvoice(payload);
         persistedIdRef.current = saved.id;
+        savedId = saved.id;
       }
       if (sharing) {
         await shareInvoicePdf({
@@ -459,7 +471,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       }
       Alert.alert(t('common.success'), isEditing ? t('newInvoice.updatedSuccess') : t('newInvoice.savedSuccess'));
       if (!isEditing) resetForm();
-      leaveAfterSave();
+      leaveAfterSave(savedId);
     } catch (err) {
       skipLeaveGuard.current = false;
       if (err?.code === 'PLAN_LIMIT' || err?.message === 'PLAN_LIMIT') {
@@ -508,6 +520,18 @@ export default function NewInvoiceScreen({ navigation, route }) {
         />
 
         {mode === 'ai' && (
+          aiCollapsed ? (
+            <Pressable
+              onPress={() => setAiCollapsed(false)}
+              style={styles.aiCollapsed}
+              accessibilityRole="button"
+              accessibilityLabel={t('newInvoice.aiFilledCollapsed')}
+            >
+              <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
+              <Text style={styles.aiCollapsedText}>{t('newInvoice.aiFilledCollapsed')}</Text>
+              <Ionicons name="chevron-down" size={18} color={colors.primary} />
+            </Pressable>
+          ) : (
           <Section>
             <FormField
               label={t('newInvoice.aiInputLabel')}
@@ -536,10 +560,18 @@ export default function NewInvoiceScreen({ navigation, route }) {
                 icon={<Ionicons name="camera-outline" size={18} color={colors.primary} />}
               />
             </View>
-            <Pressable onPress={() => void handleExtractGallery()} disabled={extracting} style={styles.galleryLink}>
-              <Text style={styles.galleryLinkText}>{t('newInvoice.aiChoosePhoto')}</Text>
+            <Pressable
+              onPress={() => void handleExtractGallery()}
+              disabled={extracting}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('newInvoice.aiChoosePhoto')}
+              style={styles.galleryIconBtn}
+            >
+              <Ionicons name="images-outline" size={22} color={colors.primary} />
             </Pressable>
           </Section>
+          )
         )}
 
         <Section title={t('newInvoice.clientSectionTitle')}>
@@ -842,8 +874,31 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
-  galleryLink: { marginTop: 8, alignSelf: 'flex-start', paddingVertical: 4 },
-  galleryLinkText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  galleryIconBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-end',
+    width: 44,
+    height: 44,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiCollapsed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  aiCollapsedText: { flex: 1, color: colors.text, fontWeight: '700', fontSize: 13 },
   chipRow: {
     flexDirection: 'row',
     gap: 8,

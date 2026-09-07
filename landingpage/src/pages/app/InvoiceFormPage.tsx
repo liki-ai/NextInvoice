@@ -55,6 +55,7 @@ export function InvoiceFormPage() {
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [aiText, setAiText] = useState('')
   const [extracting, setExtracting] = useState(false)
+  const [aiCollapsed, setAiCollapsed] = useState(false)
   const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' })
   const [clientId, setClientId] = useState(existing?.clientId || searchParams.get('clientId') || '')
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
@@ -263,8 +264,16 @@ export function InvoiceFormPage() {
       businessId: result.businessId || '',
     }
     const match = findMatchingClient(clients, extractedClient)
-    if (match) applyClient(match)
-    else if (extractedClient.fullName.trim()) {
+    if (match) {
+      setClientId(match.id)
+      setClient({
+        fullName: clientDisplayName(match) || extractedClient.fullName,
+        address: extractedClient.address || match.address || '',
+        phone: extractedClient.phone || match.phone || '',
+        email: extractedClient.email || match.email || '',
+        businessId: extractedClient.businessId || match.businessId || '',
+      })
+    } else if (extractedClient.fullName.trim() || extractedClient.address || extractedClient.phone) {
       setClientId('')
       setClient(extractedClient)
     }
@@ -273,6 +282,7 @@ export function InvoiceFormPage() {
       setItems(lines)
       setActiveItemId(lines[0].id)
     }
+    setAiCollapsed(true)
   }
 
   async function extractClient() {
@@ -442,7 +452,7 @@ export function InvoiceFormPage() {
         })
         downloadHtmlAsPdf(html, `${invoice.number}.pdf`)
       }
-      navigate(savedId ? `/app/invoices/${savedId}` : '/app')
+      navigate(savedId ? `/app?added=${encodeURIComponent(savedId)}` : '/app')
     } catch (err) {
       skipAutosaveRef.current = false
       const message = err instanceof Error ? err.message : t('common.error')
@@ -486,6 +496,16 @@ export function InvoiceFormPage() {
       </div>
 
       {mode === 'ai' ? (
+        aiCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setAiCollapsed(false)}
+            className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-brand-ink/8 bg-white px-4 py-3 text-left text-sm font-semibold text-brand-ink shadow-[0_1px_2px_rgba(29,43,46,0.04)]"
+          >
+            <span className="flex-1">{t('newInvoice.aiFilledCollapsed')}</span>
+            <span className="text-brand">▾</span>
+          </button>
+        ) : (
         <Card className="mt-6">
           <TextArea
             label={t('newInvoice.aiInputLabel')}
@@ -494,18 +514,25 @@ export function InvoiceFormPage() {
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
           />
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-start gap-2">
             <Button type="button" disabled={!aiText.trim() || extracting} onClick={() => void extractClient()}>
               {extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
             </Button>
-            <Button type="button" variant="secondary" disabled={extracting} onClick={() => cameraInputRef.current?.click()}>
-              <Camera className="h-4 w-4" />
-              {t('newInvoice.aiTakePhoto')}
-            </Button>
-            <Button type="button" variant="secondary" disabled={extracting} onClick={() => photoInputRef.current?.click()}>
-              <ImagePlus className="h-4 w-4" />
-              {t('newInvoice.aiChoosePhoto')}
-            </Button>
+            <div className="flex flex-col items-end gap-2">
+              <Button type="button" variant="secondary" disabled={extracting} onClick={() => cameraInputRef.current?.click()}>
+                <Camera className="h-4 w-4" />
+                {t('newInvoice.aiTakePhoto')}
+              </Button>
+              <button
+                type="button"
+                disabled={extracting}
+                onClick={() => photoInputRef.current?.click()}
+                title={t('newInvoice.aiChoosePhoto')}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand text-brand hover:bg-brand/5 disabled:opacity-50"
+              >
+                <ImagePlus className="h-5 w-5" />
+              </button>
+            </div>
             <input
               ref={cameraInputRef}
               type="file"
@@ -529,6 +556,7 @@ export function InvoiceFormPage() {
             />
           </div>
         </Card>
+        )
       ) : null}
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -580,7 +608,7 @@ export function InvoiceFormPage() {
                 ))}
               </div>
             ) : null}
-            {clientId && (client.address || client.phone || client.email || client.businessId) ? (
+            {client.address || client.phone || client.email || client.businessId ? (
               <div className="rounded-xl border border-brand-ink/8 bg-[#F7FAFB] p-3 text-sm text-brand-ink/80">
                 {client.address ? (
                   <p className="flex items-start gap-2">

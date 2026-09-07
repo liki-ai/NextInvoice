@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
@@ -107,6 +107,40 @@ function StatusCluster({ sent, sending, paying, onSend, status, late, paidAmount
   );
 }
 
+function HighlightPulse({ active, children }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!active) {
+      pulse.setValue(0);
+      return undefined;
+    }
+    const anim = Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 220, useNativeDriver: false }),
+      Animated.timing(pulse, { toValue: 0.4, duration: 220, useNativeDriver: false }),
+      Animated.timing(pulse, { toValue: 1, duration: 220, useNativeDriver: false }),
+      Animated.timing(pulse, { toValue: 0, duration: 420, useNativeDriver: false }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [active, pulse]);
+  const backgroundColor = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(44,110,127,0)', 'rgba(44,110,127,0.22)'],
+  });
+  const borderColor = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(44,110,127,0)', 'rgba(44,110,127,0.7)'],
+  });
+  return (
+    <View>
+      {children}
+      {active ? (
+        <Animated.View pointerEvents="none" style={[styles.highlightOverlay, { backgroundColor, borderColor }]} />
+      ) : null}
+    </View>
+  );
+}
+
 function sendCopy(filter, t) {
   if (filter === 'paid') {
     return { kind: 'paid', cta: t('invoiceList.sendPaid'), title: t('invoiceList.sendPaidTitle') };
@@ -117,18 +151,35 @@ function sendCopy(filter, t) {
   return { kind: 'all', cta: t('invoiceList.sendList'), title: t('invoiceList.sendAllTitle') };
 }
 
-export default function InvoiceListScreen({ navigation }) {
+export default function InvoiceListScreen({ navigation, route }) {
   const { invoices, companyProfile, usage, deleteInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice } = useApp();
   const { t } = useTranslation();
+  const listRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [previewVisible, setPreviewVisible] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [payId, setPayId] = useState(null);
   const [sendingId, setSendingId] = useState(null);
   const [payingId, setPayingId] = useState(null);
+  const [pulseId, setPulseId] = useState(null);
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
   const send = sendCopy(statusFilter, t);
+
+  useEffect(() => {
+    const id = route?.params?.highlightId;
+    if (!id) return undefined;
+    setStatusFilter('all');
+    setPulseId(id);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+    const timer = setTimeout(() => {
+      setPulseId(null);
+      navigation.setParams({ highlightId: undefined });
+    }, 1600);
+    return () => clearTimeout(timer);
+  }, [route?.params?.highlightId, navigation]);
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return invoices;
@@ -280,6 +331,7 @@ export default function InvoiceListScreen({ navigation }) {
       ) : null}
 
       <FlatList
+        ref={listRef}
         data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -356,6 +408,7 @@ export default function InvoiceListScreen({ navigation }) {
               }
               onTogglePaid={paid ? markPaidOrUnpaid : undefined}
             >
+              <HighlightPulse active={pulseId === item.id}>
               <View style={styles.card}>
               <View style={styles.cardRow}>
                 <Text style={styles.invoiceNumber}>{item.number}</Text>
@@ -375,7 +428,7 @@ export default function InvoiceListScreen({ navigation }) {
                     onSend={() => void onShareInvoice(item)}
                     status={visible}
                     late={late}
-                    paidAmount={Number(item.total) || totals.total}
+                    paidAmount={totals.amountPaid}
                     remaining={due}
                     t={t}
                     onToggle={() => {
@@ -385,6 +438,7 @@ export default function InvoiceListScreen({ navigation }) {
                   />
               </View>
               </View>
+              </HighlightPulse>
             </SwipeableRow>
           );
         }}
@@ -498,6 +552,11 @@ const styles = StyleSheet.create({
   filterTextActive: { color: '#fff' },
   subRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   statusCluster: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, maxWidth: '72%' },
+  highlightOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radius.md,
+    borderWidth: 2,
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
