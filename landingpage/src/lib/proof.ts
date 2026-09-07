@@ -27,6 +27,31 @@ export function fileToDataUrl(file: File) {
   })
 }
 
+const OPENAI_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+export async function fileToSupportedImageDataUrl(file: File) {
+  const type = String(file.type || '').toLowerCase()
+  if (OPENAI_IMAGE_TYPES.has(type)) return fileToDataUrl(file)
+  try {
+    const bitmap = await createImageBitmap(file)
+    const max = 1600
+    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      bitmap.close()
+      return fileToDataUrl(file)
+    }
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    return canvas.toDataURL('image/jpeg', 0.8)
+  } catch {
+    return fileToDataUrl(file)
+  }
+}
+
 export async function fileToProof(file: File) {
   if (file.size > MAX_PROOF_BYTES) {
     const err = new Error('PROOF_TOO_LARGE')

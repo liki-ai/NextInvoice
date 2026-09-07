@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -43,8 +44,9 @@ export function proofSource(item) {
 
 const IMAGE_PICK_OPTIONS = {
   mediaTypes: ['images'],
-  quality: 0.55,
+  quality: 0.8,
   exif: false,
+  preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
 };
 
 function jpegProofName(name) {
@@ -53,7 +55,24 @@ function jpegProofName(name) {
 }
 
 async function copyPickedImage(asset) {
-  return copyLocalProof(asset.uri, jpegProofName(asset.fileName), 'image/jpeg');
+  const actions = [];
+  const width = Number(asset.width) || 0;
+  if (width > 1600) actions.push({ resize: { width: 1600 } });
+  const converted = await ImageManipulator.manipulateAsync(asset.uri, actions, {
+    compress: 0.7,
+    format: ImageManipulator.SaveFormat.JPEG,
+    base64: true,
+  });
+  const dir = `${FileSystem.documentDirectory}proofs/`;
+  await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+  const dest = `${dir}${Date.now()}.jpg`;
+  await FileSystem.copyAsync({ from: converted.uri, to: dest });
+  return {
+    proofUri: dest,
+    proofName: jpegProofName(asset.fileName),
+    proofMime: 'image/jpeg',
+    proofData: converted.base64 ? `data:image/jpeg;base64,${converted.base64}` : '',
+  };
 }
 
 export async function pickImageFile(t) {
@@ -64,7 +83,12 @@ export async function pickImageFile(t) {
   }
   const result = await ImagePicker.launchImageLibraryAsync(IMAGE_PICK_OPTIONS);
   if (result.canceled || !result.assets?.[0]) return null;
-  return copyPickedImage(result.assets[0]);
+  try {
+    return await copyPickedImage(result.assets[0]);
+  } catch {
+    Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
+    return null;
+  }
 }
 
 export async function takePhotoFile(t) {
@@ -75,7 +99,12 @@ export async function takePhotoFile(t) {
   }
   const result = await ImagePicker.launchCameraAsync(IMAGE_PICK_OPTIONS);
   if (result.canceled || !result.assets?.[0]) return null;
-  return copyPickedImage(result.assets[0]);
+  try {
+    return await copyPickedImage(result.assets[0]);
+  } catch {
+    Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
+    return null;
+  }
 }
 
 export async function pickProof(t) {

@@ -44,11 +44,48 @@ const EXTRACT_INSTRUCTIONS =
   'The source may be Albanian, English or Italian, typed or handwritten, a note, screenshot, order or invoice. ' +
   'If a field is genuinely not present, return an empty string for it (and an empty items array if there are no items). Do not invent data.';
 
+function sniffImageMime(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) return '';
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return 'image/gif';
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  const brand = buf.toString('ascii', 4, 16);
+  if (brand.startsWith('ftyp') && /heic|heif|mif1|msf1/i.test(brand)) return 'image/heic';
+  return '';
+}
+
+function unsupportedImageError() {
+  const err = new Error('UNSUPPORTED_IMAGE');
+  err.code = 'UNSUPPORTED_IMAGE';
+  return err;
+}
+
+function normalizeOpenAiImage(dataUrl, mimeHint) {
+  const match = String(dataUrl || '').match(/^data:([^;]+);base64,([\s\S]+)$/);
+  if (!match) return dataUrl;
+  let buf;
+  try {
+    buf = Buffer.from(match[2], 'base64');
+  } catch {
+    throw unsupportedImageError();
+  }
+  const sniffed = sniffImageMime(buf);
+  if (sniffed === 'image/heic') throw unsupportedImageError();
+  const mime = sniffed || mimeHint || match[1];
+  if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mime)) {
+    throw unsupportedImageError();
+  }
+  return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
 function imageFromBody(body) {
   const raw = typeof body?.image === 'string' ? body.image.trim() : '';
   if (!raw) return '';
-  if (raw.startsWith('data:image/')) return raw;
-  if (/^[A-Za-z0-9+/=]+$/.test(raw.slice(0, 80))) return `data:image/jpeg;base64,${raw}`;
+  if (raw.startsWith('data:image/')) return normalizeOpenAiImage(raw);
+  if (/^[A-Za-z0-9+/=]+$/.test(raw.slice(0, 80))) {
+    return normalizeOpenAiImage(`data:image/jpeg;base64,${raw}`);
+  }
   return '';
 }
 
@@ -56,7 +93,12 @@ router.post('/extract-client', upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
-    const image = imageFromBody(req.body);
+    let image = '';
+    try {
+      image = imageFromBody(req.body);
+    } catch (err) {
+      if (err?.code === 'UNSUPPORTED_IMAGE' && !file && !text) throw err;
+    }
     if (!file && !text && !image) {
       return res.status(400).json({ error: 'Provide text or an image file.' });
     }
@@ -68,7 +110,11 @@ router.post('/extract-client', upload.single('file'), async (req, res) => {
       const base64 = file.buffer.toString('base64');
       const mimeType = file.mimetype || 'image/jpeg';
       if (mimeType.startsWith('image/')) {
-        content.push({ type: 'input_image', image_url: `data:${mimeType};base64,${base64}`, detail: 'high' });
+        content.push({
+          type: 'input_image',
+          image_url: normalizeOpenAiImage(`data:${mimeType};base64,${base64}`, mimeType),
+          detail: 'high',
+        });
       } else {
         content.push({
           type: 'input_file',
@@ -86,6 +132,11 @@ router.post('/extract-client', upload.single('file'), async (req, res) => {
     return res.json(result);
   } catch (err) {
     console.error('[extract-client] error:', err);
+    if (err?.code === 'UNSUPPORTED_IMAGE') {
+      return res.status(400).json({
+        error: 'The photo format is not supported. Use a JPEG or PNG photo.',
+      });
+    }
     return res.status(500).json({ error: 'Failed to extract client data. ' + (err.message || '') });
   }
 });

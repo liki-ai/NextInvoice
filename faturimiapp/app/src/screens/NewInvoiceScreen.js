@@ -539,8 +539,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
               value={aiText}
               onChangeText={setAiText}
               multiline
-              numberOfLines={4}
-              style={{ height: 90, textAlignVertical: 'top' }}
+              numberOfLines={3}
+              style={{ height: 72, textAlignVertical: 'top' }}
             />
             <View style={styles.aiActions}>
               <Button
@@ -548,7 +548,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
                 onPress={() => void handleExtract()}
                 loading={extracting}
                 disabled={!aiText.trim() || extracting}
-                style={{ flex: 1 }}
+                style={{ flex: 1, paddingHorizontal: 8 }}
               />
               <Button
                 title={t('newInvoice.aiTakePhoto')}
@@ -556,20 +556,20 @@ export default function NewInvoiceScreen({ navigation, route }) {
                 loading={extracting}
                 disabled={extracting}
                 variant="secondary"
-                style={{ flex: 1 }}
+                style={{ flex: 1, paddingHorizontal: 8 }}
                 icon={<Ionicons name="camera-outline" size={18} color={colors.primary} />}
               />
+              <Pressable
+                onPress={() => void handleExtractGallery()}
+                disabled={extracting}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('newInvoice.aiChoosePhoto')}
+                style={[styles.galleryIconBtn, extracting && { opacity: 0.5 }]}
+              >
+                <Ionicons name="images-outline" size={22} color={colors.primary} />
+              </Pressable>
             </View>
-            <Pressable
-              onPress={() => void handleExtractGallery()}
-              disabled={extracting}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('newInvoice.aiChoosePhoto')}
-              style={styles.galleryIconBtn}
-            >
-              <Ionicons name="images-outline" size={22} color={colors.primary} />
-            </Pressable>
           </Section>
           )
         )}
@@ -875,10 +875,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   galleryIconBtn: {
-    marginTop: 8,
-    alignSelf: 'flex-end',
-    width: 44,
-    height: 44,
+    width: 48,
+    alignSelf: 'stretch',
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.primary,

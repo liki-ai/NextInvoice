@@ -21,6 +21,7 @@ import { cn } from '../../lib/cn'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { clientDisplayName, clientMatchesQuery, composeClient, findMatchingClient, frequentClients } from '../../lib/client'
 import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catalog'
+import { fileToSupportedImageDataUrl } from '../../lib/proof'
 
 function emptyItem(): InvoiceItem {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' }
@@ -313,12 +314,7 @@ export function InvoiceFormPage() {
     setExtracting(true)
     setError('')
     try {
-      const image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result || ''))
-        reader.onerror = () => reject(reader.error || new Error('photo'))
-        reader.readAsDataURL(file)
-      })
+      const image = await fileToSupportedImageDataUrl(file)
       const result = await api<{
         fullName?: string
         address?: string
@@ -514,25 +510,23 @@ export function InvoiceFormPage() {
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
           />
-          <div className="mt-3 flex flex-wrap items-start gap-2">
+          <div className="mt-3 flex flex-wrap items-stretch gap-2">
             <Button type="button" disabled={!aiText.trim() || extracting} onClick={() => void extractClient()}>
               {extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
             </Button>
-            <div className="flex flex-col items-end gap-2">
-              <Button type="button" variant="secondary" disabled={extracting} onClick={() => cameraInputRef.current?.click()}>
-                <Camera className="h-4 w-4" />
-                {t('newInvoice.aiTakePhoto')}
-              </Button>
-              <button
-                type="button"
-                disabled={extracting}
-                onClick={() => photoInputRef.current?.click()}
-                title={t('newInvoice.aiChoosePhoto')}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand text-brand hover:bg-brand/5 disabled:opacity-50"
-              >
-                <ImagePlus className="h-5 w-5" />
-              </button>
-            </div>
+            <Button type="button" variant="secondary" disabled={extracting} onClick={() => cameraInputRef.current?.click()}>
+              <Camera className="h-4 w-4" />
+              {t('newInvoice.aiTakePhoto')}
+            </Button>
+            <button
+              type="button"
+              disabled={extracting}
+              onClick={() => photoInputRef.current?.click()}
+              title={t('newInvoice.aiChoosePhoto')}
+              className="inline-flex min-h-[42px] w-11 items-center justify-center rounded-xl border border-brand text-brand hover:bg-brand/5 disabled:opacity-50"
+            >
+              <ImagePlus className="h-5 w-5" />
+            </button>
             <input
               ref={cameraInputRef}
               type="file"
