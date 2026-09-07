@@ -86,3 +86,41 @@ export function invoiceClientFields(client) {
     businessId: client?.businessId || '',
   };
 }
+
+function digits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+export function findMatchingClient(clients, extracted) {
+  const list = clients || [];
+  const name = String(extracted?.fullName || '').trim().toLowerCase();
+  const phone = digits(extracted?.phone);
+  const email = String(extracted?.email || '').trim().toLowerCase();
+  const businessId = String(extracted?.businessId || '').trim().toLowerCase();
+
+  if (phone.length >= 6) {
+    const byPhone = list.find((item) => {
+      const p = digits(item.phone);
+      return p && (p === phone || (p.length >= 6 && (p.endsWith(phone) || phone.endsWith(p))));
+    });
+    if (byPhone) return byPhone;
+  }
+  if (email) {
+    const byEmail = list.find((item) => String(item.email || '').trim().toLowerCase() === email);
+    if (byEmail) return byEmail;
+  }
+  if (businessId) {
+    const byId = list.find((item) => String(item.businessId || '').trim().toLowerCase() === businessId);
+    if (byId) return byId;
+  }
+  if (name) {
+    const exact = list.find((item) => clientDisplayName(item).toLowerCase() === name);
+    if (exact) return exact;
+    const partial = list.find((item) => {
+      const n = clientDisplayName(item).toLowerCase();
+      return n.length >= 4 && name.length >= 4 && (n.includes(name) || name.includes(n));
+    });
+    if (partial) return partial;
+  }
+  return null;
+}

@@ -92,8 +92,9 @@ export function InvoiceDetailPage() {
     navigate('/app/new', { state: { duplicateFromId: current.id } })
   }
 
-  function onDownload() {
+  async function onDownload() {
     if (!company || !client) return
+    if (current.lifecycle === 'draft') await issueInvoice(current.id)
     const doc = buildInvoiceHtml({
       company,
       client,
@@ -127,10 +128,14 @@ export function InvoiceDetailPage() {
             {t('newInvoice.dueDate')}: {invoice.dueDate || dict.pdf.onReceipt}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${sent ? 'bg-[#EEF5F7] text-brand' : 'bg-brand-ink/8 text-brand-ink/55'}`}>
+            <button
+              type="button"
+              onClick={() => void onDownload()}
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${sent ? 'bg-brand text-white' : 'border border-brand-ink/12 bg-brand-ink/8 text-brand-ink/55'}`}
+            >
               <Send className="h-3 w-3" />
               {sent ? t('docs.sent') : t('docs.notSent')}
-            </span>
+            </button>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                 visible === 'paid'

@@ -71,3 +71,44 @@ export function frequentClients<T extends { id: string; firstName?: string; last
     .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || clientDisplayName(a).localeCompare(clientDisplayName(b)))
     .slice(0, limit)
 }
+
+function digits(value: string | undefined) {
+  return String(value || '').replace(/\D/g, '')
+}
+
+export function findMatchingClient<T extends { firstName?: string; lastName?: string; fullName?: string; phone?: string; email?: string; businessId?: string }>(
+  clients: T[],
+  extracted: { fullName?: string; phone?: string; email?: string; businessId?: string },
+) {
+  const list = clients || []
+  const name = String(extracted?.fullName || '').trim().toLowerCase()
+  const phone = digits(extracted?.phone)
+  const email = String(extracted?.email || '').trim().toLowerCase()
+  const businessId = String(extracted?.businessId || '').trim().toLowerCase()
+
+  if (phone.length >= 6) {
+    const byPhone = list.find((item) => {
+      const p = digits(item.phone)
+      return p && (p === phone || (p.length >= 6 && (p.endsWith(phone) || phone.endsWith(p))))
+    })
+    if (byPhone) return byPhone
+  }
+  if (email) {
+    const byEmail = list.find((item) => String(item.email || '').trim().toLowerCase() === email)
+    if (byEmail) return byEmail
+  }
+  if (businessId) {
+    const byId = list.find((item) => String(item.businessId || '').trim().toLowerCase() === businessId)
+    if (byId) return byId
+  }
+  if (name) {
+    const exact = list.find((item) => clientDisplayName(item).toLowerCase() === name)
+    if (exact) return exact
+    const partial = list.find((item) => {
+      const n = clientDisplayName(item).toLowerCase()
+      return n.length >= 4 && name.length >= 4 && (n.includes(name) || name.includes(n))
+    })
+    if (partial) return partial
+  }
+  return null
+}

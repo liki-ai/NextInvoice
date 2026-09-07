@@ -7,6 +7,7 @@ import { api } from '../../lib/api'
 import { Button, Modal } from '../../components/ui'
 import { PaymentModal } from '../../components/PaymentModal'
 import {
+  buildInvoiceHtml,
   buildInvoiceListHtml,
   clientUnpaidSummaries,
   downloadHtmlAsPdf,
@@ -38,6 +39,7 @@ export function InvoiceListPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
   const [payId, setPayId] = useState<string | null>(null)
+  const [sendingId, setSendingId] = useState<string | null>(null)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
   const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
@@ -91,6 +93,26 @@ export function InvoiceListPage() {
       window.alert(err instanceof Error ? err.message : t('common.error'))
     } finally {
       setBusyId(null)
+    }
+  }
+
+  async function onShareInvoice(item: (typeof invoices)[number]) {
+    if (!profile || visiblePaymentStatus(item) === 'cancelled') return
+    setSendingId(item.id)
+    try {
+      if (item.lifecycle === 'draft') await issueInvoice(item.id)
+      const html = buildInvoiceHtml({
+        company: item.companySnapshot || localizeCompanyProfile(profile, t),
+        client: item.clientSnapshot || item.client,
+        invoice: item,
+        pdfLabels: { ...dict.pdf, amountDue: t('docs.amountDue'), amountPaid: t('docs.amountPaid') },
+      })
+      downloadHtmlAsPdf(html, `${item.number}.pdf`)
+      await updateInvoice(item.id, { sent: true, sentAt: new Date().toISOString() })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : t('common.error'))
+    } finally {
+      setSendingId(null)
     }
   }
 
@@ -300,19 +322,22 @@ export function InvoiceListPage() {
                   const due = remainingOf(item) || (status === 'draft' ? Number(item.total) || 0 : 0)
                   const sent = isInvoiceSent(item)
                   const canPay = due > 0 && visible !== 'cancelled'
-                  const markPaidOrUnpaid = () => {
-                    const run = (doc: typeof item) =>
-                      togglePaid(doc, {
+                  const markPaidOrUnpaid = async () => {
+                    try {
+                      let doc = item
+                      if (item.lifecycle === 'draft') {
+                        await issueInvoice(item.id)
+                        doc = { ...item, lifecycle: 'issued' as const }
+                      }
+                      await togglePaid(doc, {
                         addPayment: addInvoicePayment,
                         voidPayment: voidInvoicePayment,
                         setStatus: (next) => updateInvoice(doc.id, { status: next }),
                         payload: fullPaymentPayload(doc),
                       })
-                    if (item.lifecycle === 'draft') {
-                      void issueInvoice(item.id).then(() => run({ ...item, lifecycle: 'issued' }))
-                      return
+                    } catch (err) {
+                      window.alert(err instanceof Error ? err.message : t('common.error'))
                     }
-                    void run(item)
                   }
                   return (
                   <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''}`}>
@@ -326,9 +351,18 @@ export function InvoiceListPage() {
                       <div className="font-semibold">{item.date}</div>
                       <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span title={sent ? t('docs.sent') : t('docs.notSent')} className={sent ? 'text-brand' : 'text-brand-ink/35'}>
+                        <button
+                          type="button"
+                          title={sent ? t('docs.sent') : t('docs.notSent')}
+                          disabled={sendingId === item.id}
+                          onClick={() => void onShareInvoice(item)}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            sent ? 'bg-brand text-white' : 'border border-brand-ink/12 bg-[#F3F4F4] text-brand-ink/55'
+                          }`}
+                        >
                           <Send className="h-3.5 w-3.5" strokeWidth={sent ? 2.5 : 1.75} />
-                        </span>
+                          {sent ? t('docs.sent') : t('docs.notSent')}
+                        </button>
                         <button
                           type="button"
                           disabled={busyId === item.id || visible === 'cancelled'}

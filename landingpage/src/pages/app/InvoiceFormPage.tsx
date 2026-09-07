@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Eye, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { Eye, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
@@ -19,8 +19,8 @@ import {
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { localizeCompanyProfile } from '../../lib/companySamples'
-import { clientDisplayName, clientMatchesQuery, composeClient, frequentClients } from '../../lib/client'
-import { invoiceLineFromCatalog } from '../../lib/catalog'
+import { clientDisplayName, clientMatchesQuery, composeClient, findMatchingClient, frequentClients } from '../../lib/client'
+import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catalog'
 
 function emptyItem(): InvoiceItem {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' }
@@ -38,6 +38,7 @@ export function InvoiceFormPage() {
   const persistedIdRef = useRef(invoiceId || '')
   const skipAutosaveRef = useRef(false)
   const persistLock = useRef<Promise<unknown> | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef({
     client: existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' },
     clientId: existing?.clientId || '',
@@ -168,6 +169,7 @@ export function InvoiceFormPage() {
   const persistDraft = useCallback(async () => {
     if (skipAutosaveRef.current) return null
     if (persistLock.current) await persistLock.current
+    if (skipAutosaveRef.current) return null
     const snap = formRef.current
     if (!snap.canSaveOnly) return null
     if (!snap.client?.fullName?.trim() && !snap.clientId) return null
@@ -244,27 +246,82 @@ export function InvoiceFormPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)))
   }
 
+  async function applyExtracted(result: {
+    fullName?: string
+    address?: string
+    phone?: string
+    email?: string
+    businessId?: string
+    items?: { description?: string; quantity?: string | number; unitPrice?: string | number }[]
+  }) {
+    const extractedClient = {
+      fullName: result.fullName || '',
+      address: result.address || '',
+      phone: result.phone || '',
+      email: result.email || '',
+      businessId: result.businessId || '',
+    }
+    const match = findMatchingClient(clients, extractedClient)
+    if (match) applyClient(match)
+    else if (extractedClient.fullName.trim()) {
+      setClientId('')
+      setClient(extractedClient)
+    }
+    const lines = invoiceLinesFromExtract(result.items, catalogItems)
+    if (lines.length) {
+      setItems(lines)
+      setActiveItemId(lines[0].id)
+    }
+  }
+
   async function extractClient() {
     if (!aiText.trim()) return
     setExtracting(true)
     setError('')
     try {
-      const result = await api<{ fullName?: string; address?: string; phone?: string }>('/api/extract-client', {
+      const result = await api<{
+        fullName?: string
+        address?: string
+        phone?: string
+        email?: string
+        businessId?: string
+        items?: { description?: string; quantity?: string | number; unitPrice?: string | number }[]
+      }>('/api/extract-client', {
         method: 'POST',
         body: { text: aiText },
       })
-      setClient({
-        fullName: result.fullName || '',
-        address: result.address || '',
-        phone: result.phone || '',
-        email: '',
-        businessId: '',
-      })
-      setClientId('')
+      await applyExtracted(result)
     } catch {
       setError(t('newInvoice.aiExtractError'))
     } finally {
       setExtracting(false)
+    }
+  }
+
+  async function extractFromPhoto(file: File) {
+    setExtracting(true)
+    setError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      if (aiText.trim()) form.append('text', aiText.trim())
+      const result = await api<{
+        fullName?: string
+        address?: string
+        phone?: string
+        email?: string
+        businessId?: string
+        items?: { description?: string; quantity?: string | number; unitPrice?: string | number }[]
+      }>('/api/extract-client', {
+        method: 'POST',
+        form,
+      })
+      await applyExtracted(result)
+    } catch {
+      setError(t('newInvoice.aiExtractError'))
+    } finally {
+      setExtracting(false)
+      if (photoInputRef.current) photoInputRef.current.value = ''
     }
   }
 
@@ -432,9 +489,25 @@ export function InvoiceFormPage() {
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
           />
-          <Button type="button" disabled={!aiText.trim() || extracting} onClick={extractClient}>
-            {extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" disabled={!aiText.trim() || extracting} onClick={() => void extractClient()}>
+              {extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
+            </Button>
+            <Button type="button" variant="secondary" disabled={extracting} onClick={() => photoInputRef.current?.click()}>
+              <ImagePlus className="h-4 w-4" />
+              {t('newInvoice.aiUploadPhoto')}
+            </Button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void extractFromPhoto(file)
+              }}
+            />
+          </div>
         </Card>
       ) : null}
 

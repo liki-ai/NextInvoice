@@ -14,6 +14,7 @@ import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 import { daysOverdue, isInvoiceSent, paymentStatus, pdfClient, pdfCompany, remainingOf, reminderText, visiblePaymentStatus } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
 import ProofBlock from '../components/ProofBlock';
+import SentButton from '../components/SentButton';
 
 export default function InvoiceDetailScreen({ route, navigation }) {
   const { invoiceId } = route.params;
@@ -70,6 +71,7 @@ export default function InvoiceDetailScreen({ route, navigation }) {
   const handleShare = async () => {
     setSharing(true);
     try {
+      if (invoice.lifecycle === 'draft') await issueInvoice(invoice.id);
       await shareInvoicePdf({
         company,
         client,
@@ -139,12 +141,13 @@ export default function InvoiceDetailScreen({ route, navigation }) {
           <Text style={typography.muted}>{t('pdf.dueDateLabel')}: {invoice.dueDate || t('pdf.onReceipt')}</Text>
           {late > 0 ? <Text style={[typography.muted, { color: colors.danger }]}>{t('docs.overdueDays', { days: late })}</Text> : null}
           <View style={styles.statusLine}>
-            <Ionicons
-              name={sent ? 'send' : 'send-outline'}
-              size={14}
-              color={sent ? colors.primary : colors.textMuted}
+            <SentButton
+              sent={sent}
+              loading={sharing}
+              sentLabel={t('docs.sent')}
+              notSentLabel={t('docs.notSent')}
+              onPress={() => void handleShare()}
             />
-            <Text style={typography.muted}>{sent ? t('docs.sent') : t('docs.notSent')}</Text>
             <Text style={typography.muted}>·</Text>
             <Text style={typography.muted}>
               {visible === 'paid'

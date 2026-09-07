@@ -23,16 +23,18 @@ import { generateInvoiceNumber, formatDateForInvoice } from '../utils/invoiceNum
 import { buildInvoiceHtml, computeTotals } from '../pdf/invoiceTemplate';
 import { formatMoney, toNumber } from '../utils/money';
 import { generateId } from '../utils/id';
-import { extractClientInfo } from '../api/extract';
+import { extractInvoiceInfo } from '../api/extract';
 import { shareInvoicePdf } from '../pdf/generateInvoicePdf';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import {
   clientDisplayName,
   clientMatchesQuery,
+  findMatchingClient,
   frequentClients,
   invoiceClientFields,
 } from '../utils/client';
-import { invoiceLineFromCatalog } from '../utils/catalog';
+import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../utils/catalog';
+import { pickImageFile } from '../utils/proof';
 
 function emptyItem() {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' };
@@ -223,7 +225,9 @@ export default function NewInvoiceScreen({ navigation, route }) {
 
   const persistDraft = useCallback(
     async ({ silent = true } = {}) => {
+      if (skipLeaveGuard.current) return null;
       if (persistLock.current) await persistLock.current;
+      if (skipLeaveGuard.current) return null;
       const snap = formRef.current;
       if (!snap.canAutosaveDraft) return null;
       if (!snap.client?.fullName?.trim() && !snap.clientId) return null;
@@ -315,24 +319,49 @@ export default function NewInvoiceScreen({ navigation, route }) {
     });
   }, [previewVisible, invoiceNumber, date, client, items, discount, notes, subtotal, total, companyProfile, t]);
 
-  const handleExtract = async () => {
-    if (!aiText.trim()) return;
+  const handleExtract = async (file) => {
+    const photo = file?.uri ? file : null;
+    if (!photo && !aiText.trim()) return;
     setExtracting(true);
     try {
-      const result = await extractClientInfo(settings.apiBaseUrl, aiText);
-      setClientId('');
-      setClient({
+      const result = await extractInvoiceInfo(settings.apiBaseUrl, {
+        text: aiText.trim(),
+        file: photo,
+      });
+      const extractedClient = {
         fullName: result.fullName || '',
         address: result.address || '',
         phone: result.phone || '',
-        email: '',
-        businessId: '',
-      });
+        email: result.email || '',
+        businessId: result.businessId || '',
+      };
+      const match = findMatchingClient(clients, extractedClient);
+      if (match) applyClient(match);
+      else if (extractedClient.fullName.trim()) {
+        setClientId('');
+        setClient(extractedClient);
+      }
+      const lines = invoiceLinesFromExtract(result.items, catalogItems, generateId);
+      if (lines.length) {
+        setItems(lines);
+        setActiveItemId(lines[0].id);
+      }
+      Alert.alert(t('common.success'), t('newInvoice.aiExtractSuccess'));
     } catch (err) {
       Alert.alert(t('common.error'), t('newInvoice.aiExtractError'));
     } finally {
       setExtracting(false);
     }
+  };
+
+  const handleExtractPhoto = async () => {
+    const picked = await pickImageFile(t);
+    if (!picked?.proofUri) return;
+    await handleExtract({
+      uri: picked.proofUri,
+      name: picked.proofName || 'photo.jpg',
+      mimeType: picked.proofMime || 'image/jpeg',
+    });
   };
 
   const handlePreview = () => {
@@ -354,6 +383,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
       return;
     }
 
+    skipLeaveGuard.current = true;
+    if (persistLock.current) await persistLock.current;
     setSaving(true);
     try {
       let savedClientId = clientId;
@@ -396,6 +427,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       if (!isEditing) resetForm();
       leaveAfterSave();
     } catch (err) {
+      skipLeaveGuard.current = false;
       if (err?.code === 'PLAN_LIMIT' || err?.message === 'PLAN_LIMIT') {
         Alert.alert(t('billing.limitTitle'), t('newInvoice.limitReached'), [
           { text: t('common.cancel'), style: 'cancel' },
@@ -452,12 +484,24 @@ export default function NewInvoiceScreen({ navigation, route }) {
               numberOfLines={4}
               style={{ height: 90, textAlignVertical: 'top' }}
             />
-            <Button
-              title={extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
-              onPress={handleExtract}
-              loading={extracting}
-              disabled={!aiText.trim()}
-            />
+            <View style={styles.aiActions}>
+              <Button
+                title={extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
+                onPress={() => void handleExtract()}
+                loading={extracting}
+                disabled={!aiText.trim() || extracting}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title={t('newInvoice.aiUploadPhoto')}
+                onPress={() => void handleExtractPhoto()}
+                loading={extracting}
+                disabled={extracting}
+                variant="secondary"
+                style={{ flex: 1 }}
+                icon={<Ionicons name="camera-outline" size={18} color={colors.primary} />}
+              />
+            </View>
           </Section>
         )}
 
@@ -754,6 +798,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.sm,
+  },
+  aiActions: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   chipRow: {
     flexDirection: 'row',

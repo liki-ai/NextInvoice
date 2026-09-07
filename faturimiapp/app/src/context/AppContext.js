@@ -319,14 +319,16 @@ export function AppProvider({ children }) {
   }, [token, enqueue]);
 
   const issueInvoice = useCallback(async (id) => {
+    setInvoices((prev) => {
+      const next = prev.map((inv) =>
+        inv.id === id && inv.lifecycle !== 'issued'
+          ? { ...inv, lifecycle: 'issued', issuedAt: inv.issuedAt || new Date().toISOString() }
+          : inv,
+      );
+      setJson(KEYS.INVOICES, next);
+      return next;
+    });
     if (token) await enqueue({ collection: 'invoices', op: 'issue', id, body: {} });
-    else {
-      setInvoices((prev) => {
-        const next = prev.map((inv) => (inv.id === id ? { ...inv, lifecycle: 'issued', issuedAt: new Date().toISOString() } : inv));
-        setJson(KEYS.INVOICES, next);
-        return next;
-      });
-    }
   }, [token, enqueue]);
 
   const cancelInvoice = useCallback(async (id, reason) => {

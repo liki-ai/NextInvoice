@@ -6,13 +6,14 @@ import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
 import { formatMoney } from '../utils/money';
 import { buildInvoiceListHtml, formatStatementFileDate } from '../pdf/invoiceTemplate';
-import { shareInvoiceListPdf } from '../pdf/generateInvoicePdf';
+import { shareInvoiceListPdf, shareInvoicePdf } from '../pdf/generateInvoicePdf';
 import { localizeCompanyProfile } from '../storage/companySamples';
 import SwipeableRow, { useLockRowPress } from '../components/SwipeableRow';
 import PdfPreviewModal from '../components/PdfPreviewModal';
 import SyncBanner from '../components/SyncBanner';
 import PaymentModal from '../components/PaymentModal';
-import { daysOverdue, isInvoiceSent, isOverdue, paymentStatus, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
+import SentButton from '../components/SentButton';
+import { daysOverdue, isInvoiceSent, isOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
 
 function PaidChip({ status, paid, late, remaining, currency, t, onToggle }) {
@@ -76,6 +77,25 @@ function PaidChip({ status, paid, late, remaining, currency, t, onToggle }) {
   );
 }
 
+function StatusCluster({ sent, sending, onSend, status, paid, late, remaining, currency, t, onToggle }) {
+  const { lock } = useLockRowPress();
+  return (
+    <View style={styles.statusCluster}>
+      <SentButton
+        sent={sent}
+        loading={sending}
+        sentLabel={t('docs.sent')}
+        notSentLabel={t('docs.notSent')}
+        onPress={() => {
+          lock();
+          onSend();
+        }}
+      />
+      <PaidChip status={status} paid={paid} late={late} remaining={remaining} currency={currency} t={t} onToggle={onToggle} />
+    </View>
+  );
+}
+
 function sendCopy(filter, t) {
   if (filter === 'paid') {
     return { kind: 'paid', cta: t('invoiceList.sendPaid'), title: t('invoiceList.sendPaidTitle') };
@@ -93,6 +113,7 @@ export default function InvoiceListScreen({ navigation }) {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [payId, setPayId] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
   const send = sendCopy(statusFilter, t);
@@ -129,6 +150,25 @@ export default function InvoiceListScreen({ navigation }) {
       },
     });
   }, [previewVisible, filtered, companyProfile, t, send.title]);
+
+  const onShareInvoice = async (item) => {
+    if (visiblePaymentStatus(item) === 'cancelled') return;
+    setSendingId(item.id);
+    try {
+      if (item.lifecycle === 'draft') await issueInvoice(item.id);
+      await shareInvoicePdf({
+        company: pdfCompany(item, localizeCompanyProfile(companyProfile, t)),
+        client: pdfClient(item),
+        invoice: item,
+        pdfLabels: t('pdf'),
+      });
+      await updateInvoice(item.id, { sent: true, sentAt: new Date().toISOString() });
+    } catch (err) {
+      Alert.alert(t('common.error'), err.message);
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   const onShareList = async () => {
     if (!filtered.length) return;
@@ -248,19 +288,22 @@ export default function InvoiceListScreen({ navigation }) {
           const due = remainingOf(item) || (status === 'draft' ? Number(item.total) || 0 : 0);
           const sent = isInvoiceSent(item);
           const canPay = due > 0 && visible !== 'cancelled';
-          const markPaidOrUnpaid = () => {
-            const run = (doc) =>
-              togglePaid(doc, {
+          const markPaidOrUnpaid = async () => {
+            try {
+              let doc = item;
+              if (item.lifecycle === 'draft') {
+                await issueInvoice(item.id);
+                doc = { ...item, lifecycle: 'issued' };
+              }
+              await togglePaid(doc, {
                 addPayment: addInvoicePayment,
                 voidPayment: voidInvoicePayment,
                 setStatus: (next) => updateInvoice(doc.id, { status: next }),
                 payload: fullPaymentPayload(doc),
               });
-            if (item.lifecycle === 'draft') {
-              void issueInvoice(item.id).then(() => run({ ...item, lifecycle: 'issued' }));
-              return;
+            } catch (err) {
+              Alert.alert(t('common.error'), err.message);
             }
-            void run(item);
           };
           return (
             <SwipeableRow
@@ -290,8 +333,10 @@ export default function InvoiceListScreen({ navigation }) {
               onPartialPay={
                 canPay
                   ? () => {
-                      if (item.lifecycle === 'draft') void issueInvoice(item.id).then(() => setPayId(item.id));
-                      else setPayId(item.id);
+                      void (async () => {
+                        if (item.lifecycle === 'draft') await issueInvoice(item.id);
+                        setPayId(item.id);
+                      })();
                     }
                   : undefined
               }
@@ -309,14 +354,10 @@ export default function InvoiceListScreen({ navigation }) {
               </View>
               <View style={styles.subRow}>
                 <Text style={typography.muted}>{item.dueDate || t('pdf.onReceipt')}</Text>
-                <View style={styles.statusCluster}>
-                  <Ionicons
-                    name={sent ? 'send' : 'send-outline'}
-                    size={14}
-                    color={sent ? colors.primary : colors.textMuted}
-                    accessibilityLabel={sent ? t('docs.sent') : t('docs.notSent')}
-                  />
-                  <PaidChip
+                <StatusCluster
+                    sent={sent}
+                    sending={sendingId === item.id}
+                    onSend={() => void onShareInvoice(item)}
                     status={visible}
                     paid={paid}
                     late={late}
@@ -325,10 +366,9 @@ export default function InvoiceListScreen({ navigation }) {
                     t={t}
                     onToggle={() => {
                       if (visible === 'cancelled') return;
-                      markPaidOrUnpaid();
+                      void markPaidOrUnpaid();
                     }}
                   />
-                </View>
               </View>
               </View>
             </SwipeableRow>
@@ -443,7 +483,7 @@ const styles = StyleSheet.create({
   filterText: { color: colors.textMuted, fontWeight: '700', fontSize: 12 },
   filterTextActive: { color: '#fff' },
   subRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  statusCluster: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusCluster: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, maxWidth: '72%' },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
