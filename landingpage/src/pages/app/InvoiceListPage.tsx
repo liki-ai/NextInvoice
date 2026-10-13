@@ -10,7 +10,6 @@ import { ImportInvoicesModal } from '../../components/ImportInvoicesModal'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
 import {
   buildInvoiceListHtml,
-  clientUnpaidSummaries,
   downloadHtmlAsPdf,
   formatMoney,
   formatAmountShort,
@@ -182,8 +181,6 @@ export function InvoiceListPage() {
   }
 
   const sendTarget = sendId ? invoices.find((item) => item.id === sendId) : undefined
-  const unpaidClients = useMemo(() => clientUnpaidSummaries(yearInvoices), [yearInvoices])
-  const statementTotal = unpaidClients.reduce((sum, item) => sum + item.unpaidTotal, 0)
   const unpaidInvoiceTotal = formatMoneyList(
     totalsByCurrency(yearInvoices, (item) => (invoiceStatus(item) === 'paid' ? 0 : remainingOf(item))),
     formatMoney,
@@ -329,23 +326,6 @@ export function InvoiceListPage() {
             </button>
           </div>
         </div>
-      ) : null}
-
-      {statusFilter !== 'paid' && unpaidClients.length > 0 ? (
-        <button
-          type="button"
-          onClick={() => {
-            setStatusFilter('unpaid')
-            setPreview(true)
-          }}
-          className="mt-5 flex w-full items-center justify-between gap-4 rounded-2xl border border-brand-ink/8 bg-white px-5 py-4 text-left hover:border-brand/30"
-        >
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('statement.title')}</p>
-            <p className="mt-1 text-sm text-brand-ink/70">{t('statement.banner')}</p>
-          </div>
-          <p className="font-display text-xl font-medium">{formatMoney(statementTotal, currency)}</p>
-        </button>
       ) : null}
 
       {invoices.length > 0 ? (
