@@ -23,6 +23,11 @@ test('settings are cleaned, and a blank password keeps the saved one', () => {
   const kept = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', senders: [] }, first, account.email);
   assert.equal(decryptSecret(kept.pass), 'abcdefghijklmnop');
 
+  const checked = { ...first, verifiedAt: '2026-10-13T10:00:00.000Z' };
+  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', senders: [{ email: 'a@tretek.io' }] }, checked, account.email).verifiedAt, checked.verifiedAt);
+  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', password: 'another' }, checked, account.email).verifiedAt, null);
+  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 465, user: 'info@tretek.io' }, checked, account.email).verifiedAt, null);
+
   const moved = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'other@tretek.io' }, first, account.email);
   assert.equal(moved.pass, null);
   assert.ok(!mailReady(moved));
@@ -38,6 +43,8 @@ test('the browser never receives the password', () => {
   const shown = publicMailSettings(saved, account, 'Tretek SH.P.K.');
   assert.equal(shown.hasPassword, true);
   assert.equal(shown.ready, true);
+  assert.equal(shown.verified, false);
+  assert.equal(publicMailSettings({ ...saved, verifiedAt: '2026-10-13T10:00:00.000Z' }, account, 'Tretek SH.P.K.').verified, true);
   assert.ok(!JSON.stringify(shown).includes('secret-value'));
   assert.ok(!('pass' in shown));
   assert.deepEqual(shown.from, [

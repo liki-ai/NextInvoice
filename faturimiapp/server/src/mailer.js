@@ -94,10 +94,14 @@ function sanitizeMailSettings(body, current, accountEmail) {
     user,
     pass: current && current.pass ? current.pass : null,
     senders: cleanSenders(src.senders, accountEmail),
+    // When the mail server last accepted this mailbox and password; cleared whenever either changes.
+    verifiedAt: (current && current.verifiedAt) || null,
   };
   // A password belongs to one mailbox on one server; it is never carried over to another.
+  if (current && (current.host !== host || current.port !== port || current.user !== user)) next.verifiedAt = null;
   if (current && (current.host !== host || current.user !== user)) next.pass = null;
   if (typeof src.password === 'string' && src.password.trim()) {
+    next.verifiedAt = null;
     // Google shows app passwords in groups of four; the spaces are not part of it.
     const password = /gmail\.com$|google\.com$/.test(host) ? src.password.replace(/\s+/g, '') : src.password.trim();
     next.pass = encryptSecret(password.slice(0, 200));
@@ -129,6 +133,7 @@ function publicMailSettings(settings, account, companyName) {
     hasPassword: Boolean(saved.pass && decryptSecret(saved.pass)),
     senders: saved.senders || [],
     ready: mailReady(saved),
+    verified: mailReady(saved) && Boolean(saved.verifiedAt),
     from: senderOptions(saved, account, companyName),
   };
 }
@@ -182,6 +187,19 @@ async function openTransport(settings) {
     disableFileAccess: true,
     disableUrlAccess: true,
   });
+}
+
+/** Signs in to the mail server without sending anything, to prove the connection works. */
+async function verifyConnection(settings) {
+  let transport;
+  try {
+    transport = await openTransport(settings);
+    await transport.verify();
+  } catch (err) {
+    throw mailError(err);
+  } finally {
+    if (transport) transport.close();
+  }
 }
 
 /** Turns whatever the mail server or the network said into one of our own error codes. */
@@ -283,4 +301,5 @@ module.exports = {
   publicMailSettings,
   sanitizeMailSettings,
   senderOptions,
+  verifyConnection,
 };

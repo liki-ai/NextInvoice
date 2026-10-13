@@ -263,7 +263,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return res
   }, [])
 
-  const testMail = useCallback((message: { from?: string; subject: string; body: string }) => api<{ to: string }>('/api/mail/test', { method: 'POST', body: message }), [])
+  const testMail = useCallback(async (message: { from?: string; subject: string; body: string }) => {
+    const res = await api<{ to: string } & Partial<MailState>>('/api/mail/test', { method: 'POST', body: message })
+    // A delivered test also proves a connection that was saved before saving checked it.
+    if (res.mail) setMail({ mail: res.mail, pdf: Boolean(res.pdf) })
+    return res
+  }, [])
 
   const sendInvoiceEmail = useCallback(async (id: string, message: InvoiceEmailInput) => {
     const res = await api<{ invoice: Invoice; attached: boolean }>(`/api/invoices/${id}/send`, { method: 'POST', body: message })

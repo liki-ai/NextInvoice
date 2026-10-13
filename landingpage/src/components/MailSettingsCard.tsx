@@ -131,11 +131,11 @@ export function MailSettingsCard() {
           <span
             className={cn(
               'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
-              saved.ready ? 'bg-brand/10 text-brand' : 'bg-brand-ink/6 text-brand-ink/55',
+              saved.verified ? 'bg-brand/10 text-brand' : saved.ready ? 'bg-[#FFF6E5] text-[#8A5A00]' : 'bg-brand-ink/6 text-brand-ink/55',
             )}
           >
-            {saved.ready ? <Check className="h-3.5 w-3.5" /> : null}
-            {saved.ready ? t('mail.connected') : t('mail.notConnected')}
+            {saved.verified ? <Check className="h-3.5 w-3.5" /> : null}
+            {saved.verified ? t('mail.connected') : saved.ready ? t('mail.unverified') : t('mail.notConnected')}
           </span>
         </div>
 
@@ -234,7 +234,7 @@ export function MailSettingsCard() {
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <Button type="button" disabled={busy !== null || !dirty || !complete || !sendersValid} onClick={() => void onSave()}>
-              {busy === 'save' ? t('common.loading') : t('mail.save')}
+              {busy === 'save' ? t('mail.verifying') : t('mail.save')}
             </Button>
             <Button type="button" variant="secondary" disabled={busy !== null || dirty || !saved.ready} onClick={() => void onTest()}>
               <Send className="h-4 w-4" />

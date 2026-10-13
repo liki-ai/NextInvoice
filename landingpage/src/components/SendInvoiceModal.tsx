@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Check, Copy, Download, ExternalLink, Link2, Mail, Paperclip, Send } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Check, CheckCircle2, Copy, Download, ExternalLink, Link2, Mail, Paperclip, Send } from 'lucide-react'
 import { useAppData } from '../context/AppDataContext'
 import { LANGS, translateIn, useI18n, type Lang } from '../i18n'
 import { isInvoiceSent, parseLooseDate } from '../lib/document'
@@ -12,6 +12,15 @@ import { Button, Field, Modal, Select, TextArea } from './ui'
 
 function shareUrl(token: string) {
   return `${window.location.origin}/i/?t=${token}`
+}
+
+type EmailRecord = NonNullable<Invoice['emails']>[number]
+
+function formatSentTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()}, ${two(date.getHours())}:${two(date.getMinutes())}`
 }
 
 function formatSentDate(value?: string) {
@@ -29,6 +38,7 @@ function formatSentDate(value?: string) {
 export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const { profile, mail, shareInvoice, issueInvoice, updateInvoice, sendInvoiceEmail } = useAppData()
   const { t, lang: uiLang, dict } = useI18n()
+  const navigate = useNavigate()
   const draft = invoice.lifecycle === 'draft'
   const sent = isInvoiceSent(invoice)
   const client = invoice.clientSnapshot || invoice.client
@@ -49,7 +59,8 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
   const [cc, setCc] = useState('')
   const [attachPdf, setAttachPdf] = useState(true)
   const [sending, setSending] = useState(false)
-  const [delivered, setDelivered] = useState('')
+  // Set once the email has gone out: the dialog then shows what was sent, and to whom.
+  const [receipt, setReceipt] = useState<EmailRecord | null>(null)
   const sender = senders.some((item) => item.email === from) ? from : senders[0]?.email || ''
   const lastEmail = invoice.emails?.[invoice.emails.length - 1]
 
@@ -126,10 +137,10 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
     }
     setSending(true)
     setError('')
-    setDelivered('')
     try {
-      await sendInvoiceEmail(invoice.id, { from: sender, to, cc, subject, body, lang: messageLang, attachPdf: attachPdf && Boolean(mail?.pdf) })
-      setDelivered(t('send.sentOk', { to: recipients.join(', ') }))
+      const res = await sendInvoiceEmail(invoice.id, { from: sender, to, cc, subject, body, lang: messageLang, attachPdf: attachPdf && Boolean(mail?.pdf) })
+      const logged = res.invoice.emails?.[res.invoice.emails.length - 1]
+      setReceipt(logged || { at: new Date().toISOString(), from: sender, to: recipients, cc: splitRecipients(cc) || [], subject, attached: res.attached })
     } catch (err) {
       setError(mailErrorText(err, t))
     } finally {
@@ -152,6 +163,54 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
 
   const ready = !draft && Boolean(link)
   const linkButton = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition'
+
+  if (receipt) {
+    // The invoice is already marked sent; OK goes back to the list, where its row shows it.
+    const done = () => {
+      onClose()
+      navigate('/app')
+    }
+    const senderName = senders.find((item) => item.email === receipt.from)?.name
+    const rows: [string, string][] = [
+      [t('send.from'), senderName ? `${senderName} <${receipt.from}>` : receipt.from],
+      [t('send.to'), receipt.to.join(', ')],
+      ...(receipt.cc?.length ? [[t('send.cc'), receipt.cc.join(', ')] as [string, string]] : []),
+      [t('send.subject'), receipt.subject],
+      [t('send.receiptInvoice'), `${invoice.number} · ${formatMoney(Number(invoice.total) || 0, currency)}`],
+      [t('send.receiptAttachment'), receipt.attached ? `${invoice.number}.pdf` : t('send.receiptNoAttachment')],
+      [t('send.receiptTime'), formatSentTime(receipt.at)],
+    ]
+    return (
+      <Modal
+        size="sm"
+        title={t('send.receiptTitle')}
+        onClose={done}
+        footer={
+          <Button type="button" autoFocus className="min-w-28" onClick={done}>
+            {t('send.receiptOk')}
+          </Button>
+        }
+      >
+        <div className="bg-white p-6">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-9 w-9 shrink-0 text-brand" />
+            <div className="min-w-0">
+              <p className="text-base font-semibold">{t('send.receiptHeadline')}</p>
+              <p className="mt-1 text-sm leading-6 text-brand-ink/60">{t('send.receiptNote', { number: invoice.number })}</p>
+            </div>
+          </div>
+          <dl className="mt-5 divide-y divide-brand-ink/8 rounded-xl border border-brand-ink/8 text-sm">
+            {rows.map(([label, value]) => (
+              <div key={label} className="grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-2.5">
+                <dt className="text-[11px] font-semibold uppercase leading-5 tracking-[0.08em] text-brand-ink/45">{label}</dt>
+                <dd className="min-w-0 break-words font-medium">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </Modal>
+    )
+  }
 
   return (
     <Modal
@@ -311,15 +370,7 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
           </div>
         </div>
 
-        <div role="status" aria-live="polite">
-          {delivered ? (
-            <p className="flex items-center gap-2 rounded-xl bg-brand/8 px-4 py-3 text-sm font-semibold text-brand">
-              <Check className="h-4 w-4 shrink-0" />
-              {delivered}
-            </p>
-          ) : null}
-          {error ? <p className="text-sm leading-6 text-[#C0503A]">{error}</p> : null}
-        </div>
+        <div role="alert">{error ? <p className="text-sm leading-6 text-[#C0503A]">{error}</p> : null}</div>
       </div>
     </Modal>
   )

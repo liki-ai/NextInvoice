@@ -103,11 +103,14 @@ export function Modal({
   children,
   footer,
   onClose,
+  size = 'lg',
 }: {
   title: string
   children: ReactNode
   footer?: ReactNode
   onClose: () => void
+  /** 'sm' for a short message or confirmation; 'lg' for forms and previews. */
+  size?: 'sm' | 'lg'
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -120,7 +123,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
       <button type="button" aria-label="Close" className="absolute inset-0 bg-brand-ink/45 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className={cn('relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl', size === 'sm' ? 'max-w-lg' : 'max-w-4xl')}>
         <div className="flex items-center justify-between border-b border-brand-ink/8 px-6 py-4">
           <h2 className="font-display text-xl font-medium">{title}</h2>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-brand-ink/50 hover:bg-brand-ink/5 hover:text-brand-ink">

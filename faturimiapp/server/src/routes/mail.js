@@ -2,7 +2,7 @@ const express = require('express');
 const { authRequired } = require('../auth');
 const { appUrl } = require('../mail');
 const { getProfile, getInvoice, shareInvoice, getMailSettings, saveMailSettings, recordInvoiceEmail } = require('../store');
-const { countSend, deliver, mailReady, messageHtml, parseRecipients, pickSender, publicMailSettings, sanitizeMailSettings } = require('../mailer');
+const { countSend, deliver, mailReady, messageHtml, parseRecipients, pickSender, publicMailSettings, sanitizeMailSettings, verifyConnection } = require('../mailer');
 const { pdfAvailable, htmlToPdf } = require('../pdf');
 
 const router = express.Router();
@@ -106,14 +106,22 @@ router.get('/', (req, res) => {
   res.json(describe(req.user));
 });
 
-router.put('/', (req, res) => {
+/**
+ * Saves the connection only after the mail server has accepted the mailbox and its password, so a
+ * saved connection is one that works. Changing just the list of senders needs no new sign-in.
+ */
+router.put('/', async (req, res, next) => {
   try {
-    const next = sanitizeMailSettings(req.body, getMailSettings(req.user.id), req.user.email);
-    if (!next.host || !next.user || !next.pass) throw code('MAIL_INCOMPLETE');
-    saveMailSettings(req.user.id, next);
+    const settings = sanitizeMailSettings(req.body, getMailSettings(req.user.id), req.user.email);
+    if (!settings.host || !settings.user || !settings.pass) throw code('MAIL_INCOMPLETE');
+    if (!settings.verifiedAt) {
+      await verifyConnection(settings);
+      settings.verifiedAt = new Date().toISOString();
+    }
+    saveMailSettings(req.user.id, settings);
     res.json(describe(req.user));
   } catch (err) {
-    if (!sendMailError(res, err)) throw err;
+    if (!sendMailError(res, err)) next(err);
   }
 });
 
@@ -133,7 +141,9 @@ router.post('/test', async (req, res, next) => {
     const { subject, text } = messageParts(req.body || {});
     countSend(req.user.id);
     await deliver(settings, { sender, to, subject, text, html: messageHtml(text, { accent: profile.accentColor }) });
-    res.json({ ok: true, to: to[0], from: sender.email });
+    // A connection saved before saving checked it: a delivered test proves it just as well.
+    if (!settings.verifiedAt) saveMailSettings(req.user.id, { ...settings, verifiedAt: new Date().toISOString() });
+    res.json({ ok: true, to: to[0], from: sender.email, ...describe(req.user) });
   } catch (err) {
     if (!sendMailError(res, err)) next(err);
   }

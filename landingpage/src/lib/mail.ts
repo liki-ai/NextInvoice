@@ -9,6 +9,8 @@ export type MailSettings = {
   /** Extra addresses the company allows as sender. */
   senders: MailSender[]
   ready: boolean
+  /** The mail server has accepted this mailbox and password. */
+  verified: boolean
   /** Everything that may stand under "From", the account's own address first. */
   from: MailSender[]
 }
