@@ -1,4 +1,8 @@
 FROM node:22-alpine
+# A headless browser prints invoices to PDF for the emails; the fonts are the ones the invoice
+# templates ask for (Carlito stands in for Calibri, Liberation for Arial and Helvetica).
+RUN apk add --no-cache chromium font-liberation font-carlito
+ENV CHROMIUM_PATH=/usr/bin/chromium
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./

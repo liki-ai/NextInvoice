@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Download, ExternalLink, Link2, Mail, Send } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Check, Copy, Download, ExternalLink, Link2, Mail, Paperclip, Send } from 'lucide-react'
 import { useAppData } from '../context/AppDataContext'
 import { LANGS, translateIn, useI18n, type Lang } from '../i18n'
 import { isInvoiceSent, parseLooseDate } from '../lib/document'
 import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, type Invoice } from '../lib/invoice'
 import { companyForPdf, displayCompanyValue } from '../lib/companySamples'
+import { mailErrorText, splitRecipients } from '../lib/mail'
 import { cn } from '../lib/cn'
-import { Button, Field, Modal, TextArea } from './ui'
+import { Button, Field, Modal, Select, TextArea } from './ui'
 
 function shareUrl(token: string) {
   return `${window.location.origin}/i/?t=${token}`
@@ -19,11 +21,13 @@ function formatSentDate(value?: string) {
 }
 
 /**
- * Sending an invoice: an email ready to go in the user's own mail program, carrying a link where
- * the client reads and downloads the invoice. Also the place to say by hand that it was (or was not) sent.
+ * Sending an invoice. With the company mailbox connected, the email goes out from here, from the
+ * address the user picks, with the invoice attached. Without it, the same email is handed to the
+ * user's own mail program. Either way it carries a link where the client reads and downloads the
+ * invoice, and this is also the place to say by hand that it was (or was not) sent.
  */
 export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
-  const { profile, shareInvoice, issueInvoice, updateInvoice } = useAppData()
+  const { profile, mail, shareInvoice, issueInvoice, updateInvoice, sendInvoiceEmail } = useAppData()
   const { t, lang: uiLang, dict } = useI18n()
   const draft = invoice.lifecycle === 'draft'
   const sent = isInvoiceSent(invoice)
@@ -39,6 +43,15 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
   const [error, setError] = useState('')
   const [copied, setCopied] = useState<'link' | 'message' | null>(null)
   const [opened, setOpened] = useState(false)
+  const direct = Boolean(mail?.mail.ready)
+  const senders = mail?.mail.from || []
+  const [from, setFrom] = useState('')
+  const [cc, setCc] = useState('')
+  const [attachPdf, setAttachPdf] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [delivered, setDelivered] = useState('')
+  const sender = senders.some((item) => item.email === from) ? from : senders[0]?.email || ''
+  const lastEmail = invoice.emails?.[invoice.emails.length - 1]
 
   const link = token ? shareUrl(token) : ''
 
@@ -105,6 +118,25 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
     }
   }
 
+  async function onSend() {
+    const recipients = splitRecipients(to)
+    if (!recipients?.length || !splitRecipients(cc)) {
+      setError(t('send.invalidTo'))
+      return
+    }
+    setSending(true)
+    setError('')
+    setDelivered('')
+    try {
+      await sendInvoiceEmail(invoice.id, { from: sender, to, cc, subject, body, lang: messageLang, attachPdf: attachPdf && Boolean(mail?.pdf) })
+      setDelivered(t('send.sentOk', { to: recipients.join(', ') }))
+    } catch (err) {
+      setError(mailErrorText(err, t))
+    } finally {
+      setSending(false)
+    }
+  }
+
   function onDownload() {
     if (!profile || !client) return
     downloadHtmlAsPdf(
@@ -127,28 +159,38 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
       onClose={onClose}
       footer={
         <>
-          <p className={cn('mr-auto flex items-center gap-2 text-sm font-semibold', sent ? 'text-brand' : 'text-brand-ink/50')}>
-            {sent ? <Check className="h-4 w-4" /> : null}
-            {sent ? (formatSentDate(invoice.sentAt) ? t('send.sentOn', { date: formatSentDate(invoice.sentAt) }) : t('send.sentNoDate')) : t('send.notSentYet')}
+          <p className={cn('mr-auto flex min-w-0 flex-[1_1_10rem] items-center gap-2 text-sm font-semibold', sent ? 'text-brand' : 'text-brand-ink/50')}>
+            {sent ? <Check className="h-4 w-4 shrink-0" /> : null}
+            <span className="min-w-0 truncate">
+              {sent ? (formatSentDate(invoice.sentAt) ? t('send.sentOn', { date: formatSentDate(invoice.sentAt) }) : t('send.sentNoDate')) : t('send.notSentYet')}
+              {sent && lastEmail ? ` · ${t('send.emailedTo', { to: lastEmail.to.join(', ') })}` : ''}
+            </span>
           </p>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" className="shrink-0 whitespace-nowrap" onClick={onClose}>
             {t('common.close')}
           </Button>
           {draft ? null : sent ? (
-            <Button type="button" variant="ghost" disabled={busy} onClick={() => void run(() => updateInvoice(invoice.id, { sent: false, sentAt: '' }).then(onClose))}>
+            <Button type="button" variant="ghost" className="shrink-0 whitespace-nowrap" disabled={busy || sending} onClick={() => void run(() => updateInvoice(invoice.id, { sent: false, sentAt: '' }).then(onClose))}>
               {t('send.markUnsent')}
             </Button>
           ) : (
             <Button
               type="button"
-              variant={opened ? 'primary' : 'secondary'}
-              disabled={busy}
+              variant={opened && !direct ? 'primary' : 'secondary'}
+              className="shrink-0 whitespace-nowrap"
+              disabled={busy || sending}
               onClick={() => void run(() => updateInvoice(invoice.id, { sent: true, sentAt: new Date().toISOString() }).then(onClose))}
             >
               <Check className="h-4 w-4" />
               {t('send.markSent')}
             </Button>
           )}
+          {direct && !draft ? (
+            <Button type="button" className="shrink-0 whitespace-nowrap" disabled={!ready || sending || busy || !sender} onClick={() => void onSend()}>
+              <Send className="h-4 w-4" />
+              {sending ? t('send.sending') : t('send.sendNow')}
+            </Button>
+          ) : null}
         </>
       }
     >
@@ -163,9 +205,34 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
           </div>
         ) : null}
 
+        {!direct && mail && !draft ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{t('send.connectTitle')}</p>
+              <p className="mt-0.5 text-xs leading-5 text-brand-ink/60">{t('send.connectHint')}</p>
+            </div>
+            <Link to="/app/profile#email" className={cn(linkButton, 'border border-brand bg-white px-3 py-2 text-xs text-brand hover:bg-brand hover:text-white')}>
+              <Mail className="h-3.5 w-3.5" />
+              {t('send.connectAction')}
+            </Link>
+          </div>
+        ) : null}
+
         <div className={cn('space-y-5', !ready && 'pointer-events-none opacity-50')} aria-disabled={!ready}>
+          {direct ? (
+            <Select label={t('send.from')} value={sender} onChange={(e) => setFrom(e.target.value)}>
+              {senders.map((item) => (
+                <option key={item.email} value={item.email}>
+                  {item.name ? `${item.name} <${item.email}>` : item.email}
+                </option>
+              ))}
+            </Select>
+          ) : null}
           <div className="grid gap-x-4 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <Field label={t('send.to')} type="email" value={to} placeholder={t('send.toPlaceholder')} autoComplete="email" onChange={(e) => setTo(e.target.value)} />
+            <div className={cn(direct && 'grid gap-x-4 sm:grid-cols-2')}>
+              <Field label={t('send.to')} type={direct ? 'text' : 'email'} inputMode="email" value={to} placeholder={t('send.toPlaceholder')} autoComplete="email" title={direct ? t('send.recipientsHint') : undefined} onChange={(e) => setTo(e.target.value)} />
+              {direct ? <Field label={t('send.cc')} inputMode="email" value={cc} placeholder={t('send.ccPlaceholder')} autoComplete="off" wrapperClassName="last:mb-5" title={t('send.recipientsHint')} onChange={(e) => setCc(e.target.value)} /> : null}
+            </div>
             <div className="mb-5">
               <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('send.messageLanguage')}</p>
               <div className="flex rounded-xl bg-brand-bg p-1" role="radiogroup" aria-label={t('send.messageLanguage')}>
@@ -207,9 +274,23 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
             <p className="mt-2 text-xs leading-5 text-brand-ink/50">{t('send.linkHint')}</p>
           </div>
 
-          <div>
+          {direct && mail?.pdf ? (
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+              <input type="checkbox" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} className="h-4 w-4 rounded border-brand-ink/25 accent-[#2C6E7F]" />
+              <Paperclip className="h-4 w-4 text-brand-ink/45" />
+              {t('send.attachPdf')}
+              <span className="font-normal text-brand-ink/45">{invoice.number}.pdf</span>
+            </label>
+          ) : null}
+
+          <div className={cn(direct && 'border-t border-brand-ink/8 pt-4')}>
+            {direct ? <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('send.otherWays')}</p> : null}
             <div className="flex flex-wrap gap-2">
-              <a href={mailto} onClick={() => setOpened(true)} className={cn(linkButton, 'bg-brand text-white shadow-sm hover:bg-brand-dark')}>
+              <a
+                href={mailto}
+                onClick={() => setOpened(true)}
+                className={cn(linkButton, direct ? 'border border-brand-ink/12 bg-white text-brand-ink hover:border-brand/30 hover:bg-brand/5' : 'bg-brand text-white shadow-sm hover:bg-brand-dark')}
+              >
                 <Mail className="h-4 w-4" />
                 {t('send.openMail')}
               </a>
@@ -226,11 +307,19 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
                 {t('send.downloadPdf')}
               </button>
             </div>
-            <p className="mt-2 text-xs text-brand-ink/50">{t('send.howTo')}</p>
+            {direct ? null : <p className="mt-2 text-xs text-brand-ink/50">{t('send.howTo')}</p>}
           </div>
         </div>
 
-        {error ? <p className="text-sm text-[#C0503A]">{error}</p> : null}
+        <div role="status" aria-live="polite">
+          {delivered ? (
+            <p className="flex items-center gap-2 rounded-xl bg-brand/8 px-4 py-3 text-sm font-semibold text-brand">
+              <Check className="h-4 w-4 shrink-0" />
+              {delivered}
+            </p>
+          ) : null}
+          {error ? <p className="text-sm leading-6 text-[#C0503A]">{error}</p> : null}
+        </div>
       </div>
     </Modal>
   )

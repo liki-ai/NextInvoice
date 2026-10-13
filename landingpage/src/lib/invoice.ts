@@ -58,6 +58,8 @@ export type Invoice = {
   sentAt?: string
   /** Code of the link the recipient opens to see this invoice without a login. */
   shareToken?: string
+  /** Each time the invoice was emailed from the app, oldest first. */
+  emails?: { at: string; from: string; to: string[]; cc?: string[]; subject: string; attached?: boolean }[]
   createdAt?: string
   updatedAt?: string
   proofUri?: string

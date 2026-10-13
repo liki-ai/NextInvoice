@@ -6,6 +6,7 @@ import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, Select, TextArea } from '../../components/ui'
 import { LanguagePicker } from '../../components/LangSwitch'
+import { MailSettingsCard } from '../../components/MailSettingsCard'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { CURRENCIES, DEFAULT_EXPORT_NOTE, normalizeTaxRate, usesExportNote, type CompanyProfile } from '../../lib/invoice'
@@ -527,6 +528,8 @@ export function ProfilePage() {
               />
             </div>
           </SettingsSection>
+
+          <MailSettingsCard />
         </div>
 
         <aside className="space-y-6 lg:sticky lg:top-8">

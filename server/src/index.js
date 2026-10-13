@@ -22,6 +22,7 @@ const syncRouter = require('./routes/sync');
 const profileRouter = require('./routes/profile');
 const billingRouter = require('./routes/billing');
 const publicRouter = require('./routes/public');
+const mailRouter = require('./routes/mail');
 const { handleStripeWebhook } = require('./routes/billing');
 const { initStore, flushStore, storeHealth } = require('./store');
 const { billingHealth } = require('./billing/stripe');
@@ -61,6 +62,7 @@ app.use('/api/sync', syncRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/public', publicRouter);
+app.use('/api/mail', mailRouter);
 app.use('/api', extractClientRouter);
 app.use('/api', extractCompanyRouter);
 

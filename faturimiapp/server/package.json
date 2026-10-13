@@ -6,7 +6,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "test": "node --test src/domain.test.js src/mailer.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,8 +17,10 @@
     "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
+    "nodemailer": "^7.0.13",
     "openai": "^4.68.0",
     "pg": "^8.16.3",
+    "puppeteer-core": "^24.43.1",
     "stripe": "^17.7.0"
   }
 }

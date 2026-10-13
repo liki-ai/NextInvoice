@@ -82,8 +82,9 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   })
   const data = (await response.json().catch(() => null)) as T & { error?: string; code?: string; resetUrl?: string }
   if (!response.ok) {
-    const err = new Error(data?.error || `Request failed (${response.status})`) as Error & { code?: string; status?: number }
+    const err = new Error(data?.error || `Request failed (${response.status})`) as Error & { code?: string; status?: number; detail?: string }
     err.code = data?.code
+    err.detail = (data as { detail?: string } | null)?.detail
     err.status = response.status
     throw err
   }

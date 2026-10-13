@@ -39,6 +39,7 @@ Accounts, profiles, invoices, clients, items and obligations are stored in Postg
 |-----|-------|
 | `users`, `passwordResets` | one document each |
 | `profiles/<userId>`, `invoices/<userId>`, `clients/<userId>`, `items/<userId>`, `obligations/<userId>`, `syncOps/<userId>`, `migrations/<userId>` | one document per user |
+| `mail/<userId>` | the company's mailbox connection for sending invoices; its password is encrypted with a key derived from `MAIL_SECRET` (or `JWT_SECRET`), so changing that secret means entering the mailbox password again |
 
 - A save writes only the documents that changed, in one transaction. A failed save is retried until it goes through; meanwhile `GET /health` reports `"durable": false` and the error.
 - On a deploy the old process receives SIGTERM and finishes its writes before exiting.

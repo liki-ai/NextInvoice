@@ -5,6 +5,7 @@ import type { CompanyProfile, Invoice } from '../lib/invoice'
 import type { Obligation } from '../lib/obligation'
 import type { ClientRecord, Payment } from '../lib/document'
 import type { CatalogItem } from '../lib/catalog'
+import type { InvoiceEmailInput, MailSettingsInput, MailState } from '../lib/mail'
 import { useI18n, isLang } from '../i18n'
 
 type PaymentInput = { amount: number; date: string; method?: string; note?: string; opId?: string }
@@ -42,6 +43,14 @@ type DataValue = {
   /** Records full payment on each invoice. Without a date, each payment is dated like its invoice. */
   markInvoicesPaid: (ids: string[], date?: string) => Promise<{ paid: number; skipped: number }>
   saveProfile: (profile: Partial<CompanyProfile>) => Promise<CompanyProfile>
+  /** The company's mailbox connection for sending invoices; null until it is known. */
+  mail: MailState | null
+  saveMail: (settings: MailSettingsInput) => Promise<MailState>
+  removeMail: () => Promise<MailState>
+  /** Sends a test message to the account's own address. */
+  testMail: (message: { from?: string; subject: string; body: string }) => Promise<{ to: string }>
+  /** Emails the invoice from the company mailbox and marks it sent. */
+  sendInvoiceEmail: (id: string, message: InvoiceEmailInput) => Promise<{ invoice: Invoice; attached: boolean }>
   downloadBackup: () => Promise<void>
   restoreBackup: (backup: unknown) => Promise<void>
 }
@@ -56,6 +65,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [items, setItems] = useState<CatalogItem[]>([])
   const [profile, setProfile] = useState<CompanyProfile | null>(null)
+  const [mail, setMail] = useState<MailState | null>(null)
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -65,6 +75,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setClients([])
       setItems([])
       setProfile(null)
+      setMail(null)
       return
     }
     setLoading(true)
@@ -85,6 +96,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setItems(snap.items || [])
       setProfile(snap.profile)
       if (isLang(snap.profile?.language)) setLang(snap.profile.language)
+      // Loaded on the side: the invoices must appear even if this answer is slow or missing.
+      void api<MailState>('/api/mail').then(setMail, () => setMail(null))
     } finally {
       setLoading(false)
     }
@@ -238,6 +251,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return res.profile
   }, [setLang])
 
+  const saveMail = useCallback(async (settings: MailSettingsInput) => {
+    const res = await api<MailState>('/api/mail', { method: 'PUT', body: settings })
+    setMail(res)
+    return res
+  }, [])
+
+  const removeMail = useCallback(async () => {
+    const res = await api<MailState>('/api/mail', { method: 'DELETE' })
+    setMail(res)
+    return res
+  }, [])
+
+  const testMail = useCallback((message: { from?: string; subject: string; body: string }) => api<{ to: string }>('/api/mail/test', { method: 'POST', body: message }), [])
+
+  const sendInvoiceEmail = useCallback(async (id: string, message: InvoiceEmailInput) => {
+    const res = await api<{ invoice: Invoice; attached: boolean }>(`/api/invoices/${id}/send`, { method: 'POST', body: message })
+    setInvoices((prev) => prev.map((item) => (item.id === id ? res.invoice : item)))
+    return res
+  }, [])
+
   const downloadBackup = useCallback(async () => {
     const backup = await api<Record<string, unknown>>('/api/sync/backup')
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
@@ -287,6 +320,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       markInvoicesPaid,
       shareInvoice,
       saveProfile,
+      mail,
+      saveMail,
+      removeMail,
+      testMail,
+      sendInvoiceEmail,
       downloadBackup,
       restoreBackup,
     }),
@@ -321,6 +359,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       markInvoicesPaid,
       shareInvoice,
       saveProfile,
+      mail,
+      saveMail,
+      removeMail,
+      testMail,
+      sendInvoiceEmail,
       downloadBackup,
       restoreBackup,
     ],

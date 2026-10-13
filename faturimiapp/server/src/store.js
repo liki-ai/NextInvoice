@@ -59,6 +59,7 @@ async function initStore() {
   if (!cache.items) cache.items = {};
   if (!cache.syncOps) cache.syncOps = {};
   if (!cache.migrations) cache.migrations = {};
+  if (!cache.mail) cache.mail = {};
   if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
   return cache;
 }
@@ -847,6 +848,40 @@ function shareInvoice(userId, invoiceId) {
   return list[idx].shareToken;
 }
 
+/**
+ * A company's connection to its own mailbox, for sending invoices. Kept apart from the profile so it
+ * never travels with it: not to the apps, not into a backup file, not onto a shared invoice.
+ */
+function getMailSettings(userId) {
+  const db = readDb();
+  return (db.mail && db.mail[userId]) || null;
+}
+
+function saveMailSettings(userId, settings) {
+  const db = readDb();
+  if (!db.mail) db.mail = {};
+  if (settings) db.mail[userId] = { ...settings, updatedAt: nowIso() };
+  else delete db.mail[userId];
+  writeDb(db);
+  return db.mail[userId] || null;
+}
+
+const EMAIL_LOG_MAX = 20;
+
+/** Notes on the invoice that it went out by email, and marks it sent. */
+function recordInvoiceEmail(userId, invoiceId, { from, to, cc, subject, attached }) {
+  const db = readDb();
+  const list = db.invoices[userId] || [];
+  const idx = list.findIndex((item) => item.id === invoiceId);
+  if (idx === -1) return null;
+  const at = nowIso();
+  const emails = [...(Array.isArray(list[idx].emails) ? list[idx].emails : []), { at, from, to, cc: cc || [], subject, attached: Boolean(attached) }];
+  list[idx] = { ...list[idx], sent: true, sentAt: at, emails: emails.slice(-EMAIL_LOG_MAX), updatedAt: at };
+  db.invoices[userId] = list;
+  writeDb(db);
+  return hydrateInvoice(list[idx], db.profiles[userId]);
+}
+
 /** What a recipient may see through a share link: the invoice as printed, nothing internal. */
 function sharedInvoice(token) {
   const code = String(token || '');
@@ -1441,6 +1476,9 @@ module.exports = {
   markInvoicesPaid,
   shareInvoice,
   sharedInvoice,
+  getMailSettings,
+  saveMailSettings,
+  recordInvoiceEmail,
   exportBackup,
   restoreBackup,
   applySync,

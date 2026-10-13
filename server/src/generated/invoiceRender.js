@@ -1,0 +1,2952 @@
+// Generated from landingpage/src/lib/serverRender.ts by landingpage/scripts/build-server-render.mjs. Do not edit.
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+//#region src/i18nCore.ts
+const LANGS = [
+	{
+		code: "sq",
+		short: "SQ",
+		name: "Shqip"
+	},
+	{
+		code: "en",
+		short: "EN",
+		name: "English"
+	},
+	{
+		code: "it",
+		short: "IT",
+		name: "Italiano"
+	}
+];
+function isLang(value) {
+	return LANGS.some((item) => item.code === value);
+}
+const translations = {
+	sq: {
+		nav: {
+			invoices: "Faturat",
+			obligations: "Detyrimet",
+			overview: "Pasqyra",
+			newInvoice: "Faturë e re",
+			newObligation: "Detyrim i ri",
+			profile: "Cilësimet",
+			more: "Më shumë",
+			login: "Hyr",
+			signup: "Regjistrohu",
+			logout: "Dil",
+			openApp: "Hap aplikacionin",
+			workspace: "Hapësira e punës",
+			menu: "Menu",
+			clients: "Klientët",
+			items: "Artikujt",
+			groupCatalog: "Katalogu",
+			groupAccount: "Llogaria",
+			subscribe: "Abonohu"
+		},
+		auth: {
+			language: "Gjuha",
+			tagline: "Fatura profesionale, drejtpërdrejt në web.",
+			loginTitle: "Hyr në llogarinë tënde",
+			signupTitle: "Krijo një llogari",
+			email: "Email",
+			password: "Fjalëkalimi",
+			confirmPassword: "Përsërit fjalëkalimin",
+			loginCta: "Hyr",
+			signupCta: "Krijo llogarinë",
+			noAccount: "Nuk ke llogari?",
+			hasAccount: "Ke tashmë llogari?",
+			passwordHint: "Të paktën 8 karaktere.",
+			mismatch: "Fjalëkalimet nuk përputhen.",
+			forgotLink: "Ke harruar fjalëkalimin?",
+			forgotTitle: "Rivendos fjalëkalimin",
+			forgotHint: "Shkruaj email-in dhe të dërgojmë një lidhje për fjalëkalim të ri.",
+			forgotCta: "Dërgo lidhjen",
+			forgotSent: "Nëse ekziston një llogari me këtë email, dërguam lidhjen e rivendosjes.",
+			resetTitle: "Zgjidh një fjalëkalim të ri",
+			resetCta: "Ruaj fjalëkalimin e ri",
+			resetSuccess: "Fjalëkalimi u ndryshua. Mund të hysh tani.",
+			resetInvalid: "Kjo lidhje ka skaduar ose nuk është e vlefshme.",
+			unknownEmail: "Nuk ka llogari me këtë email. Krijo një.",
+			wrongPassword: "Fjalëkalimi është i gabuar.",
+			emailTaken: "Ekziston tashmë një llogari me këtë email. Hyr ose rivendos fjalëkalimin.",
+			backToLogin: "Kthehu te hyrja",
+			newPassword: "Fjalëkalimi i ri",
+			mailNotConfigured: "Rivendosja me email nuk është konfiguruar ende. Provo të hysh me fjalëkalimin që përdore."
+		},
+		common: {
+			save: "Ruaj",
+			cancel: "Anulo",
+			delete: "Fshij",
+			edit: "Ndrysho",
+			loading: "Duke u ngarkuar...",
+			error: "Gabim",
+			success: "Sukses",
+			close: "Mbyll",
+			back: "Kthehu",
+			search: "Kërko",
+			send: "Shpërndaj",
+			optional: "opsionale",
+			noResults: "Asnjë rezultat për këtë kërkim."
+		},
+		more: {
+			title: "Më shumë",
+			clients: "Klientët",
+			items: "Artikujt"
+		},
+		clients: {
+			title: "Klientët",
+			add: "Klient i ri",
+			edit: "Ndrysho klientin",
+			empty: "Nuk ka klientë ende.",
+			bio: "Të dhënat e klientit",
+			firstName: "Emri",
+			lastName: "Mbiemri",
+			notes: "Shënime shtesë",
+			vatNumber: "Numri i TVSH-së",
+			fiscalNumber: "Numri fiskal",
+			taxTitle: "TVSH për këtë klient",
+			taxCompany: "Si kompania",
+			taxNone: "Pa TVSH",
+			taxCustom: "Tjetër",
+			taxHint: "Faturat e reja për këtë klient fillojnë me këtë normë. Zgjidh “Pa TVSH” për eksport. Mund ta ndryshosh në çdo faturë.",
+			measurements: "Masat e trupit",
+			addPhoto: "Foto",
+			saveAndInvoice: "Ruaj dhe vazhdo me faturë",
+			validationName: "Emri i plotë është i detyrueshëm.",
+			validationPhone: "Numri i telefonit është i detyrueshëm.",
+			deleteTitle: "Fshi klientin",
+			deleteMessage: "Ky klient do të fshihet.",
+			measure: {
+				chest: "Gjoksi",
+				waist: "Beli",
+				hips: "Ijet",
+				shoulders: "Supet",
+				height: "Gjatësia"
+			}
+		},
+		items: {
+			title: "Artikujt",
+			add: "Artikull i ri",
+			edit: "Ndrysho artikullin",
+			empty: "Nuk ka artikuj ende.",
+			untitled: "Pa emër",
+			description: "Përshkrimi",
+			phDescription: "Emri i artikullit",
+			unitCost: "Çmimi për njësi",
+			unitLabel: "Njësia",
+			unit: {
+				pcs: "copë",
+				hours: "orë",
+				days: "ditë",
+				m: "m",
+				kg: "kg"
+			},
+			taxable: "Tatueshëm",
+			additionalDetails: "Detaje shtesë",
+			phAdditional: "Shënime",
+			validationDescription: "Përshkrimi është i detyrueshëm.",
+			deleteTitle: "Fshi artikullin",
+			deleteMessage: "Ky artikull do të fshihet.",
+			pick: "Nga katalogu"
+		},
+		industry: {
+			label: "Industria / sektori",
+			fashion: "Dizajn mode",
+			services: "Shërbime",
+			retail: "Tregti",
+			hospitality: "Hoteleri",
+			construction: "Ndërtim",
+			other: "Tjetër"
+		},
+		balance: {
+			title: "Bilanci i klientit",
+			send: "Bilanci",
+			deposit: "Kapari / e paguar"
+		},
+		docs: {
+			synced: "U sinkronizua",
+			pending: "Në pritje",
+			error: "Gabim",
+			recordPayment: "Regjistro pagesë",
+			amount: "Shuma",
+			date: "Data",
+			method: "Mënyra e pagesës (opsionale)",
+			methodCash: "Kesh",
+			methodBank: "Bank",
+			note: "Shënim (opsional)",
+			remaining: "E mbetur",
+			paidAmount: "E paguar",
+			statusPartial: "Pjesërisht paguar",
+			payPartial: "Paguar pjesërisht",
+			statusDraft: "Draft",
+			statusCancelled: "Anuluar",
+			overdue: "Të vonuara",
+			overdueDays: "{days} ditë vonesë",
+			reminder: "Kujtesë për klientin",
+			reminderHello: "Përshëndetje,",
+			reminderBody: "Fatura {number} ka afat {due}. Shuma e mbetur është {amount}. Është {days} ditë vonesë.",
+			reminderThanks: "Faleminderit.",
+			copy: "Kopjo",
+			copied: "U kopjua",
+			share: "Ndaj",
+			saveDraft: "Ruaj",
+			sent: "Dërguar",
+			notSent: "Pa dërguar",
+			issue: "Lësho faturën",
+			issued: "E lëshuar",
+			draft: "Draft",
+			cancelInvoice: "Anulo faturën",
+			cancelReason: "Arsyeja e anulimit",
+			correct: "Korrigjo shumat",
+			correctReason: "Arsyeja e korrigjimit",
+			voidPayment: "Korrigjo pagesën",
+			voidReason: "Arsyeja e korrigjimit",
+			clients: "Klientët",
+			pickClient: "Zgjidh klientin",
+			addClient: "Shto klient",
+			email: "Email",
+			businessId: "Identifikuesi i biznesit",
+			similarClient: "Ka një klient me të njëjtin emër dhe telefon/email. Nuk u bashkua automatikisht.",
+			backup: "Ruajtje rezervë",
+			backupExport: "Shkarko kopjen rezervë",
+			backupRestore: "Rikthe nga skedar",
+			backupConfirm: "Kjo zëvendëson faturat, detyrimet, klientët dhe profilin e kësaj llogarie. Shkruaj RESTORE për të konfirmuar.",
+			backupOk: "Rikthimi u krye. Kontrolloni checksum-in e skedarit.",
+			checksum: "Checksum",
+			snapshotMigrated: "Të dhënat e kompanisë për këtë faturë u kopjuan nga të dhënat aktuale gjatë migrimit; nuk janë snapshot i verifikuar i lëshimit.",
+			amountDue: "Për t’u paguar",
+			amountPaid: "Paguar",
+			paymentHistory: "Historiku i pagesave",
+			voided: "E korrigjuar",
+			newClient: "Klient i ri"
+		},
+		invoiceList: {
+			status: "Statusi",
+			selectAll: "Zgjidh të gjitha të papaguarat",
+			selectOne: "Zgjidh faturën {number}",
+			selectedCount: "{count} të zgjedhura",
+			clearSelection: "Hiq zgjedhjen",
+			markPaid: "Shëno si të paguara",
+			markPaidBody: "{count} fatura, gjithsej {total}, do të shënohen si të paguara plotësisht.",
+			markPaidConfirm: "Shëno {count} si të paguara",
+			markPaidUndo: "Për ta kthyer mbrapsht një faturë, kliko shenjën “Paguar” në rreshtin e saj.",
+			paymentDate: "Data e pagesës",
+			paymentDateInvoice: "Data e secilës faturë",
+			paymentDateInvoiceHint: "Për fatura të vjetra, kur dita e saktë e pagesës nuk dihet.",
+			paymentDateToday: "Sot",
+			year: "Viti",
+			allYears: "Të gjitha vitet",
+			title: "Faturat",
+			subtitle: "Të gjitha faturat e tua, në një vend.",
+			emptyTitle: "Nuk ka fatura ende",
+			empty: "Krijo faturën e parë — klienti, artikujt dhe PDF-ja në të njëjtin ekran.",
+			itemsCount: "{count} artikuj",
+			deleteConfirm: "Të fshihet kjo faturë? Ky veprim nuk kthehet.",
+			search: "Kërko sipas numrit ose klientit",
+			client: "Klienti",
+			amount: "Shuma",
+			billed: "Total i faturuar",
+			countLabel: "{count} fatura",
+			view: "Hape",
+			filterAll: "Të gjitha",
+			filterUnpaid: "Pa paguar",
+			filterPaid: "Paguar",
+			filterOverdue: "Të vonuara",
+			due: "Afati",
+			statusPaid: "Paguar",
+			statusUnpaid: "Pa paguar",
+			usageBanner: "{used} nga {limit} fatura këtë muaj",
+			usageUnlimited: "Premium — fatura pa limit",
+			upgrade: "Abonohu",
+			unpaidTotal: "Pa paguar",
+			paidTotal: "Paguar",
+			tapToMarkPaid: "Shtyp për ta shënuar të paguar",
+			limitReached: "Kufiri mujor",
+			sendList: "Dërgo listën",
+			sendUnpaid: "Dërgo të papaguarat",
+			sendPaid: "Dërgo të paguarat",
+			sendAllTitle: "Faturat",
+			sendUnpaidTitle: "Faturat e papaguara",
+			sendPaidTitle: "Faturat e paguara"
+		},
+		newInvoice: {
+			title: "Faturë e re",
+			editTitle: "Ndrysho faturën",
+			modeManual: "Manualisht",
+			modeAi: "Me AI",
+			clientSectionTitle: "Të dhënat e klientit",
+			fullName: "Emri i plotë",
+			address: "Adresa",
+			phone: "Telefoni",
+			aiInputLabel: "Ngjit tekstin ose ngarko foto (klient, artikuj, sasi, çmim)",
+			aiInputPlaceholder: "p.sh. Almedina Sadiku, 7 Arrowhead Dr, Milford CT 06460 USA, +8603029000",
+			aiExtractButton: "Zbulo me AI",
+			aiUploadPhoto: "Ngarko foto",
+			aiTakePhoto: "Bëj foto",
+			aiChoosePhoto: "Nga galeria",
+			aiExtracting: "Duke analizuar...",
+			aiExtractError: "Nuk u arrit të nxirren të dhënat.",
+			aiFilledCollapsed: "Të dhënat u ngarkuan. Trokit për t’i ndryshuar.",
+			phFullName: "p.sh. Emri i klientit",
+			phAddress: "p.sh. Rruga, qyteti",
+			phPhone: "p.sh. +383 00 000 000",
+			phItemDescription: "p.sh. Shërbim ose produkt",
+			invoiceDetailsSectionTitle: "Detajet e faturës",
+			invoiceNumber: "Numri i faturës",
+			date: "Data",
+			dueDate: "Afati i pagesës",
+			phDueDate: "p.sh. SEP 17, 2026",
+			recentClients: "Klientë të mëparshëm",
+			pickClient: "Zgjidh një klient",
+			limitReached: "Ke përdorur 10 faturat falas të këtij muaji. Kaloni në Premium për të vazhduar.",
+			duplicate: "Dupliko",
+			itemsSectionTitle: "Artikujt",
+			itemDescription: "Përshkrimi",
+			itemQuantity: "Sasia",
+			itemUnitPrice: "Çmimi për njësi",
+			itemTotal: "Shuma",
+			addItem: "Shto artikull",
+			discount: "Zbritje",
+			notes: "Shënime (opsionale)",
+			showDiscount: "Zbritje",
+			showNotes: "Shënime",
+			subtotal: "Nëntotali",
+			total: "Totali",
+			saveAndShare: "Ruaj dhe shpërndaj",
+			saveChanges: "Ruaj ndryshimet",
+			selectClient: "Zgjidh",
+			searchClients: "Kërko klientin",
+			taxRate: "TVSH (%)",
+			taxNone: "Pa TVSH",
+			taxFromClient: "Sipas cilësimit të këtij klienti. Mund ta ndryshosh për këtë faturë.",
+			pricesIncludeTax: "Çmimet përfshijnë TVSH-në",
+			pricesIncludeTaxHint: "Shkruaj çmimin përfundimtar; nëntotali pa TVSH llogaritet vetë.",
+			withTax: "me TVSH",
+			tax: "TVSH",
+			noMatchingClients: "Nuk u gjet asnjë klient",
+			preview: "Parapamje",
+			previewTitle: "Parapamje e faturës",
+			savedSuccess: "Fatura u ruajt me sukses.",
+			updatedSuccess: "Fatura u përditësua.",
+			validationClient: "Plotëso emrin e klientit para se të vazhdosh.",
+			validationItems: "Shto të paktën një artikull me çmim."
+		},
+		invoiceDetail: {
+			title: "Detajet e faturës",
+			downloadPdf: "Shkarko PDF",
+			deleteInvoice: "Fshij faturën",
+			issuedTo: "Lëshuar për",
+			summary: "Përmbledhje",
+			markPaid: "Shëno si e paguar",
+			markUnpaid: "Shëno si e papaguar",
+			duplicate: "Dupliko faturën"
+		},
+		statement: {
+			title: "Lista e papaguar",
+			subtitle: "Gjenero dhe dërgo listën e faturave të papaguara te një klient.",
+			cta: "Dërgo listën",
+			banner: "Ke fatura të papaguara. Dërgoja listën klientit.",
+			empty: "Nuk ka fatura të papaguara për të dërguar.",
+			selectClient: "Zgjidh klientin",
+			invoicesLabel: "Faturat e papaguara",
+			unpaidCount: "{count} fatura të papaguara",
+			sendPdf: "Gjenero dhe dërgo PDF",
+			preview: "Parapamje",
+			previewTitle: "Parapamje e listës",
+			asOf: "Gjendja në {date}"
+		},
+		overview: {
+			title: "Pasqyra",
+			subtitle: "Përmbledhje e faturave, pagesave dhe detyrimeve për periudhën e zgjedhur.",
+			exportPdf: "Eksporto PDF",
+			thisMonth: "Këtë muaj",
+			thisYear: "Këtë vit",
+			month: "Muaj",
+			year: "Vit",
+			custom: "Interval",
+			from: "Nga",
+			to: "Deri",
+			currency: "Monedha",
+			invoiced: "Faturuar",
+			received: "Pagesa të marra",
+			obligationsRecorded: "Detyrime të regjistruara",
+			paidOut: "Pagesa të bëra",
+			receivables: "Të arkëtueshme",
+			payables: "Të pagueshme",
+			netPayments: "Pagesat neto",
+			netHint: "Pagesat e marra minus pagesat e bëra në periudhë. Nuk është fitim dhe as gjendje bankare.",
+			customers: "Klientë me balans të hapur",
+			overdue: "Detyrime të vonuara",
+			empty: "Nuk ka të dhëna për këtë periudhë dhe monedhë.",
+			tapHint: "Trokit shumën për të parë dokumentet.",
+			limitationTitle: "Kufizim i të dhënave",
+			limitationLegacy: "Disa dokumente janë shënuar si të paguara pa datë pagese. Totals historike mund të jenë të paplota.",
+			limitationUndated: "Disa pagesa nuk kanë datë, prandaj nuk përfshihen te lëvizjet e periudhës.",
+			limitationDates: "Disa dokumente nuk kanë datë të vlefshme dhe u anashkaluan.",
+			limitationCancel: "Disa anulime nuk kanë datë, prandaj mund të ndikojnë gabimisht në periudhat e mëparshme.",
+			drillInvoiced: "Faturat e lëshuara",
+			drillReceived: "Pagesat e marra",
+			drillObligations: "Detyrimet e regjistruara",
+			drillPaidOut: "Pagesat e bëra",
+			drillReceivables: "Faturat e hapura",
+			drillPayables: "Detyrimet e hapura",
+			drillNet: "Pagesat neto",
+			paymentOn: "Pagesë më {date}",
+			daysOverdue: "{days} ditë vonesë",
+			noMatches: "Asnjë dokument nuk përputhet me këtë filtër.",
+			pdfTitle: "Pasqyra",
+			asOf: "Në datën {date}"
+		},
+		obligations: {
+			title: "Detyrimet",
+			subtitle: "Qira, transport, materiale dhe pagesa të tjera ndaj furnitorëve — të ndara nga faturat që lëshon.",
+			emptyTitle: "Nuk ka detyrime ende",
+			empty: "Shto të parën këtu — qira, transport ose çdo pagesë ndaj furnitorëve.",
+			search: "Kërko sipas furnitorit ose faturës",
+			vendor: "Furnitori",
+			description: "Përshkrimi",
+			optionalNotes: "Shënime opsionale",
+			phNotes: "p.sh. muaji, numri i faturës",
+			relatedInvoice: "Lidhur me faturën",
+			unpaidTotal: "Për të paguar",
+			paidTotal: "Paguar",
+			countLabel: "{count} detyrime",
+			vendorCount: "{count} rreshta",
+			stillDue: "ende e papaguar",
+			invoiceBanner: "Ke pagesa të hapura ndaj furnitorëve.",
+			allVendors: "Të gjithë furnitorët",
+			newTitle: "Detyrim i ri",
+			editTitle: "Ndrysho detyrimin",
+			formHint: "Shëno furnitorin, shumën dhe kategorinë. Shënimet, afati dhe fatura janë opsionale.",
+			phVendor: "p.sh. DHL",
+			phDescription: "p.sh. Dërgesat e marsit, ose numri i tracking",
+			phAmount: "p.sh. 48.50",
+			addDueDate: "Afati i pagesës",
+			clearDueDate: "Hiq afatin",
+			categoryLabel: "Kategoria",
+			status: "Statusi",
+			noRelatedInvoice: "Pa lidhje me faturë",
+			validationVendor: "Shkruaj emrin e furnitorit.",
+			validationAmount: "Shkruaj një shumë më të madhe se 0.",
+			deleteConfirm: "Të fshihet ky detyrim? Ky veprim nuk kthehet.",
+			delete: "Fshij detyrimin",
+			sendPaid: "Dërgo të paguarat",
+			sendPaidTitle: "Detyrimet e paguara",
+			sendUnpaid: "Dërgo të papaguarat",
+			sendUnpaidTitle: "Detyrimet e papaguara",
+			sendList: "Dërgo listën",
+			sendAllTitle: "Detyrimet",
+			proofTitle: "Dëshmia e pagesës",
+			proofHint: "Ngarko PDF ose foto nga transaksioni.",
+			proofAdd: "Ngarko dëshmi",
+			proofAttached: "Dëshmi e ngarkuar",
+			proofMissing: "Pa dëshmi",
+			proofTooLarge: "Skedari është shumë i madh (maks. 4 MB).",
+			proofReplace: "Ndrysho dëshminë",
+			category: {
+				shipping: "Transport",
+				supplies: "Materiale",
+				rent: "Qira",
+				tax: "Taksë",
+				other: "Tjetër"
+			}
+		},
+		profile: {
+			title: "Cilësimet",
+			companySectionTitle: "Të dhënat e kompanisë",
+			companyHint: "Këto shfaqen në çdo faturë. Zëvendësoji me të dhënat e tua.",
+			companyName: "Emri i kompanisë",
+			contactPerson: "Personi kontaktues",
+			nui: "Numri Unik Identifikues (NUI)",
+			streetAddress: "Adresa",
+			state: "Shteti / Rajoni",
+			zipCode: "Kodi postar",
+			email: "Email",
+			phone: "Telefoni",
+			currency: "Monedha",
+			phCompanyName: "Kompania juaj (shembull)",
+			phContactPerson: "Emri juaj (shembull)",
+			phNui: "000000000",
+			phStreetAddress: "Rruga shembull, nr. 1",
+			phState: "Kosovë",
+			phZipCode: "10000",
+			phEmail: "email@shembull.com",
+			phPhone: "+383 00 000 000",
+			phCurrency: "EUR",
+			bankName: "Banka",
+			iban: "IBAN",
+			phBankName: "p.sh. TEB, Raiffeisen",
+			phIban: "p.sh. XK05 ...",
+			paymentHint: "Këto dalin në fund të faturës, që klienti të dijë ku të paguajë.",
+			exportNote: "Shënimi i eksportit (PDF)",
+			phExportNote: "Eksport ne bazë te Ligjit (05-L-037 Neni 33)",
+			exportNoteHint: "Shfaqet nën “Faleminderit” në PDF. Fshije tekstin për ta hequr komplet, ose ndryshoje.",
+			importSectionTitle: "Importo nga një faturë shembull",
+			importDescription: "Ngarko një faturë (PDF ose imazh) dhe AI nxjerr të dhënat e kompanisë.",
+			importButton: "Ngarko faturë shembull",
+			importing: "Duke analizuar faturën...",
+			importSuccess: "Të dhënat u plotësuan. Kontrolloji para se t’i ruash.",
+			importError: "Nuk u arrit të nxirren të dhënat nga fatura.",
+			languageSectionTitle: "Gjuha",
+			languageHint: "Ndërro gjuhën e aplikacionit. Zgjedhja ruhet në llogarinë tënde.",
+			languageSq: "Shqip",
+			languageEn: "English",
+			languageIt: "Italiano",
+			saveSuccess: "Cilësimet u ruajtën.",
+			account: "Llogaria",
+			workspaceHint: "Gjuha dhe të dhënat e kompanisë përdoren në çdo faturë.",
+			subtitle: "Të dhënat e biznesit, pamja e faturës dhe llogaria.",
+			sectionBrand: "Logo",
+			logoHint: "PNG ose JPG. Shfaqet në krye të çdo fature.",
+			upload: "Ngarko",
+			change: "Ndrysho",
+			remove: "Hiq",
+			imageError: "Ky skedar nuk është imazh i vlefshëm.",
+			sectionBusiness: "Biznesi",
+			businessHint: "Emri ligjor dhe numrat e regjistrimit, siç dalin në faturë.",
+			vatNumber: "Numri i TVSH-së",
+			phVatNumber: "p.sh. 330000000",
+			sectionContact: "Adresa dhe kontakti",
+			contactHint: "Ku ndodhet biznesi dhe si të kontakton klienti.",
+			website: "Faqja web",
+			phWebsite: "p.sh. kompania.com",
+			sectionPayment: "Pagesa",
+			swift: "SWIFT / BIC",
+			phSwift: "p.sh. MBKOXKPR",
+			sectionInvoice: "Pamja e faturës",
+			invoiceHint: "Modeli dhe ngjyra përdoren për çdo PDF që shkarkon ose dërgon.",
+			templateLabel: "Modeli",
+			templateClassic: "Klasik",
+			templateClassicDesc: "I njohur dhe i qartë, me vijë ngjyre në krye.",
+			templateCorporate: "Korporativ",
+			templateCorporateDesc: "Kokë me ngjyrë, tabelë e plotë dhe kuti pagese.",
+			templateMinimal: "Minimal",
+			templateMinimalDesc: "I pastër, me shumë hapësirë dhe pak vija.",
+			templateSelected: "I zgjedhur",
+			templatePreview: "Shiko të plotë",
+			accent: "Ngjyra",
+			accentDefault: "Ngjyra e modelit",
+			sectionSignature: "Nënshkrimi dhe vula",
+			signatureHint: "Opsionale. Dalin në fund të faturës, te vendi i nënshkrimit.",
+			signature: "Nënshkrimi",
+			stamp: "Vula",
+			sectionData: "Të dhënat",
+			defaultTaxRate: "TVSH e paracaktuar (%)",
+			defaultTaxRateHint: "Plotësohet vetë në çdo faturë të re; mund ta ndryshosh për secilën faturë.",
+			backupHint: "Shkarko një kopje të të gjitha të dhënave, ose riktheji nga një skedar.",
+			unsaved: "Ke ndryshime të paruajtura.",
+			discard: "Hidhi poshtë",
+			invalidEmail: "Email-i nuk është i vlefshëm.",
+			sampleClient: "Klienti Shembull SH.P.K.",
+			sampleAddress: "Rr. Shembull 10, Prishtinë",
+			sampleLine1: "Zhvillim softueri (orë)",
+			sampleLine2: "Mirëmbajtje mujore",
+			sampleLine3: "Konsulencë"
+		},
+		send: {
+			action: "Dërgo",
+			title: "Dërgo faturën {number}",
+			to: "Për",
+			toPlaceholder: "email@klienti.com",
+			subject: "Subjekti",
+			message: "Mesazhi",
+			messageLanguage: "Gjuha e mesazhit",
+			defaultSubject: "Faturë {number} nga {company}",
+			defaultBody: "Përshëndetje,\n\nJu dërgojmë faturën {number} të datës {date}, në vlerë {total}.\nAfati i pagesës: {due}.\n\nFaturën mund ta shikoni dhe ta shkarkoni këtu:\n{link}\n{payment}\nFaleminderit,\n{sender}",
+			paymentLine: "Të dhënat për pagesë: {details}",
+			link: "Lidhja e faturës",
+			linkHint: "Klienti e hap faturën nga kjo lidhje dhe e shkarkon si PDF, pa llogari. E sheh kushdo që e ka lidhjen.",
+			preparing: "Duke përgatitur lidhjen...",
+			copyLink: "Kopjo lidhjen",
+			copied: "U kopjua",
+			openMail: "Hap në email",
+			openGmail: "Hap në Gmail",
+			copyMessage: "Kopjo mesazhin",
+			downloadPdf: "Shkarko PDF",
+			howTo: "Email-i hapet me marrësin, subjektin dhe mesazhin të plotësuar; ti vetëm shtyp Dërgo.",
+			markSent: "Shëno si të dërguar",
+			markUnsent: "Shëno si të padërguar",
+			sentOn: "E dërguar më {date}",
+			sentNoDate: "E shënuar si e dërguar",
+			notSentYet: "Ende e padërguar",
+			draftNote: "Kjo faturë është ende draft. Për ta dërguar duhet lëshuar; pas kësaj numri dhe shumat nuk ndryshohen më lirisht.",
+			issueAndPrepare: "Lësho faturën dhe përgatit email-in",
+			from: "Nga",
+			cc: "Kopje (Cc)",
+			ccPlaceholder: "opsionale",
+			recipientsHint: "Disa adresa ndahen me presje.",
+			attachPdf: "Bashkëngjit faturën si PDF",
+			sendNow: "Dërgo email-in",
+			sending: "Duke dërguar...",
+			sentOk: "Email-i u dërgua te {to}.",
+			emailedTo: "Dërguar me email te {to}",
+			otherWays: "Ose dërgoje vetë",
+			connectTitle: "Dërgoje direkt nga aplikacioni",
+			connectHint: "Lidhe email-in e kompanisë te Cilësimet dhe fatura niset nga këtu me një klik, me PDF-në e bashkëngjitur.",
+			connectAction: "Lidh email-in",
+			invalidTo: "Shkruaj një adresë të vlefshme email-i.",
+			viewInvoice: "Shiko faturën",
+			publicInvalid: "Kjo lidhje e faturës nuk është e vlefshme.",
+			publicDownload: "Shkarko / Printo",
+			publicFrom: "Faturë nga {company}"
+		},
+		mail: {
+			title: "Dërgimi i faturave me email",
+			hint: "Lidhe kutinë postare të kompanisë. Faturat dërgohen direkt nga aplikacioni, me adresën tënde si dërgues dhe me PDF-në e bashkëngjitur.",
+			connected: "E lidhur",
+			notConnected: "E palidhur",
+			provider: "Shërbimi i email-it",
+			providerGoogle: "Google Workspace / Gmail",
+			providerGoogleRelay: "Google SMTP relay",
+			providerMicrosoft: "Microsoft 365",
+			providerOther: "Tjetër",
+			host: "Serveri SMTP",
+			port: "Porti",
+			user: "Kutia postare (email)",
+			password: "Fjalëkalimi i aplikacionit",
+			passwordSaved: "I ruajtur. Shkruaj vetëm për ta ndërruar.",
+			passwordHelp: "Te Google nuk përdoret fjalëkalimi i zakonshëm, por një \"fjalëkalim aplikacioni\" me 16 shkronja. Krijohet te llogaria Google, pasi të jetë ndezur verifikimi me dy hapa. Këtu ruhet i koduar dhe nuk shfaqet më.",
+			passwordHelpOther: "Fjalëkalimi ruhet i koduar dhe nuk shfaqet më.",
+			passwordLink: "Krijo fjalëkalimin te Google",
+			senders: "Adresat që dërgojnë fatura",
+			sendersHint: "Adresa e llogarisë, {email}, është gjithmonë në listë dhe zgjidhet e para. Shto adresat e tjera të kompanisë që duhet të shfaqen te \"Nga\".",
+			aliasNote: "Gmail pranon si dërgues vetëm kutinë e lidhur dhe aliaset e saj (\"Send mail as\"); çdo adresë tjetër e zëvendëson me kutinë e lidhur. Me Google SMTP relay mund të dërgojë çdo adresë e domenit.",
+			senderName: "Emri që shfaqet",
+			senderEmail: "Adresa",
+			addSender: "Shto adresë",
+			removeSender: "Hiq adresën",
+			save: "Ruaj lidhjen",
+			saved: "Lidhja u ruajt.",
+			test: "Dërgo email provë",
+			testing: "Duke provuar...",
+			testOk: "Email-i provë u dërgua te {to}. Shiko kutinë postare.",
+			testSubject: "Provë nga Next Invoice",
+			testBody: "Ky është një email provë.\n\nLidhja e email-it për dërgimin e faturave funksionon.",
+			disconnect: "Shkëput",
+			disconnected: "Email-i u shkëput.",
+			errAuth: "Kutia postare ose fjalëkalimi i aplikacionit nuk u pranua.",
+			errConnect: "Nuk u arrit serveri i email-it. Kontrollo serverin dhe portin.",
+			errRejected: "Serveri i email-it e refuzoi mesazhin.",
+			errSender: "Kjo adresë nuk është në listën e dërguesve.",
+			errRecipient: "Shkruaj të paktën një adresë të vlefshme marrësi (deri në 5).",
+			errContent: "Email-i duhet të ketë subjekt dhe mesazh.",
+			errLimit: "U arrit kufiri ditor i email-eve. Provo nesër.",
+			errPdf: "PDF-ja nuk u krijua. Provo përsëri ose dërgoje pa bashkëngjitje.",
+			errNotConfigured: "Email-i i kompanisë nuk është lidhur ende.",
+			errHost: "Ky server ose port SMTP nuk lejohet. Portet e lejuara: 587, 465, 2525.",
+			errIncomplete: "Plotëso serverin, kutinë postare dhe fjalëkalimin.",
+			errGeneric: "Email-i nuk u dërgua."
+		},
+		importer: {
+			button: "Importo nga Excel",
+			title: "Importo faturat nga Excel",
+			intro: "Ngarko skedarin .xlsx me faturat e tua. Asgjë nuk ruhet derisa ta konfirmosh.",
+			choose: "Zgjidh skedarin .xlsx",
+			chooseAnother: "Zgjidh skedar tjetër",
+			reading: "Duke lexuar skedarin...",
+			formats: "Lexohen fletët e faturave, të rreshtave të faturave dhe të klientëve. Kolonat gjenden nga titujt, p.sh. Invoice #, Company, Invoice Date, Tax Rate, Përshkrimi, Sasia, Çmimi për njësi.",
+			notXlsx: "Ky nuk është skedar Excel (.xlsx) i vlefshëm.",
+			noSheet: "Nuk u gjet asnjë fletë me fatura. Duhen të paktën kolonat e numrit dhe të datës së faturës.",
+			sheets: "Fletët e lexuara",
+			toImport: "Për import",
+			existing: "Ekzistojnë tashmë",
+			newClients: "Klientë",
+			total: "Vlera me TVSH",
+			period: "Periudha",
+			existingNote: "{count} fatura kanë numër që ekziston tashmë dhe do të anashkalohen.",
+			problems: "{count} rreshta nuk mund të importohen",
+			reasonDate: "mungon ose nuk lexohet data",
+			reasonClient: "mungon klienti",
+			reasonItems: "nuk ka as rreshta, as shumë",
+			reasonDuplicate: "numër i përsëritur në skedar",
+			warnings: "{count} fatura kërkojnë vëmendje",
+			warnTotalMismatch: "totali i llogaritur ndryshon nga ai në Excel",
+			warnOther: "vlera në kolonën “Other” nuk importohet",
+			warnNoLines: "pa rreshta: u krijua një rresht me shumën e faturës",
+			warnUnknownClient: "klienti nuk është në fletën e klientëve",
+			pickHint: "Hiqja shenjën faturave që nuk do t’i importosh, p.sh. të anuluarat.",
+			search: "Kërko sipas numrit ose klientit",
+			selectAll: "Zgjidh të gjitha",
+			selectOne: "Importo faturën {number}",
+			remove: "Largo",
+			restore: "Kthe",
+			removeFlagged: "Largoji të gjitha",
+			restoreFlagged: "Ktheji të gjitha",
+			removed: "{count} fatura u larguan nga importi.",
+			restoreAll: "Ktheji të gjitha",
+			noMatch: "Asnjë faturë nuk përputhet me kërkimin.",
+			markPaid: "Shëno të gjitha si të paguara",
+			markPaidHint: "Lëre të pazgjedhur nëse pagesat do t’i shënosh më vonë, një nga një.",
+			otherClients: "Importo edhe {count} klientët e tjerë të skedarit",
+			colNumber: "Nr.",
+			colClient: "Klienti",
+			colDate: "Data",
+			colLines: "Rreshta",
+			colTax: "TVSH",
+			colTotal: "Totali",
+			more: "dhe {count} të tjera",
+			confirm: "Importo {count} fatura",
+			importing: "Duke importuar...",
+			nothing: "Të gjitha faturat e këtij skedari ekzistojnë tashmë.",
+			done: "Importi përfundoi",
+			doneSummary: "U shtuan {created} fatura dhe {clients} klientë.",
+			doneSkipped: "{count} u anashkaluan.",
+			limit: "Plani falas lejon 10 fatura në muaj. Kalo në Premium për ta importuar këtë skedar."
+		},
+		pdf: {
+			invoiceLabel: "Faturë",
+			dateLabel: "Data",
+			clientLabel: "Klienti",
+			nuiLabel: "NUI",
+			description: "Përshkrimi",
+			quantity: "Sasia",
+			unit: "Njësia",
+			sum: "Shuma",
+			subtotal: "Nëntotali",
+			discount: "Zbritje",
+			total: "Totali",
+			issuedBy: "Faturoi",
+			receivedBy: "Pranoi",
+			thankYou: "Faleminderit!",
+			dueDateLabel: "Afati",
+			onReceipt: "Me pranim",
+			paymentInfo: "Pagesa",
+			bankName: "Banka",
+			ibanLabel: "IBAN",
+			fullNameLabel: "Full Name",
+			addressLabel: "Address",
+			phoneLabel: "Phone No",
+			statementTitle: "PREVENTIVI",
+			billedTo: "FATURUAR PËR",
+			order: "POROSIA",
+			patientService: "PACIENTI / SHËRBIMI",
+			unitPrice: "ÇMIMI PËR NJËSI",
+			qty: "SASIA",
+			ordersTotal: "TOTALI I POROSIVE",
+			paymentsTotal: "TOTALI I PAGESAVE",
+			balanceDue: "TOTALI I BILANCIT",
+			pivaLabel: "p.IVA",
+			vatLabel: "Nr. TVSH",
+			swiftLabel: "SWIFT (BIC)",
+			beneficiary: "Përfituesi",
+			signature: "Nënshkrimi",
+			paymentDetails: "Detajet e pagesës",
+			vat: "TVSH",
+			fiscalLabel: "Nr. fiskal"
+		},
+		billing: {
+			title: "Planet",
+			subtitle: "Fillo falas. Kaloni në Premium kur të duhen më shumë fatura.",
+			freeName: "Falas",
+			freeLimit: "Deri në 10 fatura në muaj",
+			freeHint: "10 fatura në muaj janë falas. Abonohu për fatura pa limit.",
+			premiumName: "Premium",
+			premiumLimit: "Fatura pa limit",
+			premiumPrice: "€20 / muaj",
+			premiumHint: "Pa kufi mujor. I njëjti aplikacion, pa ndërprerje.",
+			current: "Plani aktual",
+			cta: "Fillo Premium — €20/muaj",
+			ctaStripe: "Paguaj me kartë — €20/muaj",
+			alreadyPremium: "Je në Premium.",
+			manage: "Menaxho abonimin",
+			success: "Pagesa u konfirmua. Je në Premium.",
+			canceled: "Pagesa u anulua.",
+			confirming: "Duke konfirmuar pagesën...",
+			stripeNote: "Pagesa sigurohet nga Stripe. Mund ta anulosh kurdo nga portali i abonimit.",
+			stripeMissing: "Stripe nuk është konfiguruar në server."
+		}
+	},
+	en: {
+		nav: {
+			invoices: "Invoices",
+			obligations: "Obligations",
+			overview: "Overview",
+			newInvoice: "New invoice",
+			newObligation: "New bill",
+			profile: "Settings",
+			more: "More",
+			login: "Log in",
+			signup: "Sign up",
+			logout: "Log out",
+			openApp: "Open app",
+			workspace: "Workspace",
+			menu: "Menu",
+			clients: "Clients",
+			items: "Items",
+			groupCatalog: "Catalog",
+			groupAccount: "Account",
+			subscribe: "Subscribe"
+		},
+		auth: {
+			language: "Language",
+			tagline: "Professional invoices, right in the browser.",
+			loginTitle: "Log in to your account",
+			signupTitle: "Create an account",
+			email: "Email",
+			password: "Password",
+			confirmPassword: "Confirm password",
+			loginCta: "Log in",
+			signupCta: "Create account",
+			noAccount: "Don't have an account?",
+			hasAccount: "Already have an account?",
+			passwordHint: "At least 8 characters.",
+			mismatch: "Passwords do not match.",
+			forgotLink: "Forgot password?",
+			forgotTitle: "Reset your password",
+			forgotHint: "Enter your email and we will send a reset link.",
+			forgotCta: "Send reset link",
+			forgotSent: "If an account exists for that email, we sent a reset link.",
+			resetTitle: "Choose a new password",
+			resetCta: "Save new password",
+			resetSuccess: "Password updated. You can log in now.",
+			resetInvalid: "This reset link is invalid or has expired.",
+			unknownEmail: "No account with this email. Create one.",
+			wrongPassword: "Wrong password.",
+			emailTaken: "An account with this email already exists. Log in or reset your password.",
+			backToLogin: "Back to login",
+			newPassword: "New password",
+			mailNotConfigured: "Email reset is not set up yet. Try logging in with the password you used."
+		},
+		common: {
+			save: "Save",
+			cancel: "Cancel",
+			delete: "Delete",
+			edit: "Edit",
+			loading: "Loading...",
+			error: "Error",
+			success: "Success",
+			close: "Close",
+			back: "Back",
+			search: "Search",
+			send: "Send",
+			optional: "optional",
+			noResults: "Nothing matches that search."
+		},
+		more: {
+			title: "More",
+			clients: "Clients",
+			items: "Items"
+		},
+		clients: {
+			title: "Clients",
+			add: "New client",
+			edit: "Edit client",
+			empty: "No clients yet.",
+			bio: "Client details",
+			firstName: "First name",
+			lastName: "Last name",
+			notes: "Additional notes",
+			vatNumber: "VAT number",
+			fiscalNumber: "Fiscal number",
+			taxTitle: "VAT for this client",
+			taxCompany: "Company rate",
+			taxNone: "No VAT",
+			taxCustom: "Other",
+			taxHint: "New invoices for this client start with this rate. Choose “No VAT” for exports. You can change it on any invoice.",
+			measurements: "Body measurements",
+			addPhoto: "Photo",
+			saveAndInvoice: "Save and continue to invoice",
+			validationName: "Full name is required.",
+			validationPhone: "Phone number is required.",
+			deleteTitle: "Delete client",
+			deleteMessage: "This client will be removed.",
+			measure: {
+				chest: "Chest",
+				waist: "Waist",
+				hips: "Hips",
+				shoulders: "Shoulders",
+				height: "Height"
+			}
+		},
+		items: {
+			title: "Items",
+			add: "New item",
+			edit: "Edit item",
+			empty: "No items yet.",
+			untitled: "Untitled",
+			description: "Description",
+			phDescription: "Item name",
+			unitCost: "Unit cost",
+			unitLabel: "Unit",
+			unit: {
+				pcs: "pcs",
+				hours: "hours",
+				days: "days",
+				m: "m",
+				kg: "kg"
+			},
+			taxable: "Taxable",
+			additionalDetails: "Additional details",
+			phAdditional: "Notes",
+			validationDescription: "Description is required.",
+			deleteTitle: "Delete item",
+			deleteMessage: "This item will be removed.",
+			pick: "From catalog"
+		},
+		industry: {
+			label: "Industry / sector",
+			fashion: "Fashion design",
+			services: "Services",
+			retail: "Retail",
+			hospitality: "Hospitality",
+			construction: "Construction",
+			other: "Other"
+		},
+		balance: {
+			title: "Client balance",
+			send: "Balance",
+			deposit: "Deposit / paid"
+		},
+		docs: {
+			synced: "Synced",
+			pending: "Pending",
+			error: "Error",
+			recordPayment: "Record payment",
+			amount: "Amount",
+			date: "Date",
+			method: "Payment method (optional)",
+			methodCash: "Cash",
+			methodBank: "Bank",
+			note: "Note (optional)",
+			remaining: "Remaining",
+			paidAmount: "Paid",
+			statusPartial: "Partially paid",
+			payPartial: "Pay partially",
+			statusDraft: "Draft",
+			statusCancelled: "Cancelled",
+			overdue: "Overdue",
+			overdueDays: "{days} days overdue",
+			reminder: "Client reminder",
+			reminderHello: "Hello,",
+			reminderBody: "Invoice {number} was due on {due}. Remaining amount is {amount}. It is {days} days overdue.",
+			reminderThanks: "Thank you.",
+			copy: "Copy",
+			copied: "Copied",
+			share: "Share",
+			saveDraft: "Save",
+			sent: "Sent",
+			notSent: "Not sent",
+			issue: "Issue invoice",
+			issued: "Issued",
+			draft: "Draft",
+			cancelInvoice: "Cancel invoice",
+			cancelReason: "Cancellation reason",
+			correct: "Correct amounts",
+			correctReason: "Correction reason",
+			voidPayment: "Correct payment",
+			voidReason: "Correction reason",
+			clients: "Clients",
+			pickClient: "Choose a client",
+			addClient: "Add client",
+			email: "Email",
+			businessId: "Business ID",
+			similarClient: "A client with the same name and phone/email already exists. They were not merged.",
+			backup: "Backup",
+			backupExport: "Download backup",
+			backupRestore: "Restore from file",
+			backupConfirm: "This replaces invoices, obligations, clients and profile for this account. Type RESTORE to confirm.",
+			backupOk: "Restore finished. Verify the file checksum.",
+			checksum: "Checksum",
+			snapshotMigrated: "Company details on this invoice were copied during migration and are not a verified issue-time snapshot.",
+			amountDue: "Amount due",
+			amountPaid: "Paid",
+			paymentHistory: "Payment history",
+			voided: "Corrected",
+			newClient: "New client"
+		},
+		invoiceList: {
+			status: "Status",
+			selectAll: "Select all unpaid",
+			selectOne: "Select invoice {number}",
+			selectedCount: "{count} selected",
+			clearSelection: "Clear selection",
+			markPaid: "Mark as paid",
+			markPaidBody: "{count} invoices, {total} in total, will be marked as paid in full.",
+			markPaidConfirm: "Mark {count} as paid",
+			markPaidUndo: "To undo one invoice, click the “Paid” badge on its row.",
+			paymentDate: "Payment date",
+			paymentDateInvoice: "Each invoice’s own date",
+			paymentDateInvoiceHint: "For older invoices, when the exact payment day is not known.",
+			paymentDateToday: "Today",
+			year: "Year",
+			allYears: "All years",
+			title: "Invoices",
+			subtitle: "All of your invoices in one place.",
+			emptyTitle: "No invoices yet",
+			empty: "Create the first one — client, line items and PDF on a single screen.",
+			itemsCount: "{count} items",
+			deleteConfirm: "Delete this invoice? This cannot be undone.",
+			search: "Search by number or client",
+			client: "Client",
+			amount: "Amount",
+			billed: "Billed total",
+			countLabel: "{count} invoices",
+			view: "Open",
+			filterAll: "All",
+			filterUnpaid: "Unpaid",
+			filterPaid: "Paid",
+			filterOverdue: "Overdue",
+			due: "Due",
+			statusPaid: "Paid",
+			statusUnpaid: "Unpaid",
+			usageBanner: "{used} of {limit} invoices this month",
+			usageUnlimited: "Premium — unlimited invoices",
+			upgrade: "Subscribe",
+			unpaidTotal: "Unpaid",
+			paidTotal: "Paid",
+			tapToMarkPaid: "Tap to mark as paid",
+			limitReached: "Monthly limit",
+			sendList: "Send list",
+			sendUnpaid: "Send unpaid list",
+			sendPaid: "Send paid list",
+			sendAllTitle: "Invoices",
+			sendUnpaidTitle: "Unpaid invoices",
+			sendPaidTitle: "Paid invoices"
+		},
+		newInvoice: {
+			title: "New invoice",
+			editTitle: "Edit invoice",
+			modeManual: "Manual",
+			modeAi: "AI",
+			clientSectionTitle: "Client details",
+			fullName: "Full name",
+			address: "Address",
+			phone: "Phone",
+			aiInputLabel: "Paste text or upload a photo (client, items, quantity, price)",
+			aiInputPlaceholder: "e.g. Almedina Sadiku, 7 Arrowhead Dr, Milford CT 06460 USA, +8603029000",
+			aiExtractButton: "Extract with AI",
+			aiUploadPhoto: "Upload photo",
+			aiTakePhoto: "Take photo",
+			aiChoosePhoto: "From gallery",
+			aiExtracting: "Analyzing...",
+			aiExtractError: "Could not extract the details.",
+			aiFilledCollapsed: "Details loaded. Tap to edit.",
+			phFullName: "e.g. Client name",
+			phAddress: "e.g. Street, city",
+			phPhone: "e.g. +383 00 000 000",
+			phItemDescription: "e.g. Service or product",
+			invoiceDetailsSectionTitle: "Invoice details",
+			invoiceNumber: "Invoice number",
+			date: "Date",
+			dueDate: "Due date",
+			phDueDate: "e.g. SEP 17, 2026",
+			recentClients: "Previous clients",
+			pickClient: "Choose a client",
+			limitReached: "You have used the 10 free invoices for this month. Upgrade to Premium to continue.",
+			duplicate: "Duplicate",
+			itemsSectionTitle: "Line items",
+			itemDescription: "Description",
+			itemQuantity: "Qty",
+			itemUnitPrice: "Unit price",
+			itemTotal: "Amount",
+			addItem: "Add item",
+			discount: "Discount",
+			notes: "Notes (optional)",
+			showDiscount: "Discount",
+			showNotes: "Notes",
+			subtotal: "Subtotal",
+			total: "Total",
+			saveAndShare: "Save and share",
+			saveChanges: "Save changes",
+			selectClient: "Select",
+			searchClients: "Search clients",
+			taxRate: "VAT (%)",
+			taxNone: "No VAT",
+			taxFromClient: "From this client’s setting. You can change it for this invoice.",
+			pricesIncludeTax: "Prices include VAT",
+			pricesIncludeTaxHint: "Type the final price; the subtotal without VAT is worked out for you.",
+			withTax: "incl. VAT",
+			tax: "VAT",
+			noMatchingClients: "No matching clients",
+			preview: "Preview",
+			previewTitle: "Invoice preview",
+			savedSuccess: "Invoice saved.",
+			updatedSuccess: "Invoice updated.",
+			validationClient: "Enter the client name before continuing.",
+			validationItems: "Add at least one item with a price."
+		},
+		invoiceDetail: {
+			title: "Invoice details",
+			downloadPdf: "Download PDF",
+			deleteInvoice: "Delete invoice",
+			issuedTo: "Issued to",
+			summary: "Summary",
+			markPaid: "Mark paid",
+			markUnpaid: "Mark unpaid",
+			duplicate: "Duplicate invoice"
+		},
+		statement: {
+			title: "Unpaid list",
+			subtitle: "Generate and send a list of unpaid invoices to a client.",
+			cta: "Send unpaid list",
+			banner: "You have unpaid invoices. Send the list to a client.",
+			empty: "There are no unpaid invoices to send.",
+			selectClient: "Choose a client",
+			invoicesLabel: "Unpaid invoices",
+			unpaidCount: "{count} unpaid invoices",
+			sendPdf: "Generate and send PDF",
+			preview: "Preview",
+			previewTitle: "Statement preview",
+			asOf: "Balance as of {date}"
+		},
+		overview: {
+			title: "Overview",
+			subtitle: "A summary of invoices, payments, and obligations for the selected period.",
+			exportPdf: "Export PDF",
+			thisMonth: "This month",
+			thisYear: "This year",
+			month: "Month",
+			year: "Year",
+			custom: "Range",
+			from: "From",
+			to: "To",
+			currency: "Currency",
+			invoiced: "Invoiced",
+			received: "Payments received",
+			obligationsRecorded: "Obligations recorded",
+			paidOut: "Payments made",
+			receivables: "Outstanding receivables",
+			payables: "Outstanding payables",
+			netPayments: "Net payments",
+			netHint: "Payments received minus payments made in the period. This is not profit or a bank balance.",
+			customers: "Customers with outstanding balances",
+			overdue: "Overdue obligations",
+			empty: "No records match this period and currency.",
+			tapHint: "Tap an amount to see the documents behind it.",
+			limitationTitle: "Data limitation",
+			limitationLegacy: "Some documents are marked paid without a payment date. Historical totals may be incomplete.",
+			limitationUndated: "Some payments have no date, so they are not included in period cash movement.",
+			limitationDates: "Some documents have no usable date and were skipped.",
+			limitationCancel: "Some cancellations have no date, so earlier periods may be affected.",
+			drillInvoiced: "Invoices issued",
+			drillReceived: "Payments received",
+			drillObligations: "Obligations recorded",
+			drillPaidOut: "Payments made",
+			drillReceivables: "Open invoices",
+			drillPayables: "Open obligations",
+			drillNet: "Net payments",
+			paymentOn: "Payment on {date}",
+			daysOverdue: "{days} days overdue",
+			noMatches: "No documents match this filter.",
+			pdfTitle: "Overview",
+			asOf: "As of {date}"
+		},
+		obligations: {
+			title: "To pay",
+			subtitle: "Rent, shipping, supplies, and other bills you owe — kept separate from invoices you issue.",
+			emptyTitle: "No bills yet",
+			empty: "Add the first one here — rent, shipping, or any vendor bill.",
+			search: "Search by vendor or invoice",
+			vendor: "Vendor",
+			description: "Description",
+			optionalNotes: "Optional notes",
+			phNotes: "e.g. month, invoice number",
+			relatedInvoice: "Linked invoice",
+			unpaidTotal: "Still due",
+			paidTotal: "Paid",
+			countLabel: "{count} bills",
+			vendorCount: "{count} entries",
+			stillDue: "still unpaid",
+			invoiceBanner: "You have open bills to vendors.",
+			allVendors: "All vendors",
+			newTitle: "New bill",
+			editTitle: "Edit bill",
+			formHint: "Enter the vendor, amount, and category. Notes, due date, and invoice link are optional.",
+			phVendor: "e.g. DHL",
+			phDescription: "e.g. March shipments, or tracking number",
+			phAmount: "e.g. 48.50",
+			addDueDate: "Due date",
+			clearDueDate: "Remove due date",
+			categoryLabel: "Category",
+			status: "Status",
+			noRelatedInvoice: "Not linked to an invoice",
+			validationVendor: "Enter the vendor name.",
+			validationAmount: "Enter an amount greater than 0.",
+			deleteConfirm: "Delete this bill? This cannot be undone.",
+			delete: "Delete bill",
+			sendPaid: "Send paid list",
+			sendPaidTitle: "Paid bills",
+			sendUnpaid: "Send unpaid list",
+			sendUnpaidTitle: "Unpaid bills",
+			sendList: "Send list",
+			sendAllTitle: "Bills",
+			proofTitle: "Payment proof",
+			proofHint: "Upload a PDF or photo from the transaction.",
+			proofAdd: "Add proof",
+			proofAttached: "Proof attached",
+			proofMissing: "No proof",
+			proofTooLarge: "The file is too large (max 4 MB).",
+			proofReplace: "Change proof",
+			category: {
+				shipping: "Shipping",
+				supplies: "Supplies",
+				rent: "Rent",
+				tax: "Tax",
+				other: "Other"
+			}
+		},
+		profile: {
+			title: "Settings",
+			companySectionTitle: "Company details",
+			companyHint: "These appear on every invoice. Replace them with your own details.",
+			companyName: "Company name",
+			contactPerson: "Contact person",
+			nui: "Unique identification number (NUI)",
+			streetAddress: "Address",
+			state: "State / region",
+			zipCode: "Postal code",
+			email: "Email",
+			phone: "Phone",
+			currency: "Currency",
+			phCompanyName: "Your company (sample)",
+			phContactPerson: "Your name (sample)",
+			phNui: "000000000",
+			phStreetAddress: "Example street, no. 1",
+			phState: "Kosovo",
+			phZipCode: "10000",
+			phEmail: "email@example.com",
+			phPhone: "+383 00 000 000",
+			phCurrency: "EUR",
+			bankName: "Bank",
+			iban: "IBAN",
+			phBankName: "e.g. TEB, Raiffeisen",
+			phIban: "e.g. XK05 ...",
+			paymentHint: "These appear at the bottom of every invoice so the client knows where to pay.",
+			exportNote: "Export note (PDF)",
+			phExportNote: "Eksport ne bazë te Ligjit (05-L-037 Neni 33)",
+			exportNoteHint: "Shown under “Thank you” on the PDF. Clear the text to hide it, or edit it.",
+			importSectionTitle: "Import from a sample invoice",
+			importDescription: "Upload an invoice (PDF or image) and AI will extract your company details.",
+			importButton: "Upload sample invoice",
+			importing: "Analyzing invoice...",
+			importSuccess: "Details filled in. Please review before saving.",
+			importError: "Could not extract data from the invoice.",
+			languageSectionTitle: "Language",
+			languageHint: "Choose the app language. Your choice is saved to your account.",
+			languageSq: "Shqip",
+			languageEn: "English",
+			languageIt: "Italiano",
+			saveSuccess: "Settings saved.",
+			account: "Account",
+			workspaceHint: "Language and company details appear on every invoice.",
+			subtitle: "Business details, invoice design and your account.",
+			sectionBrand: "Logo",
+			logoHint: "PNG or JPG. Shown at the top of every invoice.",
+			upload: "Upload",
+			change: "Change",
+			remove: "Remove",
+			imageError: "That file is not a valid image.",
+			sectionBusiness: "Business",
+			businessHint: "Legal name and registration numbers, as printed on the invoice.",
+			vatNumber: "VAT number",
+			phVatNumber: "e.g. 330000000",
+			sectionContact: "Address and contact",
+			contactHint: "Where the business is and how clients reach you.",
+			website: "Website",
+			phWebsite: "e.g. company.com",
+			sectionPayment: "Payment",
+			swift: "SWIFT / BIC",
+			phSwift: "e.g. MBKOXKPR",
+			sectionInvoice: "Invoice design",
+			invoiceHint: "The template and colour apply to every PDF you download or send.",
+			templateLabel: "Template",
+			templateClassic: "Classic",
+			templateClassicDesc: "Familiar and clear, with a colour rule on top.",
+			templateCorporate: "Corporate",
+			templateCorporateDesc: "Coloured header, full grid and a payment box.",
+			templateMinimal: "Minimal",
+			templateMinimalDesc: "Clean, with lots of space and few lines.",
+			templateSelected: "Selected",
+			templatePreview: "View full size",
+			accent: "Colour",
+			accentDefault: "Template colour",
+			sectionSignature: "Signature and stamp",
+			signatureHint: "Optional. Printed at the bottom of the invoice, in the signature area.",
+			signature: "Signature",
+			stamp: "Stamp",
+			sectionData: "Data",
+			defaultTaxRate: "Default VAT (%)",
+			defaultTaxRateHint: "Pre-filled on every new invoice; you can change it per invoice.",
+			backupHint: "Download a copy of all your data, or restore it from a file.",
+			unsaved: "You have unsaved changes.",
+			discard: "Discard",
+			invalidEmail: "That email address is not valid.",
+			sampleClient: "Sample Client LLC",
+			sampleAddress: "10 Example St, Prishtina",
+			sampleLine1: "Software development (hours)",
+			sampleLine2: "Monthly maintenance",
+			sampleLine3: "Consulting"
+		},
+		send: {
+			action: "Send",
+			title: "Send invoice {number}",
+			to: "To",
+			toPlaceholder: "email@client.com",
+			subject: "Subject",
+			message: "Message",
+			messageLanguage: "Message language",
+			defaultSubject: "Invoice {number} from {company}",
+			defaultBody: "Hello,\n\nPlease find invoice {number} dated {date}, for {total}.\nPayment due: {due}.\n\nYou can view and download the invoice here:\n{link}\n{payment}\nThank you,\n{sender}",
+			paymentLine: "Payment details: {details}",
+			link: "Invoice link",
+			linkHint: "The client opens the invoice from this link and downloads it as a PDF, no account needed. Anyone with the link can see it.",
+			preparing: "Preparing the link...",
+			copyLink: "Copy link",
+			copied: "Copied",
+			openMail: "Open in email",
+			openGmail: "Open in Gmail",
+			copyMessage: "Copy message",
+			downloadPdf: "Download PDF",
+			howTo: "The email opens with the recipient, subject and message filled in; you only press Send.",
+			markSent: "Mark as sent",
+			markUnsent: "Mark as not sent",
+			sentOn: "Sent on {date}",
+			sentNoDate: "Marked as sent",
+			notSentYet: "Not sent yet",
+			draftNote: "This invoice is still a draft. It has to be issued before sending; after that its number and amounts are no longer freely editable.",
+			issueAndPrepare: "Issue the invoice and prepare the email",
+			from: "From",
+			cc: "Copy (Cc)",
+			ccPlaceholder: "optional",
+			recipientsHint: "Separate several addresses with commas.",
+			attachPdf: "Attach the invoice as a PDF",
+			sendNow: "Send email",
+			sending: "Sending...",
+			sentOk: "The email was sent to {to}.",
+			emailedTo: "Emailed to {to}",
+			otherWays: "Or send it yourself",
+			connectTitle: "Send it straight from the app",
+			connectHint: "Connect the company email in Settings and the invoice goes out from here in one click, with the PDF attached.",
+			connectAction: "Connect email",
+			invalidTo: "Enter a valid email address.",
+			viewInvoice: "View invoice",
+			publicInvalid: "This invoice link is not valid.",
+			publicDownload: "Download / Print",
+			publicFrom: "Invoice from {company}"
+		},
+		mail: {
+			title: "Sending invoices by email",
+			hint: "Connect the company mailbox. Invoices are sent straight from the app, with your address as the sender and the PDF attached.",
+			connected: "Connected",
+			notConnected: "Not connected",
+			provider: "Email service",
+			providerGoogle: "Google Workspace / Gmail",
+			providerGoogleRelay: "Google SMTP relay",
+			providerMicrosoft: "Microsoft 365",
+			providerOther: "Other",
+			host: "SMTP server",
+			port: "Port",
+			user: "Mailbox (email)",
+			password: "App password",
+			passwordSaved: "Saved. Type only to replace it.",
+			passwordHelp: "Google does not take the normal password here but a 16-letter \"app password\". It is created in the Google account once 2-Step Verification is on. Here it is stored encrypted and never shown again.",
+			passwordHelpOther: "The password is stored encrypted and never shown again.",
+			passwordLink: "Create the password at Google",
+			senders: "Addresses that send invoices",
+			sendersHint: "The account address, {email}, is always on the list and is picked first. Add the other company addresses that should appear under \"From\".",
+			aliasNote: "Gmail accepts as sender only the connected mailbox and its aliases (\"Send mail as\"); any other address is replaced with the connected mailbox. With Google SMTP relay any address of the domain can send.",
+			senderName: "Display name",
+			senderEmail: "Address",
+			addSender: "Add address",
+			removeSender: "Remove address",
+			save: "Save connection",
+			saved: "Connection saved.",
+			test: "Send test email",
+			testing: "Testing...",
+			testOk: "The test email was sent to {to}. Check the inbox.",
+			testSubject: "Test from Next Invoice",
+			testBody: "This is a test email.\n\nThe email connection for sending invoices works.",
+			disconnect: "Disconnect",
+			disconnected: "Email disconnected.",
+			errAuth: "The mailbox or its app password was not accepted.",
+			errConnect: "Could not reach the mail server. Check the server and the port.",
+			errRejected: "The mail server refused the message.",
+			errSender: "This address is not on the list of senders.",
+			errRecipient: "Enter at least one valid recipient address (up to 5).",
+			errContent: "The email needs a subject and a message.",
+			errLimit: "The daily email limit has been reached. Try again tomorrow.",
+			errPdf: "The PDF could not be created. Try again or send without the attachment.",
+			errNotConfigured: "The company email is not connected yet.",
+			errHost: "This SMTP server or port is not allowed. Allowed ports: 587, 465, 2525.",
+			errIncomplete: "Enter the server, the mailbox and the password.",
+			errGeneric: "The email was not sent."
+		},
+		importer: {
+			button: "Import from Excel",
+			title: "Import invoices from Excel",
+			intro: "Upload the .xlsx file with your invoices. Nothing is saved until you confirm.",
+			choose: "Choose .xlsx file",
+			chooseAnother: "Choose another file",
+			reading: "Reading the file...",
+			formats: "The invoice, invoice-line and customer sheets are read. Columns are found by their titles, e.g. Invoice #, Company, Invoice Date, Tax Rate, Description, Qty, Unit price.",
+			notXlsx: "That is not a valid Excel (.xlsx) file.",
+			noSheet: "No sheet with invoices was found. It needs at least an invoice number and an invoice date column.",
+			sheets: "Sheets read",
+			toImport: "To import",
+			existing: "Already here",
+			newClients: "Clients",
+			total: "Value incl. VAT",
+			period: "Period",
+			existingNote: "{count} invoices have a number that already exists and will be skipped.",
+			problems: "{count} rows cannot be imported",
+			reasonDate: "date missing or unreadable",
+			reasonClient: "client missing",
+			reasonItems: "no lines and no amount",
+			reasonDuplicate: "number repeated in the file",
+			warnings: "{count} invoices need a look",
+			warnTotalMismatch: "computed total differs from the one in Excel",
+			warnOther: "the value in the “Other” column is not imported",
+			warnNoLines: "no lines: one line was created with the invoice amount",
+			warnUnknownClient: "client is not on the customers sheet",
+			pickHint: "Untick the invoices you do not want to import, e.g. cancelled ones.",
+			search: "Search by number or client",
+			selectAll: "Select all",
+			selectOne: "Import invoice {number}",
+			remove: "Remove",
+			restore: "Restore",
+			removeFlagged: "Remove all",
+			restoreFlagged: "Restore all",
+			removed: "{count} invoices were removed from the import.",
+			restoreAll: "Restore all",
+			noMatch: "No invoice matches the search.",
+			markPaid: "Mark all as paid",
+			markPaidHint: "Leave unticked if you will record payments later, one by one.",
+			otherClients: "Also import the file’s other {count} customers",
+			colNumber: "No.",
+			colClient: "Client",
+			colDate: "Date",
+			colLines: "Lines",
+			colTax: "VAT",
+			colTotal: "Total",
+			more: "and {count} more",
+			confirm: "Import {count} invoices",
+			importing: "Importing...",
+			nothing: "Every invoice in this file already exists.",
+			done: "Import finished",
+			doneSummary: "{created} invoices and {clients} clients were added.",
+			doneSkipped: "{count} were skipped.",
+			limit: "The free plan allows 10 invoices a month. Upgrade to Premium to import this file."
+		},
+		pdf: {
+			invoiceLabel: "Invoice",
+			dateLabel: "Date",
+			clientLabel: "Client",
+			nuiLabel: "NUI",
+			description: "Description",
+			quantity: "Qty",
+			unit: "Unit",
+			sum: "Amount",
+			subtotal: "Subtotal",
+			discount: "Discount",
+			total: "Total",
+			issuedBy: "Issued by",
+			receivedBy: "Received by",
+			thankYou: "Thank you!",
+			dueDateLabel: "Due",
+			onReceipt: "On receipt",
+			paymentInfo: "Payment",
+			bankName: "Bank",
+			ibanLabel: "IBAN",
+			fullNameLabel: "Full Name",
+			addressLabel: "Address",
+			phoneLabel: "Phone No",
+			statementTitle: "UNPAID INVOICES",
+			billedTo: "BILLED TO",
+			order: "ORDER",
+			patientService: "PATIENT / SERVICE",
+			unitPrice: "UNIT PRICE",
+			qty: "QTY",
+			ordersTotal: "ORDERS TOTAL",
+			paymentsTotal: "PAYMENTS",
+			balanceDue: "BALANCE DUE",
+			pivaLabel: "VAT / p.IVA",
+			vatLabel: "VAT Number",
+			swiftLabel: "SWIFT (BIC)",
+			beneficiary: "Beneficiary",
+			signature: "Signature",
+			paymentDetails: "Payment details",
+			vat: "VAT",
+			fiscalLabel: "Fiscal Number"
+		},
+		billing: {
+			title: "Plans",
+			subtitle: "Start free. Upgrade to Premium when you need more invoices.",
+			freeName: "Free",
+			freeLimit: "Up to 10 invoices per month",
+			freeHint: "10 invoices a month are free. Subscribe for unlimited invoices.",
+			premiumName: "Premium",
+			premiumLimit: "Unlimited invoices",
+			premiumPrice: "€20 / month",
+			premiumHint: "No monthly cap. Same app, no interruptions.",
+			current: "Current plan",
+			cta: "Start Premium — €20/month",
+			ctaStripe: "Pay with card — €20/month",
+			alreadyPremium: "You are on Premium.",
+			manage: "Manage subscription",
+			success: "Payment confirmed. You are on Premium.",
+			canceled: "Checkout was canceled.",
+			confirming: "Confirming payment...",
+			stripeNote: "Secure checkout via Stripe. Cancel anytime from the billing portal.",
+			stripeMissing: "Stripe is not configured on the server."
+		}
+	},
+	it: {
+		nav: {
+			invoices: "Fatture",
+			obligations: "Obblighi",
+			overview: "Panoramica",
+			newInvoice: "Nuova fattura",
+			newObligation: "Nuovo pagamento",
+			profile: "Impostazioni",
+			more: "Altro",
+			login: "Accedi",
+			signup: "Registrati",
+			logout: "Esci",
+			openApp: "Apri l’app",
+			workspace: "Area di lavoro",
+			menu: "Menu",
+			clients: "Clienti",
+			items: "Articoli",
+			groupCatalog: "Catalogo",
+			groupAccount: "Account",
+			subscribe: "Abbonati"
+		},
+		auth: {
+			language: "Lingua",
+			tagline: "Fatture professionali, direttamente dal web.",
+			loginTitle: "Accedi al tuo account",
+			signupTitle: "Crea un account",
+			email: "Email",
+			password: "Password",
+			confirmPassword: "Conferma password",
+			loginCta: "Accedi",
+			signupCta: "Crea account",
+			noAccount: "Non hai un account?",
+			hasAccount: "Hai già un account?",
+			passwordHint: "Almeno 8 caratteri.",
+			mismatch: "Le password non coincidono.",
+			forgotLink: "Password dimenticata?",
+			forgotTitle: "Reimposta la password",
+			forgotHint: "Inserisci l’email e ti invieremo un link per la nuova password.",
+			forgotCta: "Invia il link",
+			forgotSent: "Se esiste un account con questa email, abbiamo inviato il link.",
+			resetTitle: "Scegli una nuova password",
+			resetCta: "Salva la nuova password",
+			resetSuccess: "Password aggiornata. Ora puoi accedere.",
+			resetInvalid: "Questo link non è valido o è scaduto.",
+			unknownEmail: "Nessun account con questa email. Creane uno.",
+			wrongPassword: "Password errata.",
+			emailTaken: "Esiste già un account con questa email. Accedi o reimposta la password.",
+			backToLogin: "Torna all’accesso",
+			newPassword: "Nuova password",
+			mailNotConfigured: "Il reset via email non è ancora configurato. Prova ad accedere con la password usata."
+		},
+		common: {
+			save: "Salva",
+			cancel: "Annulla",
+			delete: "Elimina",
+			edit: "Modifica",
+			loading: "Caricamento...",
+			error: "Errore",
+			success: "Operazione riuscita",
+			close: "Chiudi",
+			back: "Indietro",
+			search: "Cerca",
+			send: "Invia",
+			optional: "opzionale",
+			noResults: "Nessun risultato per questa ricerca."
+		},
+		more: {
+			title: "Altro",
+			clients: "Clienti",
+			items: "Articoli"
+		},
+		clients: {
+			title: "Clienti",
+			add: "Nuovo cliente",
+			edit: "Modifica cliente",
+			empty: "Nessun cliente.",
+			bio: "Dati del cliente",
+			firstName: "Nome",
+			lastName: "Cognome",
+			notes: "Note aggiuntive",
+			vatNumber: "Partita IVA",
+			fiscalNumber: "Codice fiscale",
+			taxTitle: "IVA per questo cliente",
+			taxCompany: "Aliquota aziendale",
+			taxNone: "Senza IVA",
+			taxCustom: "Altro",
+			taxHint: "Le nuove fatture per questo cliente partono da questa aliquota. Scegli “Senza IVA” per l’export. Puoi cambiarla in ogni fattura.",
+			measurements: "Misure del corpo",
+			addPhoto: "Foto",
+			saveAndInvoice: "Salva e continua con la fattura",
+			validationName: "Il nome completo è obbligatorio.",
+			validationPhone: "Telefono obbligatorio.",
+			deleteTitle: "Elimina cliente",
+			deleteMessage: "Il cliente verrà rimosso.",
+			measure: {
+				chest: "Petto",
+				waist: "Vita",
+				hips: "Fianchi",
+				shoulders: "Spalle",
+				height: "Altezza"
+			}
+		},
+		items: {
+			title: "Articoli",
+			add: "Nuovo articolo",
+			edit: "Modifica articolo",
+			empty: "Nessun articolo.",
+			untitled: "Senza nome",
+			description: "Descrizione",
+			phDescription: "Nome articolo",
+			unitCost: "Costo unitario",
+			unitLabel: "Unità",
+			unit: {
+				pcs: "pz",
+				hours: "ore",
+				days: "giorni",
+				m: "m",
+				kg: "kg"
+			},
+			taxable: "Tassabile",
+			additionalDetails: "Dettagli aggiuntivi",
+			phAdditional: "Note",
+			validationDescription: "Descrizione obbligatoria.",
+			deleteTitle: "Elimina articolo",
+			deleteMessage: "L’articolo verrà rimosso.",
+			pick: "Dal catalogo"
+		},
+		industry: {
+			label: "Settore",
+			fashion: "Moda",
+			services: "Servizi",
+			retail: "Commercio",
+			hospitality: "Ospitalità",
+			construction: "Edilizia",
+			other: "Altro"
+		},
+		balance: {
+			title: "Saldo cliente",
+			send: "Saldo",
+			deposit: "Acconto / pagato"
+		},
+		docs: {
+			synced: "Sincronizzato",
+			pending: "In attesa",
+			error: "Errore",
+			recordPayment: "Registra pagamento",
+			amount: "Importo",
+			date: "Data",
+			method: "Metodo di pagamento (facoltativo)",
+			methodCash: "Contanti",
+			methodBank: "Banca",
+			note: "Nota (facoltativa)",
+			remaining: "Residuo",
+			paidAmount: "Pagato",
+			statusPartial: "Parzialmente pagata",
+			payPartial: "Paga parziale",
+			statusDraft: "Bozza",
+			statusCancelled: "Annullata",
+			overdue: "Scadute",
+			overdueDays: "{days} giorni di ritardo",
+			reminder: "Promemoria per il cliente",
+			reminderHello: "Buongiorno,",
+			reminderBody: "La fattura {number} scadeva il {due}. Importo residuo {amount}. È in ritardo di {days} giorni.",
+			reminderThanks: "Grazie.",
+			copy: "Copia",
+			copied: "Copiato",
+			share: "Condividi",
+			saveDraft: "Salva",
+			sent: "Inviata",
+			notSent: "Non inviata",
+			issue: "Emetti fattura",
+			issued: "Emessa",
+			draft: "Bozza",
+			cancelInvoice: "Annulla fattura",
+			cancelReason: "Motivo dell’annullamento",
+			correct: "Correggi importi",
+			correctReason: "Motivo della correzione",
+			voidPayment: "Correggi pagamento",
+			voidReason: "Motivo della correzione",
+			clients: "Clienti",
+			pickClient: "Scegli un cliente",
+			addClient: "Aggiungi cliente",
+			email: "Email",
+			businessId: "Identificativo aziendale",
+			similarClient: "Esiste già un cliente con lo stesso nome e telefono/email. Non sono stati uniti.",
+			backup: "Backup",
+			backupExport: "Scarica backup",
+			backupRestore: "Ripristina da file",
+			backupConfirm: "Questo sostituisce fatture, obblighi, clienti e profilo di questo account. Digita RESTORE per confermare.",
+			backupOk: "Ripristino completato. Verifica il checksum del file.",
+			checksum: "Checksum",
+			snapshotMigrated: "I dati aziendali di questa fattura sono stati copiati durante la migrazione e non sono uno snapshot verificato.",
+			amountDue: "Da pagare",
+			amountPaid: "Pagato",
+			paymentHistory: "Storico pagamenti",
+			voided: "Corretto",
+			newClient: "Nuovo cliente"
+		},
+		invoiceList: {
+			status: "Stato",
+			selectAll: "Seleziona tutte le non pagate",
+			selectOne: "Seleziona la fattura {number}",
+			selectedCount: "{count} selezionate",
+			clearSelection: "Deseleziona",
+			markPaid: "Segna come pagate",
+			markPaidBody: "{count} fatture, per un totale di {total}, verranno segnate come pagate per intero.",
+			markPaidConfirm: "Segna {count} come pagate",
+			markPaidUndo: "Per annullare una fattura, clicca sull’etichetta “Pagata” nella sua riga.",
+			paymentDate: "Data del pagamento",
+			paymentDateInvoice: "La data di ciascuna fattura",
+			paymentDateInvoiceHint: "Per fatture vecchie, quando il giorno esatto del pagamento non è noto.",
+			paymentDateToday: "Oggi",
+			year: "Anno",
+			allYears: "Tutti gli anni",
+			title: "Fatture",
+			subtitle: "Tutte le tue fatture in un unico posto.",
+			emptyTitle: "Nessuna fattura",
+			empty: "Crea la prima: cliente, voci e PDF nella stessa schermata.",
+			itemsCount: "{count} voci",
+			deleteConfirm: "Eliminare questa fattura? L’operazione non può essere annullata.",
+			search: "Cerca per numero o cliente",
+			client: "Cliente",
+			amount: "Importo",
+			billed: "Totale fatturato",
+			countLabel: "{count} fatture",
+			view: "Apri",
+			filterAll: "Tutte",
+			filterUnpaid: "Da pagare",
+			filterPaid: "Pagate",
+			filterOverdue: "Scadute",
+			due: "Scadenza",
+			statusPaid: "Pagata",
+			statusUnpaid: "Da pagare",
+			usageBanner: "{used} di {limit} fatture questo mese",
+			usageUnlimited: "Premium — fatture illimitate",
+			upgrade: "Abbonati",
+			unpaidTotal: "Da pagare",
+			paidTotal: "Pagato",
+			tapToMarkPaid: "Tocca per segnare come pagata",
+			limitReached: "Limite mensile",
+			sendList: "Invia elenco",
+			sendUnpaid: "Invia non pagate",
+			sendPaid: "Invia pagate",
+			sendAllTitle: "Fatture",
+			sendUnpaidTitle: "Fatture non pagate",
+			sendPaidTitle: "Fatture pagate"
+		},
+		newInvoice: {
+			title: "Nuova fattura",
+			editTitle: "Modifica fattura",
+			modeManual: "Manuale",
+			modeAi: "AI",
+			clientSectionTitle: "Dati del cliente",
+			fullName: "Nome e cognome",
+			address: "Indirizzo",
+			phone: "Telefono",
+			aiInputLabel: "Incolla il testo o carica una foto (cliente, articoli, quantità, prezzo)",
+			aiInputPlaceholder: "es. Almedina Sadiku, 7 Arrowhead Dr, Milford CT 06460 USA, +8603029000",
+			aiExtractButton: "Estrai con AI",
+			aiUploadPhoto: "Carica foto",
+			aiTakePhoto: "Scatta foto",
+			aiChoosePhoto: "Dalla galleria",
+			aiExtracting: "Analisi in corso...",
+			aiExtractError: "Impossibile estrarre i dati.",
+			aiFilledCollapsed: "Dati caricati. Tocca per modificare.",
+			phFullName: "es. Nome del cliente",
+			phAddress: "es. Via, città",
+			phPhone: "es. +383 00 000 000",
+			phItemDescription: "es. Servizio o prodotto",
+			invoiceDetailsSectionTitle: "Dettagli fattura",
+			invoiceNumber: "Numero fattura",
+			date: "Data",
+			dueDate: "Scadenza",
+			phDueDate: "es. SEP 17, 2026",
+			recentClients: "Clienti precedenti",
+			pickClient: "Scegli un cliente",
+			limitReached: "Hai usato le 10 fatture gratuite di questo mese. Passa a Premium per continuare.",
+			duplicate: "Duplica",
+			itemsSectionTitle: "Voci",
+			itemDescription: "Descrizione",
+			itemQuantity: "Qtà",
+			itemUnitPrice: "Prezzo unitario",
+			itemTotal: "Importo",
+			addItem: "Aggiungi voce",
+			discount: "Sconto",
+			notes: "Note (facoltative)",
+			showDiscount: "Sconto",
+			showNotes: "Note",
+			subtotal: "Imponibile",
+			total: "Totale",
+			saveAndShare: "Salva e condividi",
+			saveChanges: "Salva modifiche",
+			selectClient: "Scegli",
+			searchClients: "Cerca cliente",
+			taxRate: "IVA (%)",
+			taxNone: "Senza IVA",
+			taxFromClient: "Dall’impostazione di questo cliente. Puoi cambiarla per questa fattura.",
+			pricesIncludeTax: "I prezzi includono l’IVA",
+			pricesIncludeTaxHint: "Scrivi il prezzo finale; l’imponibile senza IVA viene calcolato da solo.",
+			withTax: "IVA inclusa",
+			tax: "IVA",
+			noMatchingClients: "Nessun cliente trovato",
+			preview: "Anteprima",
+			previewTitle: "Anteprima fattura",
+			savedSuccess: "Fattura salvata.",
+			updatedSuccess: "Fattura aggiornata.",
+			validationClient: "Inserisci il nome del cliente prima di continuare.",
+			validationItems: "Aggiungi almeno una voce con un prezzo."
+		},
+		invoiceDetail: {
+			title: "Dettagli fattura",
+			downloadPdf: "Scarica PDF",
+			deleteInvoice: "Elimina fattura",
+			issuedTo: "Intestata a",
+			summary: "Riepilogo",
+			markPaid: "Segna come pagata",
+			markUnpaid: "Segna come da pagare",
+			duplicate: "Duplica fattura"
+		},
+		statement: {
+			title: "Elenco da pagare",
+			subtitle: "Genera e invia l’elenco delle fatture non pagate a un cliente.",
+			cta: "Invia elenco",
+			banner: "Hai fatture non pagate. Invia l’elenco al cliente.",
+			empty: "Non ci sono fatture non pagate da inviare.",
+			selectClient: "Scegli un cliente",
+			invoicesLabel: "Fatture non pagate",
+			unpaidCount: "{count} fatture non pagate",
+			sendPdf: "Genera e invia PDF",
+			preview: "Anteprima",
+			previewTitle: "Anteprima elenco",
+			asOf: "Saldo al {date}"
+		},
+		overview: {
+			title: "Panoramica",
+			subtitle: "Riepilogo di fatture, pagamenti e obblighi per il periodo selezionato.",
+			exportPdf: "Esporta PDF",
+			thisMonth: "Questo mese",
+			thisYear: "Quest’anno",
+			month: "Mese",
+			year: "Anno",
+			custom: "Intervallo",
+			from: "Da",
+			to: "A",
+			currency: "Valuta",
+			invoiced: "Fatturato",
+			received: "Pagamenti ricevuti",
+			obligationsRecorded: "Obblighi registrati",
+			paidOut: "Pagamenti effettuati",
+			receivables: "Crediti aperti",
+			payables: "Debiti aperti",
+			netPayments: "Pagamenti netti",
+			netHint: "Pagamenti ricevuti meno pagamenti effettuati nel periodo. Non è un utile né un saldo bancario.",
+			customers: "Clienti con saldo aperto",
+			overdue: "Obblighi in ritardo",
+			empty: "Nessun dato per questo periodo e valuta.",
+			tapHint: "Tocca un importo per vedere i documenti.",
+			limitationTitle: "Limite dei dati",
+			limitationLegacy: "Alcuni documenti risultano pagati senza data di pagamento. I totali storici possono essere incompleti.",
+			limitationUndated: "Alcuni pagamenti non hanno data e non sono inclusi nei movimenti del periodo.",
+			limitationDates: "Alcuni documenti non hanno una data valida e sono stati esclusi.",
+			limitationCancel: "Alcune cancellazioni non hanno data e possono influire sui periodi precedenti.",
+			drillInvoiced: "Fatture emesse",
+			drillReceived: "Pagamenti ricevuti",
+			drillObligations: "Obblighi registrati",
+			drillPaidOut: "Pagamenti effettuati",
+			drillReceivables: "Fatture aperte",
+			drillPayables: "Obblighi aperti",
+			drillNet: "Pagamenti netti",
+			paymentOn: "Pagamento il {date}",
+			daysOverdue: "{days} giorni di ritardo",
+			noMatches: "Nessun documento corrisponde a questo filtro.",
+			pdfTitle: "Panoramica",
+			asOf: "Al {date}"
+		},
+		obligations: {
+			title: "Da pagare",
+			subtitle: "Affitto, trasporto, materiali e altri pagamenti ai fornitori — separati dalle fatture che emetti.",
+			emptyTitle: "Nessun pagamento",
+			empty: "Aggiungi il primo qui — affitto, trasporto o qualsiasi pagamento ai fornitori.",
+			search: "Cerca per fornitore o fattura",
+			vendor: "Fornitore",
+			description: "Descrizione",
+			optionalNotes: "Note opzionali",
+			phNotes: "es. mese, numero fattura",
+			relatedInvoice: "Fattura collegata",
+			unpaidTotal: "Da pagare",
+			paidTotal: "Pagato",
+			countLabel: "{count} pagamenti",
+			vendorCount: "{count} voci",
+			stillDue: "ancora da pagare",
+			invoiceBanner: "Hai pagamenti aperti verso i fornitori.",
+			allVendors: "Tutti i fornitori",
+			newTitle: "Nuovo pagamento",
+			editTitle: "Modifica pagamento",
+			formHint: "Inserisci fornitore, importo e categoria. Note, scadenza e fattura sono opzionali.",
+			phVendor: "es. DHL",
+			phDescription: "es. Spedizioni di marzo, o numero di tracking",
+			phAmount: "es. 48.50",
+			addDueDate: "Scadenza",
+			clearDueDate: "Rimuovi scadenza",
+			categoryLabel: "Categoria",
+			status: "Stato",
+			noRelatedInvoice: "Non collegata a una fattura",
+			validationVendor: "Inserisci il nome del fornitore.",
+			validationAmount: "Inserisci un importo maggiore di 0.",
+			deleteConfirm: "Eliminare questo pagamento? L’operazione non può essere annullata.",
+			delete: "Elimina pagamento",
+			sendPaid: "Invia pagati",
+			sendPaidTitle: "Pagamenti effettuati",
+			sendUnpaid: "Invia da pagare",
+			sendUnpaidTitle: "Pagamenti da saldare",
+			sendList: "Invia elenco",
+			sendAllTitle: "Pagamenti",
+			proofTitle: "Prova di pagamento",
+			proofHint: "Carica un PDF o una foto della transazione.",
+			proofAdd: "Aggiungi prova",
+			proofAttached: "Prova allegata",
+			proofMissing: "Nessuna prova",
+			proofTooLarge: "Il file è troppo grande (max 4 MB).",
+			proofReplace: "Cambia prova",
+			category: {
+				shipping: "Spedizione",
+				supplies: "Forniture",
+				rent: "Affitto",
+				tax: "Tasse",
+				other: "Altro"
+			}
+		},
+		profile: {
+			title: "Impostazioni",
+			companySectionTitle: "Dati aziendali",
+			companyHint: "Questi dati compaiono su ogni fattura. Sostituiscili con i tuoi.",
+			companyName: "Ragione sociale",
+			contactPerson: "Referente",
+			nui: "Numero identificativo univoco (NUI)",
+			streetAddress: "Indirizzo",
+			state: "Stato / regione",
+			zipCode: "CAP",
+			email: "Email",
+			phone: "Telefono",
+			currency: "Valuta",
+			phCompanyName: "La tua azienda (esempio)",
+			phContactPerson: "Il tuo nome (esempio)",
+			phNui: "000000000",
+			phStreetAddress: "Via esempio, n. 1",
+			phState: "Kosovo",
+			phZipCode: "10000",
+			phEmail: "email@esempio.com",
+			phPhone: "+383 00 000 000",
+			phCurrency: "EUR",
+			bankName: "Banca",
+			iban: "IBAN",
+			phBankName: "es. TEB, Raiffeisen",
+			phIban: "es. XK05 ...",
+			paymentHint: "Compaiono in fondo a ogni fattura, così il cliente sa dove pagare.",
+			exportNote: "Nota di esportazione (PDF)",
+			phExportNote: "Eksport ne bazë te Ligjit (05-L-037 Neni 33)",
+			exportNoteHint: "Compare sotto “Grazie” nel PDF. Cancella il testo per nasconderla, o modificala.",
+			importSectionTitle: "Importa da una fattura di esempio",
+			importDescription: "Carica una fattura (PDF o immagine) e l’AI estrae i dati aziendali.",
+			importButton: "Carica fattura di esempio",
+			importing: "Analisi della fattura...",
+			importSuccess: "Dati compilati. Controllali prima di salvare.",
+			importError: "Impossibile estrarre i dati dalla fattura.",
+			languageSectionTitle: "Lingua",
+			languageHint: "Scegli la lingua dell’app. La scelta viene salvata nel tuo account.",
+			languageSq: "Shqip",
+			languageEn: "English",
+			languageIt: "Italiano",
+			saveSuccess: "Impostazioni salvate.",
+			account: "Account",
+			workspaceHint: "Lingua e dati aziendali compaiono su ogni fattura.",
+			subtitle: "Dati aziendali, aspetto della fattura e account.",
+			sectionBrand: "Logo",
+			logoHint: "PNG o JPG. Compare in cima a ogni fattura.",
+			upload: "Carica",
+			change: "Cambia",
+			remove: "Rimuovi",
+			imageError: "Il file non è un’immagine valida.",
+			sectionBusiness: "Azienda",
+			businessHint: "Ragione sociale e numeri di registrazione, come in fattura.",
+			vatNumber: "Partita IVA",
+			phVatNumber: "es. 330000000",
+			sectionContact: "Indirizzo e contatti",
+			contactHint: "Dove si trova l’azienda e come contattarti.",
+			website: "Sito web",
+			phWebsite: "es. azienda.com",
+			sectionPayment: "Pagamento",
+			swift: "SWIFT / BIC",
+			phSwift: "es. MBKOXKPR",
+			sectionInvoice: "Aspetto della fattura",
+			invoiceHint: "Modello e colore valgono per ogni PDF che scarichi o invii.",
+			templateLabel: "Modello",
+			templateClassic: "Classico",
+			templateClassicDesc: "Familiare e chiaro, con una linea colorata in alto.",
+			templateCorporate: "Aziendale",
+			templateCorporateDesc: "Intestazione colorata, griglia completa e riquadro pagamento.",
+			templateMinimal: "Minimale",
+			templateMinimalDesc: "Pulito, con molto spazio e poche linee.",
+			templateSelected: "Selezionato",
+			templatePreview: "Vedi a grandezza intera",
+			accent: "Colore",
+			accentDefault: "Colore del modello",
+			sectionSignature: "Firma e timbro",
+			signatureHint: "Facoltativi. Compaiono in fondo alla fattura, nell’area della firma.",
+			signature: "Firma",
+			stamp: "Timbro",
+			sectionData: "Dati",
+			defaultTaxRate: "IVA predefinita (%)",
+			defaultTaxRateHint: "Precompilata in ogni nuova fattura; puoi cambiarla per singola fattura.",
+			backupHint: "Scarica una copia di tutti i dati, o ripristinali da un file.",
+			unsaved: "Hai modifiche non salvate.",
+			discard: "Annulla modifiche",
+			invalidEmail: "L’indirizzo email non è valido.",
+			sampleClient: "Cliente Esempio S.r.l.",
+			sampleAddress: "Via Esempio 10, Pristina",
+			sampleLine1: "Sviluppo software (ore)",
+			sampleLine2: "Manutenzione mensile",
+			sampleLine3: "Consulenza"
+		},
+		send: {
+			action: "Invia",
+			title: "Invia la fattura {number}",
+			to: "A",
+			toPlaceholder: "email@cliente.com",
+			subject: "Oggetto",
+			message: "Messaggio",
+			messageLanguage: "Lingua del messaggio",
+			defaultSubject: "Fattura {number} da {company}",
+			defaultBody: "Buongiorno,\n\nLe inviamo la fattura {number} del {date}, per un importo di {total}.\nScadenza del pagamento: {due}.\n\nPuò visualizzare e scaricare la fattura qui:\n{link}\n{payment}\nGrazie,\n{sender}",
+			paymentLine: "Dati per il pagamento: {details}",
+			link: "Link della fattura",
+			linkHint: "Il cliente apre la fattura da questo link e la scarica in PDF, senza account. Chiunque abbia il link può vederla.",
+			preparing: "Preparazione del link...",
+			copyLink: "Copia link",
+			copied: "Copiato",
+			openMail: "Apri nell’email",
+			openGmail: "Apri in Gmail",
+			copyMessage: "Copia messaggio",
+			downloadPdf: "Scarica PDF",
+			howTo: "L’email si apre con destinatario, oggetto e messaggio già compilati; devi solo premere Invia.",
+			markSent: "Segna come inviata",
+			markUnsent: "Segna come non inviata",
+			sentOn: "Inviata il {date}",
+			sentNoDate: "Segnata come inviata",
+			notSentYet: "Non ancora inviata",
+			draftNote: "Questa fattura è ancora una bozza. Va emessa prima dell’invio; dopo, numero e importi non sono più liberamente modificabili.",
+			issueAndPrepare: "Emetti la fattura e prepara l’email",
+			from: "Da",
+			cc: "Copia (Cc)",
+			ccPlaceholder: "facoltativo",
+			recipientsHint: "Separa più indirizzi con virgole.",
+			attachPdf: "Allega la fattura in PDF",
+			sendNow: "Invia email",
+			sending: "Invio in corso...",
+			sentOk: "L'email è stata inviata a {to}.",
+			emailedTo: "Inviata via email a {to}",
+			otherWays: "Oppure inviala tu",
+			connectTitle: "Inviala direttamente dall'app",
+			connectHint: "Collega l'email aziendale nelle Impostazioni e la fattura parte da qui con un clic, con il PDF allegato.",
+			connectAction: "Collega l'email",
+			invalidTo: "Inserisci un indirizzo email valido.",
+			viewInvoice: "Vedi la fattura",
+			publicInvalid: "Questo link della fattura non è valido.",
+			publicDownload: "Scarica / Stampa",
+			publicFrom: "Fattura da {company}"
+		},
+		mail: {
+			title: "Invio delle fatture via email",
+			hint: "Collega la casella di posta dell'azienda. Le fatture partono direttamente dall'app, con il tuo indirizzo come mittente e il PDF allegato.",
+			connected: "Collegata",
+			notConnected: "Non collegata",
+			provider: "Servizio email",
+			providerGoogle: "Google Workspace / Gmail",
+			providerGoogleRelay: "Google SMTP relay",
+			providerMicrosoft: "Microsoft 365",
+			providerOther: "Altro",
+			host: "Server SMTP",
+			port: "Porta",
+			user: "Casella di posta (email)",
+			password: "Password per l'app",
+			passwordSaved: "Salvata. Scrivi solo per sostituirla.",
+			passwordHelp: "Google qui non accetta la password normale ma una \"password per le app\" di 16 lettere. Si crea nell'account Google dopo aver attivato la verifica in due passaggi. Qui viene salvata cifrata e non viene più mostrata.",
+			passwordHelpOther: "La password viene salvata cifrata e non viene più mostrata.",
+			passwordLink: "Crea la password su Google",
+			senders: "Indirizzi che inviano fatture",
+			sendersHint: "L'indirizzo dell'account, {email}, è sempre in elenco ed è scelto per primo. Aggiungi gli altri indirizzi aziendali che devono comparire in \"Da\".",
+			aliasNote: "Gmail accetta come mittente solo la casella collegata e i suoi alias (\"Send mail as\"); ogni altro indirizzo viene sostituito con la casella collegata. Con Google SMTP relay può inviare qualsiasi indirizzo del dominio.",
+			senderName: "Nome visualizzato",
+			senderEmail: "Indirizzo",
+			addSender: "Aggiungi indirizzo",
+			removeSender: "Rimuovi indirizzo",
+			save: "Salva collegamento",
+			saved: "Collegamento salvato.",
+			test: "Invia email di prova",
+			testing: "Prova in corso...",
+			testOk: "L'email di prova è stata inviata a {to}. Controlla la posta.",
+			testSubject: "Prova da Next Invoice",
+			testBody: "Questa è un'email di prova.\n\nIl collegamento email per l'invio delle fatture funziona.",
+			disconnect: "Scollega",
+			disconnected: "Email scollegata.",
+			errAuth: "La casella o la password per l'app non è stata accettata.",
+			errConnect: "Server di posta non raggiungibile. Controlla server e porta.",
+			errRejected: "Il server di posta ha rifiutato il messaggio.",
+			errSender: "Questo indirizzo non è nell'elenco dei mittenti.",
+			errRecipient: "Inserisci almeno un indirizzo valido del destinatario (fino a 5).",
+			errContent: "L'email deve avere oggetto e messaggio.",
+			errLimit: "Raggiunto il limite giornaliero di email. Riprova domani.",
+			errPdf: "Il PDF non è stato creato. Riprova o invia senza allegato.",
+			errNotConfigured: "L'email aziendale non è ancora collegata.",
+			errHost: "Questo server o porta SMTP non è consentito. Porte consentite: 587, 465, 2525.",
+			errIncomplete: "Inserisci server, casella e password.",
+			errGeneric: "L'email non è stata inviata."
+		},
+		importer: {
+			button: "Importa da Excel",
+			title: "Importa fatture da Excel",
+			intro: "Carica il file .xlsx con le tue fatture. Nulla viene salvato finché non confermi.",
+			choose: "Scegli file .xlsx",
+			chooseAnother: "Scegli un altro file",
+			reading: "Lettura del file...",
+			formats: "Vengono letti i fogli delle fatture, delle righe e dei clienti. Le colonne si trovano dai titoli, es. Invoice #, Company, Invoice Date, Tax Rate, Descrizione, Quantità, Prezzo unitario.",
+			notXlsx: "Non è un file Excel (.xlsx) valido.",
+			noSheet: "Nessun foglio con fatture trovato. Servono almeno le colonne numero e data fattura.",
+			sheets: "Fogli letti",
+			toImport: "Da importare",
+			existing: "Già presenti",
+			newClients: "Clienti",
+			total: "Valore IVA inclusa",
+			period: "Periodo",
+			existingNote: "{count} fatture hanno un numero già presente e verranno saltate.",
+			problems: "{count} righe non possono essere importate",
+			reasonDate: "data mancante o illeggibile",
+			reasonClient: "cliente mancante",
+			reasonItems: "né righe né importo",
+			reasonDuplicate: "numero ripetuto nel file",
+			warnings: "{count} fatture richiedono attenzione",
+			warnTotalMismatch: "il totale calcolato differisce da quello in Excel",
+			warnOther: "il valore nella colonna “Other” non viene importato",
+			warnNoLines: "senza righe: creata una riga con l’importo della fattura",
+			warnUnknownClient: "il cliente non è nel foglio clienti",
+			pickHint: "Deseleziona le fatture che non vuoi importare, es. quelle annullate.",
+			search: "Cerca per numero o cliente",
+			selectAll: "Seleziona tutte",
+			selectOne: "Importa la fattura {number}",
+			remove: "Rimuovi",
+			restore: "Ripristina",
+			removeFlagged: "Rimuovi tutte",
+			restoreFlagged: "Ripristina tutte",
+			removed: "{count} fatture rimosse dall’importazione.",
+			restoreAll: "Ripristina tutte",
+			noMatch: "Nessuna fattura corrisponde alla ricerca.",
+			markPaid: "Segna tutte come pagate",
+			markPaidHint: "Lascia deselezionato se registrerai i pagamenti dopo, uno per uno.",
+			otherClients: "Importa anche gli altri {count} clienti del file",
+			colNumber: "N.",
+			colClient: "Cliente",
+			colDate: "Data",
+			colLines: "Righe",
+			colTax: "IVA",
+			colTotal: "Totale",
+			more: "e altre {count}",
+			confirm: "Importa {count} fatture",
+			importing: "Importazione...",
+			nothing: "Tutte le fatture di questo file sono già presenti.",
+			done: "Importazione completata",
+			doneSummary: "Aggiunte {created} fatture e {clients} clienti.",
+			doneSkipped: "{count} saltate.",
+			limit: "Il piano gratuito consente 10 fatture al mese. Passa a Premium per importare questo file."
+		},
+		pdf: {
+			invoiceLabel: "Fattura",
+			dateLabel: "Data",
+			clientLabel: "Cliente",
+			nuiLabel: "NUI",
+			description: "Descrizione",
+			quantity: "Qtà",
+			unit: "Unità",
+			sum: "Importo",
+			subtotal: "Imponibile",
+			discount: "Sconto",
+			total: "Totale",
+			issuedBy: "Emessa da",
+			receivedBy: "Ricevuta da",
+			thankYou: "Grazie!",
+			dueDateLabel: "Scadenza",
+			onReceipt: "Alla consegna",
+			paymentInfo: "Pagamento",
+			bankName: "Banca",
+			ibanLabel: "IBAN",
+			fullNameLabel: "Full Name",
+			addressLabel: "Address",
+			phoneLabel: "Phone No",
+			statementTitle: "PREVENTIVI",
+			billedTo: "FATTURARE A",
+			order: "ORDINE",
+			patientService: "PAZIENTE / SERVIZIO",
+			unitPrice: "PREZZO",
+			qty: "QTÀ",
+			ordersTotal: "TOTALE ORDINI",
+			paymentsTotal: "TOTALE PAGAMENTI",
+			balanceDue: "SALDO DOVUTO",
+			pivaLabel: "p.IVA",
+			vatLabel: "P.IVA",
+			swiftLabel: "SWIFT (BIC)",
+			beneficiary: "Beneficiario",
+			signature: "Firma",
+			paymentDetails: "Dati di pagamento",
+			vat: "IVA",
+			fiscalLabel: "Cod. fiscale"
+		},
+		billing: {
+			title: "Piani",
+			subtitle: "Inizia gratis. Passa a Premium quando ti servono più fatture.",
+			freeName: "Gratis",
+			freeLimit: "Fino a 10 fatture al mese",
+			freeHint: "10 fatture al mese sono gratis. Abbonati per fatture illimitate.",
+			premiumName: "Premium",
+			premiumLimit: "Fatture illimitate",
+			premiumPrice: "€20 / mese",
+			premiumHint: "Nessun limite mensile. La stessa app, senza interruzioni.",
+			current: "Piano attuale",
+			cta: "Inizia Premium — €20/mese",
+			ctaStripe: "Paga con carta — €20/mese",
+			alreadyPremium: "Sei su Premium.",
+			manage: "Gestisci abbonamento",
+			success: "Pagamento confermato. Sei su Premium.",
+			canceled: "Pagamento annullato.",
+			confirming: "Conferma del pagamento...",
+			stripeNote: "Checkout sicuro con Stripe. Puoi annullare in qualsiasi momento dal portale.",
+			stripeMissing: "Stripe non è configurato sul server."
+		}
+	}
+};
+function getNested(obj, path) {
+	return path.split(".").reduce((acc, key) => {
+		if (acc && typeof acc === "object" && key in acc) return acc[key];
+	}, obj);
+}
+/** A string in one particular language, whatever language the interface is showing. */
+function translateIn(lang, key, params) {
+	const value = getNested(translations[lang], key) ?? getNested(translations.sq, key) ?? key;
+	if (typeof value !== "string") return key;
+	if (!params) return value;
+	return value.replace(/\{(\w+)\}/g, (_m, k) => params[k] !== void 0 ? String(params[k]) : `{${k}}`);
+}
+/** The labels printed on an invoice, in one particular language. */
+function pdfLabelsIn(lang) {
+	return {
+		...translations[lang].pdf,
+		amountDue: translations[lang].docs.amountDue,
+		amountPaid: translations[lang].docs.amountPaid
+	};
+}
+//#endregion
+//#region src/lib/document.ts
+function toCents(value) {
+	const n = typeof value === "number" ? value : parseFloat(String(value ?? "").replace(",", "."));
+	if (!Number.isFinite(n)) return 0;
+	return Math.round(n * 100);
+}
+function activePayments(payments) {
+	return (payments || []).filter((item) => !item.voidedAt);
+}
+function documentTotals(doc) {
+	const totalCents = toCents(doc?.total ?? doc?.amount ?? 0);
+	const paidCents = activePayments(doc?.payments).reduce((sum, item) => sum + toCents(item.amount), 0);
+	const dueCents = Math.max(totalCents - paidCents, 0);
+	return {
+		total: totalCents / 100,
+		amountPaid: paidCents / 100,
+		amountDue: dueCents / 100
+	};
+}
+function paymentStatus(doc) {
+	if (doc?.lifecycle === "cancelled" || doc?.status === "cancelled") return "cancelled";
+	if (doc?.lifecycle === "draft") return "draft";
+	const totals = documentTotals(doc);
+	const totalCents = toCents(doc?.total ?? doc?.amount ?? 0);
+	const paidCents = toCents(totals.amountPaid);
+	if (doc?.status === "paid" && paidCents === 0) return "paid";
+	if (totalCents > 0 && totals.amountDue === 0) return "paid";
+	if (paidCents > 0) return "partial";
+	return "unpaid";
+}
+function remainingOf(doc) {
+	const status = paymentStatus(doc);
+	if (status === "cancelled" || status === "draft") return 0;
+	if (status === "paid") return 0;
+	return documentTotals(doc).amountDue;
+}
+//#endregion
+//#region src/lib/invoiceTemplates.ts
+const INVOICE_TEMPLATES = [
+	"classic",
+	"corporate",
+	"minimal"
+];
+const TEMPLATE_ACCENT = {
+	classic: "#2C6E7F",
+	corporate: "#2E75B6",
+	minimal: "#1D2B2E"
+};
+function normalizeTemplate(value) {
+	return INVOICE_TEMPLATES.includes(value) ? value : "classic";
+}
+function isHexColor(value) {
+	return /^#[0-9a-fA-F]{6}$/.test(String(value || ""));
+}
+function resolveAccent(template, accentColor) {
+	return isHexColor(accentColor) ? accentColor : TEMPLATE_ACCENT[template];
+}
+function esc(value) {
+	return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function channels(hex) {
+	const n = parseInt(hex.slice(1), 16);
+	return [
+		n >> 16 & 255,
+		n >> 8 & 255,
+		n & 255
+	];
+}
+/** Blend a colour towards white. `white` is 0 (unchanged) to 1 (white). */
+function tint(hex, white) {
+	return `#${channels(hex).map((c) => Math.round(c + (255 - c) * white).toString(16).padStart(2, "0")).join("")}`;
+}
+/** Blend a colour towards black. `black` is 0 (unchanged) to 1 (black). */
+function shade(hex, black) {
+	return `#${channels(hex).map((c) => Math.round(c * (1 - black)).toString(16).padStart(2, "0")).join("")}`;
+}
+function inkOn(hex) {
+	const [r, g, b] = channels(hex);
+	return (r * 299 + g * 587 + b * 114) / 1e3 > 165 ? "#1D2B2E" : "#FFFFFF";
+}
+function grouped(value) {
+	return (Number.isFinite(value) ? value : 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function imageSrc(value) {
+	const src = String(value || "");
+	return /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(src) ? src : "";
+}
+function buildView({ company, client, invoice, pdfLabels, template, accentColor }) {
+	const templateId = template || normalizeTemplate(company.invoiceTemplate);
+	const accent = resolveAccent(templateId, accentColor ?? company.accentColor);
+	const items = invoice.items || [];
+	const { subtotal, total, taxRate, taxAmount } = computeTotals(items, invoice.discount, invoice.taxRate);
+	const due = remainingOf(invoice);
+	const paid = due === 0 && paymentStatus(invoice) !== "draft" ? total : total - due;
+	const symbol = currencySymbol(invoice.currency || company.currency);
+	const money = (value) => `${grouped(value)} ${symbol}`;
+	const cityLine = [company.state, company.zipCode].map((part) => String(part || "").trim()).filter(Boolean).join(", ");
+	return {
+		templateId,
+		accent,
+		accentInk: inkOn(accent),
+		L: pdfLabels,
+		company,
+		client,
+		invoice,
+		symbol,
+		money,
+		cityLine,
+		rows: items.map((item, index) => ({
+			index: index + 1,
+			description: item.description,
+			quantity: item.quantity,
+			unitPrice: toNumber(item.unitPrice),
+			lineTotal: toNumber(item.quantity) * toNumber(item.unitPrice)
+		})),
+		subtotal,
+		discount: toNumber(invoice.discount),
+		taxRate,
+		taxAmount,
+		total,
+		paid,
+		due,
+		showBalance: due > 0 && due < total,
+		dueText: invoice.dueDate || pdfLabels.onReceipt || "",
+		exportNote: resolveExportNote(company),
+		logo: imageSrc(company.logoData),
+		signature: imageSrc(company.signatureData),
+		stamp: imageSrc(company.stampData),
+		hasPayment: Boolean(company.bankName || company.iban || company.swift)
+	};
+}
+function baseCss(font) {
+	return `
+    * { box-sizing: border-box; }
+    html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; background: #fff; color: #1D2B2E; font-family: ${font}; font-size: 12px; line-height: 1.45; }
+    .page { padding: 32px; }
+    p { margin: 0; }
+    table { border-collapse: collapse; }
+    thead { display: table-header-group; }
+    tr, .keep { break-inside: avoid; page-break-inside: avoid; }
+    .right { text-align: right; }
+    .center { text-align: center; }
+    .nowrap { white-space: nowrap; }
+    .pre { white-space: pre-wrap; }
+    @page { size: A4; margin: 12mm; }
+    @media print { .page { padding: 0; } }
+  `;
+}
+function shell(v, font, css, body) {
+	return `<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="utf-8" />
+<title>${esc(v.invoice.number)}</title>
+<style>${baseCss(font)}${css}</style>
+</head>
+<body><div class="page">${body}</div></body>
+</html>`;
+}
+function paymentRows(v) {
+	const { company, L } = v;
+	return [
+		company.bankName ? [L.bankName, company.bankName] : null,
+		company.swift ? [L.swiftLabel || "SWIFT (BIC)", company.swift] : null,
+		company.iban ? [L.ibanLabel, company.iban] : null
+	].filter(Boolean);
+}
+function clientLines(v) {
+	const { client, L } = v;
+	return [
+		client.address,
+		client.phone,
+		client.email,
+		client.businessId ? `${L.nuiLabel}: ${client.businessId}` : "",
+		client.fiscalNumber ? `${L.fiscalLabel || "Fiscal No"}: ${client.fiscalNumber}` : "",
+		client.vatNumber ? `${L.vatLabel || "VAT"}: ${client.vatNumber}` : ""
+	].filter((line) => String(line || "").trim());
+}
+function classicTemplate(v) {
+	const { company, client, invoice, L, accent, money } = v;
+	const dark = shade(accent, .28);
+	return shell(v, `-apple-system, "Segoe UI", Helvetica, Arial, sans-serif`, `
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; border-bottom: 3px solid ${accent}; padding-bottom: 16px; margin-bottom: 20px; }
+    .brand { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+    .logo { height: 64px; max-width: 150px; object-fit: contain; flex-shrink: 0; }
+    .brand h1 { margin: 0 0 6px; font-size: 20px; color: ${dark}; }
+    .brand p, .client p { margin: 2px 0; color: #444; }
+    .meta { text-align: right; flex-shrink: 0; }
+    .meta h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: 2px; color: ${accent}; }
+    .meta p { margin: 2px 0; }
+    .client { margin-bottom: 22px; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6B7A7D; margin-bottom: 6px; }
+    .items { width: 100%; margin-bottom: 16px; }
+    .items thead tr { background: ${accent}; color: ${v.accentInk}; }
+    .items th, .items td { padding: 8px 10px; border-bottom: 1px solid #E1E6E7; text-align: left; font-size: 12px; vertical-align: top; }
+    .items th.right, .items td.right { text-align: right; }
+    .items th.center, .items td.center { text-align: center; }
+    .totals { width: 270px; margin-left: auto; }
+    .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
+    .totals .grand { font-weight: 700; font-size: 16px; border-top: 2px solid ${accent}; margin-top: 4px; padding-top: 8px; color: ${dark}; }
+    .notes { margin-top: 20px; color: #555; }
+    .payment { margin-top: 20px; color: #444; }
+    .payment p { margin: 2px 0; }
+    .thanks { text-align: center; margin-top: 30px; font-size: 13px; color: ${accent}; font-weight: 600; }
+    .law { text-align: center; margin-top: 8px; font-size: 13px; font-weight: 700; }
+    .signs { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 48px; }
+    .sign { width: 38%; text-align: center; font-size: 12px; color: #555; }
+    .sign .ink { height: 46px; display: flex; align-items: flex-end; justify-content: center; }
+    .sign .ink img { max-height: 46px; max-width: 160px; }
+    .sign .line { border-top: 1px solid #999; padding-top: 6px; }
+    .stamp { width: 20%; text-align: center; }
+    .stamp img { max-height: 96px; max-width: 110px; }
+  `, `
+    <div class="top">
+      <div class="brand">
+        ${v.logo ? `<img class="logo" src="${v.logo}" alt="" />` : ""}
+        <div>
+          <h1>${esc(company.companyName)}</h1>
+          ${company.nui ? `<p>${esc(L.nuiLabel)}: ${esc(company.nui)}</p>` : ""}
+          ${company.vatNumber ? `<p>${esc(L.vatLabel || "VAT")}: ${esc(company.vatNumber)}</p>` : ""}
+          ${company.streetAddress ? `<p>${esc(company.streetAddress)}</p>` : ""}
+          ${v.cityLine ? `<p>${esc(v.cityLine)}</p>` : ""}
+          ${company.email ? `<p>${esc(company.email)}</p>` : ""}
+          ${company.phone ? `<p>${esc(company.phone)}</p>` : ""}
+          ${company.website ? `<p>${esc(company.website)}</p>` : ""}
+        </div>
+      </div>
+      <div class="meta">
+        <h2>${esc(L.invoiceTitle || "INVOICE")}</h2>
+        <p>${esc(L.invoiceLabel)}: <strong>${esc(invoice.number)}</strong></p>
+        <p>${esc(L.dateLabel)}: ${esc(invoice.date)}</p>
+        <p>${esc(L.dueDateLabel)}: ${esc(v.dueText)}</p>
+      </div>
+    </div>
+    <div class="client">
+      <div class="label">${esc(L.clientLabel)}</div>
+      <p><strong>${esc(L.fullNameLabel)}:</strong> ${esc(client.fullName)}</p>
+      ${client.address ? `<p><strong>${esc(L.addressLabel)}:</strong> ${esc(client.address)}</p>` : ""}
+      ${client.phone ? `<p><strong>${esc(L.phoneLabel)}:</strong> ${esc(client.phone)}</p>` : ""}
+      ${client.email ? `<p><strong>${esc(L.emailLabel || "Email")}:</strong> ${esc(client.email)}</p>` : ""}
+      ${client.businessId ? `<p><strong>${esc(L.nuiLabel)}:</strong> ${esc(client.businessId)}</p>` : ""}
+      ${client.fiscalNumber ? `<p><strong>${esc(L.fiscalLabel || "Fiscal No")}:</strong> ${esc(client.fiscalNumber)}</p>` : ""}
+      ${client.vatNumber ? `<p><strong>${esc(L.vatLabel || "VAT")}:</strong> ${esc(client.vatNumber)}</p>` : ""}
+    </div>
+    <table class="items">
+      <thead>
+        <tr>
+          <th>${esc(L.description)}</th>
+          <th class="center">${esc(L.quantity)}</th>
+          <th class="right">${esc(L.unit)} (${esc(v.symbol)})</th>
+          <th class="right">${esc(L.sum)}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${v.rows.map((row) => `<tr>
+          <td class="pre">${esc(row.description)}</td>
+          <td class="center">${esc(row.quantity)}</td>
+          <td class="right nowrap">${money(row.unitPrice)}</td>
+          <td class="right nowrap">${money(row.lineTotal)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    <div class="totals keep">
+      <div><span>${esc(L.subtotal)}</span><span>${money(v.subtotal)}</span></div>
+      ${v.discount > 0 ? `<div><span>${esc(L.discount)}</span><span>-${money(v.discount)}</span></div>` : ""}
+      ${v.taxRate > 0 ? `<div><span>${esc(L.vat || "VAT")} ${v.taxRate}%</span><span>${money(v.taxAmount)}</span></div>` : ""}
+      <div class="grand"><span>${esc(L.total)}</span><span>${money(v.total)}</span></div>
+      ${v.showBalance ? `<div><span>${esc(L.amountPaid || "")}</span><span>${money(v.paid)}</span></div><div class="grand"><span>${esc(L.amountDue || L.total)}</span><span>${money(v.due)}</span></div>` : ""}
+    </div>
+    ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ""}
+    ${v.hasPayment ? `<div class="payment keep"><div class="label">${esc(L.paymentInfo)}</div>${paymentRows(v).map(([label, value]) => `<p>${esc(label)}: ${esc(value)}</p>`).join("")}</div>` : ""}
+    <div class="thanks">${esc(L.thankYou)}</div>
+    ${v.exportNote ? `<div class="law">${esc(v.exportNote)}</div>` : ""}
+    <div class="signs keep">
+      <div class="sign">
+        <div class="ink">${v.signature ? `<img src="${v.signature}" alt="" />` : ""}</div>
+        <div class="line">${esc(company.contactPerson)}<br/>${esc(L.issuedBy)}</div>
+      </div>
+      <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ""}</div>
+      <div class="sign">
+        <div class="ink"></div>
+        <div class="line">${esc(client.fullName)}<br/>${esc(L.receivedBy)}</div>
+      </div>
+    </div>
+  `);
+}
+const CORPORATE_MIN_ROWS = 6;
+function corporateTemplate(v) {
+	const { company, client, invoice, L, accent, symbol } = v;
+	const soft = tint(accent, .86);
+	const mid = tint(accent, .68);
+	const strong = tint(accent, .52);
+	const line = tint(accent, .3);
+	const cell = (value) => `<span class="cur">${esc(symbol)}</span><span>${grouped(value)}</span>`;
+	const filler = Math.max(CORPORATE_MIN_ROWS - v.rows.length, 0);
+	const css = `
+    .band { display: flex; align-items: center; justify-content: space-between; gap: 20px; background: ${accent}; color: ${v.accentInk}; padding: 14px 32px; }
+    .band-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .band-logo { height: 44px; max-width: 120px; object-fit: contain; background: #fff; border-radius: 4px; padding: 4px; flex-shrink: 0; }
+    .band h1 { margin: 0; font-size: 25px; font-weight: 700; letter-spacing: 0.2px; }
+    .band-title { font-size: 28px; font-weight: 400; white-space: nowrap; }
+    .sub { display: flex; gap: 24px; justify-content: space-between; background: ${mid}; padding: 14px 32px 14px 64px; font-size: 10.5px; font-weight: 700; }
+    .sub td { padding: 1px 0; vertical-align: top; }
+    .sub td.k { text-align: right; padding-right: 28px; white-space: nowrap; }
+    .parties { display: flex; justify-content: space-between; gap: 32px; margin: 26px 0 22px; font-size: 10.5px; }
+    .parties td { padding: 4px 0; vertical-align: top; font-weight: 700; }
+    .parties td.k { padding-right: 16px; white-space: nowrap; }
+    .items { width: 100%; border: 1.5px solid ${line}; }
+    .items th { padding: 18px 8px; font-size: 15px; font-weight: 400; color: ${accent}; text-align: left; border-bottom: 1.5px solid ${line}; }
+    .items td { padding: 9px 8px; height: 40px; border: 1px solid ${line}; font-size: 11px; color: #555; vertical-align: middle; }
+    .items.dense td { padding: 6px 8px; height: 30px; }
+    .items tbody tr:nth-child(even) td { background: ${soft}; }
+    .items td.sum { background: ${mid}; }
+    .items tbody tr:nth-child(even) td.sum { background: ${strong}; }
+    .items .n { width: 8%; }
+    .items .q { width: 9%; text-align: right; }
+    .items .u { width: 17%; }
+    .items .t { width: 17%; }
+    .amount { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
+    .bottom { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+    .pay { flex: 1; margin-top: 22px; background: ${soft}; padding: 10px 16px; text-align: center; font-size: 12.5px; line-height: 1.6; }
+    .pay strong { display: block; }
+    .totals { width: 26%; min-width: 190px; }
+    .totals td { padding: 4px 8px; font-size: 11px; border: 1px solid ${line}; }
+    .totals td.k { text-align: right; border-left: 0; border-top: 0; border-bottom: 0; }
+    .totals td.v { width: 62%; background: ${soft}; }
+    .totals tr:nth-child(odd) td.v { background: ${mid}; }
+    .totals tr.grand td { font-weight: 700; padding: 9px 8px; background: ${strong}; border: 1.5px solid ${line}; }
+    .notes { margin-top: 18px; color: #444; font-size: 11px; }
+    .signs { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 44px; padding: 0 64px 0 64px; font-size: 11px; }
+    .sign { width: 34%; }
+    .sign b { display: block; margin-bottom: 8px; }
+    .sign .ink { display: flex; align-items: flex-end; gap: 10px; min-height: 48px; border-bottom: 1.5px solid #1D2B2E; padding-bottom: 4px; }
+    .sign .ink img { max-height: 44px; max-width: 120px; }
+    .stamp { width: 24%; text-align: center; }
+    .stamp img { max-height: 110px; max-width: 120px; }
+    .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #555; }
+    .foot b { display: block; color: #1D2B2E; margin-top: 4px; }
+  `;
+	const pay = paymentRows(v);
+	return shell(v, `Calibri, Carlito, "Segoe UI", -apple-system, Helvetica, Arial, sans-serif`, css, `
+    <div class="band">
+      <div class="band-brand">
+        ${v.logo ? `<img class="band-logo" src="${v.logo}" alt="" />` : ""}
+        <h1>${esc(company.companyName)}</h1>
+      </div>
+      <div class="band-title">${esc(L.invoiceTitle || "Invoice")}</div>
+    </div>
+    <div class="sub">
+      <div>
+        ${company.streetAddress ? `<div>${esc(company.streetAddress)}</div>` : ""}
+        ${v.cityLine ? `<div style="margin-top:4px">${esc(v.cityLine)}</div>` : ""}
+      </div>
+      <table>
+        ${company.nui ? `<tr><td class="k">${esc(L.businessNumber || L.nuiLabel)}:</td><td>${esc(company.nui)}</td></tr>` : ""}
+        ${company.vatNumber ? `<tr><td class="k">${esc(L.vatLabel || "VAT")}:</td><td>${esc(company.vatNumber)}</td></tr>` : ""}
+      </table>
+      <div>
+        ${company.phone ? `<div>${esc(company.phone)}</div>` : ""}
+        ${company.email ? `<div style="margin-top:4px">${esc(company.email)}</div>` : ""}
+        ${company.website ? `<div style="margin-top:4px">${esc(company.website)}</div>` : ""}
+      </div>
+    </div>
+    <div class="parties">
+      <table>
+        <tr><td class="k">${esc(L.customer || L.clientLabel)}:</td><td>${esc(client.fullName)}</td></tr>
+        ${clientLines(v).map((text, index) => `<tr><td class="k">${index === 0 && client.address ? `${esc(L.addressLabel)}:` : ""}</td><td>${esc(text)}</td></tr>`).join("")}
+      </table>
+      <table>
+        <tr><td class="k">${esc(L.invoiceLabel)} #:</td><td>${esc(invoice.number)}</td></tr>
+        <tr><td class="k">${esc(L.dateLabel)}:</td><td>${esc(invoice.date)}</td></tr>
+        <tr><td class="k">${esc(L.dueDateLabel)}:</td><td>${esc(v.dueText)}</td></tr>
+      </table>
+    </div>
+    <table class="items${filler ? "" : " dense"}">
+      <thead>
+        <tr>
+          <th class="n">#</th>
+          <th>${esc(L.description)}</th>
+          <th class="q">${esc(L.quantity)}</th>
+          <th class="u">${esc(L.unit)}</th>
+          <th class="t">${esc(L.sum)}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${v.rows.map((row) => `<tr>
+          <td class="n">${row.index}</td>
+          <td class="pre">${esc(row.description)}</td>
+          <td class="q">${esc(row.quantity)}</td>
+          <td class="u"><div class="amount">${cell(row.unitPrice)}</div></td>
+          <td class="t sum"><div class="amount">${cell(row.lineTotal)}</div></td>
+        </tr>`).join("")}
+        ${"<tr><td class=\"n\"></td><td></td><td class=\"q\"></td><td class=\"u\"></td><td class=\"t sum\"></td></tr>".repeat(filler)}
+      </tbody>
+    </table>
+    <div class="bottom keep">
+      ${v.hasPayment ? `<div class="pay"><strong>${esc(L.paymentDetails || L.paymentInfo)}:</strong>
+              <div>${esc(L.beneficiary || "Beneficiary")}: ${esc(company.companyName)}</div>
+              ${pay.map(([label, value]) => `<div>${esc(label)}: ${esc(value)}</div>`).join("")}
+            </div>` : "<div style=\"flex:1\"></div>"}
+      <table class="totals">
+        <tr><td class="k">${esc(L.subtotal)}</td><td class="v"><div class="amount">${cell(v.subtotal)}</div></td></tr>
+        <tr><td class="k">${esc(L.discount)}</td><td class="v"><div class="amount">${v.discount > 0 ? cell(v.discount) : `<span class="cur">${esc(symbol)}</span><span>-</span>`}</div></td></tr>
+        <tr><td class="k">${esc(L.vat || "VAT")} %</td><td class="v"><div class="amount"><span></span><span>${v.taxRate.toFixed(2)}%</span></div></td></tr>
+        <tr><td class="k">${esc(L.vat || "VAT")}</td><td class="v"><div class="amount">${v.taxAmount > 0 ? cell(v.taxAmount) : `<span class="cur">${esc(symbol)}</span><span>-</span>`}</div></td></tr>
+        <tr class="grand"><td class="k">${esc(String(L.total || "").toUpperCase())}</td><td><div class="amount">${cell(v.total)}</div></td></tr>
+        ${v.showBalance ? `<tr><td class="k">${esc(L.amountPaid || "")}</td><td class="v"><div class="amount">${cell(v.paid)}</div></td></tr>
+               <tr class="grand"><td class="k">${esc(L.amountDue || L.total)}</td><td><div class="amount">${cell(v.due)}</div></td></tr>` : ""}
+      </table>
+    </div>
+    ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ""}
+    <div class="signs keep">
+      <div class="sign">
+        <b>${esc(L.signature || "Signature")} (${esc(company.companyName)}):</b>
+        <div class="ink"><span>${esc(company.contactPerson)}</span>${v.signature ? `<img src="${v.signature}" alt="" />` : ""}</div>
+      </div>
+      <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ""}</div>
+      <div class="sign">
+        <b>${esc(L.signature || "Signature")}:</b>
+        <div class="ink"></div>
+      </div>
+    </div>
+    ${v.exportNote ? `<div class="foot"><b>${esc(v.exportNote)}</b></div>` : ""}
+  `);
+}
+function minimalTemplate(v) {
+	const { company, client, invoice, L, accent, money } = v;
+	const hair = "#E3E7E8";
+	const muted = "#6B7A7D";
+	const css = `
+    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+    .logo { height: 56px; max-width: 180px; object-fit: contain; }
+    .name { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; }
+    .title { text-align: right; }
+    .title h2 { margin: 0; font-size: 30px; font-weight: 300; letter-spacing: 3px; color: ${accent}; }
+    .title p { margin-top: 4px; font-size: 13px; color: ${muted}; }
+    .rule { height: 2px; background: ${accent}; margin: 22px 0 24px; width: 48px; }
+    .cols { display: flex; gap: 28px; margin-bottom: 30px; }
+    .cols > div { flex: 1; min-width: 0; }
+    .cols > div:last-child { flex: 0 0 26%; }
+    .cap { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: ${muted}; margin-bottom: 8px; }
+    .cols p { margin: 2px 0; color: #444; }
+    .cols p.lead { font-weight: 700; font-size: 13px; color: #1D2B2E; }
+    .kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+    .kv span:first-child { color: ${muted}; }
+    .items { width: 100%; }
+    .items th { padding: 0 8px 10px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: ${muted}; text-align: left; border-bottom: 1.5px solid #1D2B2E; }
+    .items td { padding: 13px 8px; border-bottom: 1px solid ${hair}; vertical-align: top; }
+    .items th:first-child, .items td:first-child { padding-left: 0; }
+    .items th:last-child, .items td:last-child { padding-right: 0; }
+    .items td.t { font-weight: 600; }
+    .after { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-top: 18px; }
+    .side { flex: 1; min-width: 0; color: #444; }
+    .side .block { margin-bottom: 16px; }
+    .totals { width: 44%; min-width: 230px; }
+    .totals .kv { padding: 5px 0; }
+    .totals .grand { margin-top: 8px; padding: 12px 0 0; border-top: 1.5px solid #1D2B2E; font-size: 19px; font-weight: 700; }
+    .totals .grand span:first-child { color: #1D2B2E; }
+    .totals .grand span:last-child { color: ${accent}; }
+    .signs { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 52px; }
+    .sign { width: 34%; font-size: 11px; color: ${muted}; }
+    .sign .ink { height: 46px; display: flex; align-items: flex-end; }
+    .sign .ink img { max-height: 46px; max-width: 150px; }
+    .sign .line { border-top: 1px solid #B9C1C3; padding-top: 6px; }
+    .sign .line b { display: block; color: #1D2B2E; font-weight: 600; }
+    .stamp { width: 22%; text-align: center; }
+    .stamp img { max-height: 96px; max-width: 110px; }
+    .foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid ${hair}; text-align: center; font-size: 11px; color: ${muted}; }
+    .foot b { display: block; margin-top: 4px; color: #1D2B2E; }
+  `;
+	const pay = paymentRows(v);
+	return shell(v, `"Helvetica Neue", Helvetica, "Segoe UI", -apple-system, Arial, sans-serif`, css, `
+    <div class="head">
+      ${v.logo ? `<img class="logo" src="${v.logo}" alt="" />` : `<div class="name">${esc(company.companyName)}</div>`}
+      <div class="title">
+        <h2>${esc(L.invoiceTitle || "INVOICE")}</h2>
+        <p>${esc(invoice.number)}</p>
+      </div>
+    </div>
+    <div class="rule"></div>
+    <div class="cols">
+      <div>
+        <div class="cap">${esc(L.issuedBy)}</div>
+        <p class="lead">${esc(company.companyName)}</p>
+        ${company.streetAddress ? `<p>${esc(company.streetAddress)}</p>` : ""}
+        ${v.cityLine ? `<p>${esc(v.cityLine)}</p>` : ""}
+        ${company.nui ? `<p>${esc(L.nuiLabel)}: ${esc(company.nui)}</p>` : ""}
+        ${company.vatNumber ? `<p>${esc(L.vatLabel || "VAT")}: ${esc(company.vatNumber)}</p>` : ""}
+        ${company.phone ? `<p>${esc(company.phone)}</p>` : ""}
+        ${company.email ? `<p>${esc(company.email)}</p>` : ""}
+        ${company.website ? `<p>${esc(company.website)}</p>` : ""}
+      </div>
+      <div>
+        <div class="cap">${esc(L.billedTo || L.clientLabel)}</div>
+        <p class="lead">${esc(client.fullName)}</p>
+        ${clientLines(v).map((text) => `<p>${esc(text)}</p>`).join("")}
+      </div>
+      <div>
+        <div class="cap">${esc(L.invoiceLabel)}</div>
+        <div class="kv"><span>#</span><span>${esc(invoice.number)}</span></div>
+        <div class="kv"><span>${esc(L.dateLabel)}</span><span>${esc(invoice.date)}</span></div>
+        <div class="kv"><span>${esc(L.dueDateLabel)}</span><span>${esc(v.dueText)}</span></div>
+      </div>
+    </div>
+    <table class="items">
+      <thead>
+        <tr>
+          <th>${esc(L.description)}</th>
+          <th class="center">${esc(L.quantity)}</th>
+          <th class="right">${esc(L.unit)}</th>
+          <th class="right">${esc(L.sum)}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${v.rows.map((row) => `<tr>
+          <td class="pre">${esc(row.description)}</td>
+          <td class="center">${esc(row.quantity)}</td>
+          <td class="right nowrap">${money(row.unitPrice)}</td>
+          <td class="right nowrap t">${money(row.lineTotal)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    <div class="after keep">
+      <div class="side">
+        ${v.hasPayment ? `<div class="block"><div class="cap">${esc(L.paymentDetails || L.paymentInfo)}</div>${pay.map(([label, value]) => `<div class="kv" style="justify-content:flex-start"><span>${esc(label)}</span><span>${esc(value)}</span></div>`).join("")}</div>` : ""}
+        ${invoice.notes ? `<div class="block pre">${esc(invoice.notes)}</div>` : ""}
+      </div>
+      <div class="totals">
+        <div class="kv"><span>${esc(L.subtotal)}</span><span>${money(v.subtotal)}</span></div>
+        ${v.discount > 0 ? `<div class="kv"><span>${esc(L.discount)}</span><span>-${money(v.discount)}</span></div>` : ""}
+        ${v.taxRate > 0 ? `<div class="kv"><span>${esc(L.vat || "VAT")} ${v.taxRate}%</span><span>${money(v.taxAmount)}</span></div>` : ""}
+        <div class="kv grand"><span>${esc(L.total)}</span><span>${money(v.total)}</span></div>
+        ${v.showBalance ? `<div class="kv" style="margin-top:8px"><span>${esc(L.amountPaid || "")}</span><span>${money(v.paid)}</span></div><div class="kv" style="font-weight:700"><span style="color:#1D2B2E">${esc(L.amountDue || L.total)}</span><span>${money(v.due)}</span></div>` : ""}
+      </div>
+    </div>
+    <div class="signs keep">
+      <div class="sign">
+        <div class="ink">${v.signature ? `<img src="${v.signature}" alt="" />` : ""}</div>
+        <div class="line"><b>${esc(company.contactPerson)}</b>${esc(L.issuedBy)}</div>
+      </div>
+      <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ""}</div>
+      <div class="sign">
+        <div class="ink"></div>
+        <div class="line"><b>${esc(client.fullName)}</b>${esc(L.receivedBy)}</div>
+      </div>
+    </div>
+    <div class="foot">${esc(L.thankYou)}${v.exportNote ? `<b>${esc(v.exportNote)}</b>` : ""}</div>
+  `);
+}
+const RENDERERS = {
+	classic: classicTemplate,
+	corporate: corporateTemplate,
+	minimal: minimalTemplate
+};
+function buildInvoiceHtml(input) {
+	const view = buildView(input);
+	return RENDERERS[view.templateId](view);
+}
+//#endregion
+//#region src/lib/invoice.ts
+const DEFAULT_EXPORT_NOTE = "Eksport ne bazë te Ligjit (05-L-037 Neni 33)";
+/** The export-law line is about goods leaving the country, so service businesses never print it. */
+function usesExportNote(company) {
+	return company?.industry !== "services";
+}
+function resolveExportNote(company) {
+	if (!usesExportNote(company)) return "";
+	if (!company || company.exportNote === void 0 || company.exportNote === null) return DEFAULT_EXPORT_NOTE;
+	return String(company.exportNote).trim();
+}
+const SYMBOLS = {
+	EUR: "€",
+	USD: "$",
+	GBP: "£",
+	CHF: "CHF",
+	ALL: "L",
+	MKD: "ден"
+};
+function currencySymbol(currency) {
+	return SYMBOLS[currency] || currency || "€";
+}
+function toNumber(value) {
+	const n = parseFloat(String(value ?? "").replace(",", "."));
+	return Number.isFinite(n) ? n : 0;
+}
+function cents(value) {
+	return Math.round(value * 100) / 100;
+}
+/** VAT as a percentage, 0–100. Accepts 18, "18" or a spreadsheet-style fraction such as 0.18. */
+function normalizeTaxRate(value) {
+	const n = toNumber(value);
+	if (n <= 0) return 0;
+	const percent = n < 1 ? n * 100 : n;
+	return Math.min(Math.round(percent * 100) / 100, 100);
+}
+function computeTotals(items, discount, taxRate = 0) {
+	const gross = (items || []).reduce((sum, item) => sum + toNumber(item.quantity) * toNumber(item.unitPrice), 0);
+	const rate = normalizeTaxRate(taxRate);
+	const subtotal = cents(gross);
+	const net = cents(Math.max(subtotal - cents(toNumber(discount)), 0));
+	const total = rate > 0 ? cents(Math.max(gross - toNumber(discount), 0) * (1 + rate / 100)) : net;
+	return {
+		subtotal,
+		net,
+		taxRate: rate,
+		taxAmount: cents(total - net),
+		total
+	};
+}
+//#endregion
+//#region src/lib/companySamples.ts
+const SAMPLE_VALUES = {
+	companyName: [
+		"Kompania juaj (shembull)",
+		"Your company (sample)",
+		"La tua azienda (esempio)"
+	],
+	contactPerson: [
+		"Emri juaj (shembull)",
+		"Your name (sample)",
+		"Il tuo nome (esempio)"
+	],
+	nui: ["000000000"],
+	streetAddress: [
+		"Rruga shembull, nr. 1",
+		"Example street, no. 1",
+		"Via esempio, n. 1"
+	],
+	state: ["Kosovë", "Kosovo"],
+	zipCode: ["10000"],
+	email: [
+		"email@shembull.com",
+		"email@example.com",
+		"email@esempio.com"
+	],
+	phone: ["+383 00 000 000"]
+};
+const PLACEHOLDER_KEYS = {
+	companyName: "profile.phCompanyName",
+	contactPerson: "profile.phContactPerson",
+	nui: "profile.phNui",
+	streetAddress: "profile.phStreetAddress",
+	state: "profile.phState",
+	zipCode: "profile.phZipCode",
+	email: "profile.phEmail",
+	phone: "profile.phPhone"
+};
+const SAMPLE_FIELDS = Object.keys(SAMPLE_VALUES);
+function isSampleCompanyValue(field, value) {
+	const trimmed = String(value ?? "").trim();
+	if (!trimmed) return true;
+	return SAMPLE_VALUES[field].includes(trimmed);
+}
+/** The profile as printed: anything still a sample is shown as a localized placeholder. */
+function localizeCompanyProfile(company, t) {
+	const next = { ...company };
+	for (const field of SAMPLE_FIELDS) if (isSampleCompanyValue(field, company[field])) next[field] = t(PLACEHOLDER_KEYS[field]);
+	next.currency = company.currency?.trim() || t("profile.phCurrency");
+	next.bankName = company.bankName || "";
+	next.iban = company.iban || "";
+	next.exportNote = company.exportNote === void 0 || company.exportNote === null ? DEFAULT_EXPORT_NOTE : company.exportNote;
+	return next;
+}
+/**
+* The company block for an invoice PDF. An issued invoice carries a frozen copy of the legal details,
+* so those win; the look (logo, template, colour, signature, stamp) always follows the current profile.
+*/
+function companyForPdf(invoice, profile, t) {
+	const live = localizeCompanyProfile(profile, t);
+	const snapshot = invoice?.companySnapshot;
+	if (!snapshot) return live;
+	return {
+		...snapshot,
+		vatNumber: snapshot.vatNumber ?? live.vatNumber,
+		swift: snapshot.swift ?? live.swift,
+		website: snapshot.website ?? live.website,
+		industry: snapshot.industry ?? live.industry,
+		logoData: live.logoData,
+		signatureData: live.signatureData,
+		stampData: live.stampData,
+		invoiceTemplate: live.invoiceTemplate,
+		accentColor: live.accentColor
+	};
+}
+//#endregion
+//#region src/lib/serverRender.ts
+function translate(lang, key, params) {
+	return translateIn(lang, key, params);
+}
+/** The printable invoice page, with its labels in the given language. */
+function renderInvoiceHtml({ invoice, profile, lang }) {
+	const client = invoice.clientSnapshot || invoice.client;
+	return buildInvoiceHtml({
+		company: companyForPdf(invoice, profile, (key) => translateIn(lang, key)),
+		client,
+		invoice,
+		pdfLabels: pdfLabelsIn(lang)
+	});
+}
+//#endregion
+exports.isLang = isLang;
+exports.renderInvoiceHtml = renderInvoiceHtml;
+exports.translate = translate;

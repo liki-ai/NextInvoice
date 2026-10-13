@@ -16,6 +16,8 @@ const {
   voidPayment,
 } = require('../store');
 
+const { sendInvoiceEmail, sendMailError } = require('./mail');
+
 const router = express.Router();
 router.use(authRequired);
 
@@ -91,6 +93,21 @@ router.post('/:id/share', (req, res) => {
     res.json({ token });
   } catch (err) {
     sendError(res, err);
+  }
+});
+
+router.post('/:id/send', async (req, res, next) => {
+  try {
+    const result = await sendInvoiceEmail(req.user, req.params.id, req.body || {});
+    if (!result) return res.status(404).json({ error: 'Invoice not found.' });
+    res.json(result);
+  } catch (err) {
+    if (sendMailError(res, err)) return;
+    try {
+      sendError(res, err);
+    } catch (unknown) {
+      next(unknown);
+    }
   }
 });
 

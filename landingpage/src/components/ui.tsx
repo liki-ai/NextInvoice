@@ -128,7 +128,7 @@ export function Modal({
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto bg-[#F7F8F9]">{children}</div>
-        {footer ? <div className="flex justify-end gap-3 border-t border-brand-ink/8 px-6 py-4">{footer}</div> : null}
+        {footer ? <div className="flex flex-wrap items-center justify-end gap-3 border-t border-brand-ink/8 px-6 py-4">{footer}</div> : null}
       </div>
     </div>
   )
