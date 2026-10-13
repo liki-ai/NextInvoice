@@ -22,7 +22,7 @@ type DataValue = {
   removeInvoice: (id: string) => Promise<void>
   issueInvoice: (id: string) => Promise<Invoice>
   cancelInvoice: (id: string, reason: string) => Promise<Invoice>
-  correctInvoice: (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; notes?: string; reason: string }) => Promise<Invoice>
+  correctInvoice: (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; taxRate?: number; notes?: string; reason: string }) => Promise<Invoice>
   addInvoicePayment: (id: string, payment: PaymentInput) => Promise<Invoice>
   voidInvoicePayment: (id: string, paymentId: string, reason: string) => Promise<Invoice>
   createObligation: (obligation: Omit<Obligation, 'id' | 'createdAt'>) => Promise<Obligation>
@@ -36,7 +36,8 @@ type DataValue = {
   createItem: (item: Omit<CatalogItem, 'id' | 'createdAt'>) => Promise<CatalogItem>
   updateItem: (id: string, item: Partial<CatalogItem>) => Promise<CatalogItem>
   removeItem: (id: string) => Promise<void>
-  saveProfile: (profile: CompanyProfile) => Promise<CompanyProfile>
+  importInvoices: (payload: unknown) => Promise<{ created: number; clientsCreated: number; skipped: { number: string; reason: string }[] }>
+  saveProfile: (profile: Partial<CompanyProfile>) => Promise<CompanyProfile>
   downloadBackup: () => Promise<void>
   restoreBackup: (backup: unknown) => Promise<void>
 }
@@ -121,7 +122,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return res.invoice
   }, [])
 
-  const correctInvoice = useCallback(async (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; notes?: string; reason: string }) => {
+  const correctInvoice = useCallback(async (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; taxRate?: number; notes?: string; reason: string }) => {
     const res = await api<{ invoice: Invoice }>(`/api/invoices/${id}/correct`, { method: 'POST', body })
     setInvoices((prev) => prev.map((item) => (item.id === id ? res.invoice : item)))
     return res.invoice
@@ -202,7 +203,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setItems((prev) => prev.filter((row) => row.id !== id))
   }, [])
 
-  const saveProfile = useCallback(async (next: CompanyProfile) => {
+  const importInvoices = useCallback(
+    async (payload: unknown) => {
+      const res = await api<{ created: number; clientsCreated: number; skipped: { number: string; reason: string }[] }>('/api/invoices/import', { method: 'POST', body: payload })
+      await refresh()
+      return res
+    },
+    [refresh],
+  )
+
+  const saveProfile = useCallback(async (next: Partial<CompanyProfile>) => {
     const res = await api<{ profile: CompanyProfile }>('/api/profile', { method: 'PUT', body: next })
     setProfile(res.profile)
     if (isLang(res.profile.language)) setLang(res.profile.language)
@@ -254,6 +264,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       createItem,
       updateItem,
       removeItem,
+      importInvoices,
       saveProfile,
       downloadBackup,
       restoreBackup,
@@ -285,6 +296,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       createItem,
       updateItem,
       removeItem,
+      importInvoices,
       saveProfile,
       downloadBackup,
       restoreBackup,

@@ -19,9 +19,19 @@ function isPremiumSubscription(subscription) {
   return subscription.status === 'active' || subscription.status === 'trialing';
 }
 
+function billingHealth() {
+  const price = String(priceId() || '');
+  return {
+    stripe: Boolean(process.env.STRIPE_SECRET_KEY),
+    price: price.startsWith('price_'),
+    webhook: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+  };
+}
+
 module.exports = {
   stripeClient,
   appUrl,
   priceId,
   isPremiumSubscription,
+  billingHealth,
 };

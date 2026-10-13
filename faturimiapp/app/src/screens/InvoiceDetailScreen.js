@@ -183,6 +183,14 @@ export default function InvoiceDetailScreen({ route, navigation }) {
             <Text style={typography.muted}>{t('newInvoice.discount')}</Text>
             <Text style={typography.body}>{formatMoney(Number(invoice.discount) || 0, currency)}</Text>
           </View>
+          {Number(invoice.taxRate) > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={typography.muted}>
+                {t('newInvoice.tax')} {invoice.taxRate}%
+              </Text>
+              <Text style={typography.body}>{formatMoney(Number(invoice.taxAmount) || 0, currency)}</Text>
+            </View>
+          ) : null}
           <View style={styles.totalsRow}>
             <Text style={typography.subtitle}>{t('newInvoice.total')}</Text>
             <Text style={typography.subtitle}>{formatMoney(invoice.total, currency)}</Text>

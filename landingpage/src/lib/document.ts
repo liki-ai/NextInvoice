@@ -21,6 +21,8 @@ export type ClientRecord = {
   phone?: string
   email?: string
   businessId?: string
+  vatNumber?: string
+  fiscalNumber?: string
   notes?: string
   measurements?: Record<string, string>
   photos?: { proofUri?: string; proofData?: string; proofName?: string; proofMime?: string; data?: string }[]
@@ -115,7 +117,11 @@ export function parseLooseDate(value?: string | null) {
   const isoDay = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/)
   if (isoDay) return new Date(Number(isoDay[1]), Number(isoDay[2]) - 1, Number(isoDay[3]))
   const dmy = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/)
-  if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]))
+  if (dmy) {
+    // Day first, as written here; a "month" above 12 means the date was typed month first (9/30/2026).
+    const monthFirst = Number(dmy[2]) > 12 && Number(dmy[1]) <= 12
+    return new Date(Number(dmy[3]), Number(dmy[monthFirst ? 1 : 2]) - 1, Number(dmy[monthFirst ? 2 : 1]))
+  }
   const mdy = raw.match(/^([A-Z]{3})\s+(\d{1,2}),\s*(\d{4})$/i)
   if (mdy) {
     const month = MONTH_ABBR.indexOf(mdy[1].toUpperCase())

@@ -1,6 +1,7 @@
-import type { CompanyProfile } from './invoice'
+import { DEFAULT_EXPORT_NOTE, type CompanyProfile, type Invoice } from './invoice'
 
-export type CompanySampleField = Exclude<keyof CompanyProfile, 'language'>
+/** Fields a new account is seeded with placeholder values for. */
+export type CompanySampleField = 'companyName' | 'contactPerson' | 'nui' | 'streetAddress' | 'state' | 'zipCode' | 'email' | 'phone'
 
 const SAMPLE_VALUES: Record<CompanySampleField, string[]> = {
   companyName: ['Kompania juaj (shembull)', 'Your company (sample)', 'La tua azienda (esempio)'],
@@ -11,13 +12,6 @@ const SAMPLE_VALUES: Record<CompanySampleField, string[]> = {
   zipCode: ['10000'],
   email: ['email@shembull.com', 'email@example.com', 'email@esempio.com'],
   phone: ['+383 00 000 000'],
-  currency: [],
-  bankName: [],
-  iban: [],
-  exportNote: [],
-  industry: [],
-  logoUri: [],
-  logoData: [],
 }
 
 const PLACEHOLDER_KEYS: Record<CompanySampleField, string> = {
@@ -29,14 +23,9 @@ const PLACEHOLDER_KEYS: Record<CompanySampleField, string> = {
   zipCode: 'profile.phZipCode',
   email: 'profile.phEmail',
   phone: 'profile.phPhone',
-  currency: 'profile.phCurrency',
-  bankName: 'profile.phBankName',
-  iban: 'profile.phIban',
-  exportNote: 'profile.phExportNote',
-  industry: 'industry.label',
-  logoUri: 'profile.companyName',
-  logoData: 'profile.companyName',
 }
+
+const SAMPLE_FIELDS = Object.keys(SAMPLE_VALUES) as CompanySampleField[]
 
 export function isSampleCompanyValue(field: CompanySampleField, value: string | undefined) {
   const trimmed = String(value ?? '').trim()
@@ -52,45 +41,53 @@ export function companyPlaceholderKey(field: CompanySampleField) {
   return PLACEHOLDER_KEYS[field]
 }
 
+/** The profile as an editable form: seeded samples become empty fields. */
 export function stripSampleCompanyFields(company: CompanyProfile): CompanyProfile {
   const next = { ...company }
-  ;(Object.keys(SAMPLE_VALUES) as CompanySampleField[]).forEach((field) => {
-    if (field === 'currency') {
-      next.currency = company.currency?.trim() || 'EUR'
-      return
-    }
-    if (field === 'exportNote') {
-      if (company.exportNote === undefined || company.exportNote === null) {
-        next.exportNote = 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'
-      }
-      return
-    }
+  for (const field of SAMPLE_FIELDS) {
     if (isSampleCompanyValue(field, company[field])) next[field] = ''
-  })
+  }
+  next.currency = company.currency?.trim() || 'EUR'
+  if (company.exportNote === undefined || company.exportNote === null) next.exportNote = DEFAULT_EXPORT_NOTE
   return next
 }
 
+/** The profile as printed: anything still a sample is shown as a localized placeholder. */
 export function localizeCompanyProfile(company: CompanyProfile, t: (key: string) => string): CompanyProfile {
-  const pick = (field: CompanySampleField) => {
-    const raw = company[field] ?? ''
-    return isSampleCompanyValue(field, raw) ? t(PLACEHOLDER_KEYS[field]) : raw
+  const next = { ...company }
+  for (const field of SAMPLE_FIELDS) {
+    if (isSampleCompanyValue(field, company[field])) next[field] = t(PLACEHOLDER_KEYS[field])
   }
+  next.currency = company.currency?.trim() || t('profile.phCurrency')
+  next.bankName = company.bankName || ''
+  next.iban = company.iban || ''
+  next.exportNote = company.exportNote === undefined || company.exportNote === null ? DEFAULT_EXPORT_NOTE : company.exportNote
+  return next
+}
+
+/**
+ * The company block for an invoice PDF. An issued invoice carries a frozen copy of the legal details,
+ * so those win; the look (logo, template, colour, signature, stamp) always follows the current profile.
+ */
+export function companyForPdf(
+  invoice: Pick<Invoice, 'companySnapshot'> | null | undefined,
+  profile: CompanyProfile,
+  t: (key: string) => string,
+): CompanyProfile {
+  const live = localizeCompanyProfile(profile, t)
+  const snapshot = invoice?.companySnapshot
+  if (!snapshot) return live
   return {
-    ...company,
-    companyName: pick('companyName'),
-    contactPerson: pick('contactPerson'),
-    nui: pick('nui'),
-    streetAddress: pick('streetAddress'),
-    state: pick('state'),
-    zipCode: pick('zipCode'),
-    email: pick('email'),
-    phone: pick('phone'),
-    currency: company.currency?.trim() || t('profile.phCurrency'),
-    bankName: company.bankName || '',
-    iban: company.iban || '',
-    exportNote:
-      company.exportNote === undefined || company.exportNote === null
-        ? 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'
-        : company.exportNote,
+    ...snapshot,
+    // Added after the first snapshots were taken; older invoices fall back to the profile.
+    vatNumber: snapshot.vatNumber ?? live.vatNumber,
+    swift: snapshot.swift ?? live.swift,
+    website: snapshot.website ?? live.website,
+    industry: snapshot.industry ?? live.industry,
+    logoData: live.logoData,
+    signatureData: live.signatureData,
+    stampData: live.stampData,
+    invoiceTemplate: live.invoiceTemplate,
+    accentColor: live.accentColor,
   }
 }

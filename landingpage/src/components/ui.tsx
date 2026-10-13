@@ -13,18 +13,23 @@ export function Card({ children, className }: { children: ReactNode; className?:
 export function Field({
   label,
   className,
+  wrapperClassName,
+  error,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; wrapperClassName?: string }) {
   return (
-    <label className="mb-5 flex flex-col gap-2.5 last:mb-0">
+    <label className={cn('mb-5 flex flex-col gap-2.5 last:mb-0', wrapperClassName)}>
       <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
       <input
         {...props}
+        aria-invalid={error ? true : undefined}
         className={cn(
           'w-full rounded-xl border border-brand-ink/10 bg-white px-3.5 py-2.5 text-sm text-brand-ink outline-none transition placeholder:text-brand-ink/40 focus:border-brand focus:ring-2 focus:ring-brand/15',
+          error && 'border-[#C0503A] focus:border-[#C0503A] focus:ring-[#C0503A]/15',
           className,
         )}
       />
+      {error ? <span className="-mt-1 text-xs font-medium text-[#C0503A]">{error}</span> : null}
     </label>
   )
 }

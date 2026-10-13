@@ -1,6 +1,8 @@
-import { paymentStatus, remainingOf } from './document'
+import { parseLooseDate, paymentStatus, remainingOf } from './document'
 
-export type Client = { id?: string; fullName: string; address: string; phone: string; email?: string; businessId?: string }
+export { buildInvoiceHtml } from './invoiceTemplates'
+
+export type Client = { id?: string; fullName: string; address: string; phone: string; email?: string; businessId?: string; vatNumber?: string; fiscalNumber?: string }
 
 export type InvoiceItem = {
   id: string
@@ -26,6 +28,9 @@ export type Invoice = {
   currency?: string
   items: InvoiceItem[]
   discount: string | number
+  /** VAT as a percentage (18 = 18%). Line prices are net; VAT is added after the discount. */
+  taxRate?: number
+  taxAmount?: number
   notes?: string
   subtotal: number
   total: number
@@ -49,25 +54,42 @@ export type CompanyProfile = {
   companyName: string
   contactPerson: string
   nui: string
+  vatNumber?: string
   streetAddress: string
   state: string
   zipCode: string
   email: string
   phone: string
+  website?: string
   currency: string
   bankName?: string
   iban?: string
-  /** Legal footer on PDF. Empty string = hidden. Missing = use default. */
+  swift?: string
+  /** Legal footer on PDF. Empty string = hidden. Missing = use default. Never printed for service businesses. */
   exportNote?: string
   language?: 'sq' | 'en' | 'it'
   industry?: string
+  /** Set by the mobile app: a path on that phone, useless in a browser. */
   logoUri?: string
   logoData?: string
+  signatureData?: string
+  stampData?: string
+  invoiceTemplate?: string
+  /** Empty = the template's own colour. */
+  accentColor?: string
+  /** Pre-filled on every new invoice. */
+  defaultTaxRate?: number
 }
 
 export const DEFAULT_EXPORT_NOTE = 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'
 
-export function resolveExportNote(company: Pick<CompanyProfile, 'exportNote'> | null | undefined) {
+/** The export-law line is about goods leaving the country, so service businesses never print it. */
+export function usesExportNote(company: Pick<CompanyProfile, 'industry'> | null | undefined) {
+  return company?.industry !== 'services'
+}
+
+export function resolveExportNote(company: Pick<CompanyProfile, 'exportNote' | 'industry'> | null | undefined) {
+  if (!usesExportNote(company)) return ''
   if (!company || company.exportNote === undefined || company.exportNote === null) {
     return DEFAULT_EXPORT_NOTE
   }
@@ -75,7 +97,8 @@ export function resolveExportNote(company: Pick<CompanyProfile, 'exportNote'> | 
 }
 
 const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-const SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
+const SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', CHF: 'CHF', ALL: 'L', MKD: 'ден' }
+export const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'ALL', 'MKD'] as const
 
 export function currencySymbol(currency: string) {
   return SYMBOLS[currency] || currency || '€'
@@ -101,6 +124,17 @@ export function generateId() {
 }
 
 export function generateInvoiceNumber(existing: Invoice[], date = new Date()) {
+  // An account whose invoices are mostly numbered 202610-008 keeps that scheme; the server applies the same rule.
+  const issued = existing.filter((inv) => inv.lifecycle !== 'draft')
+  const dated = issued.filter((inv) => /^\d{6}-\d+$/.test(inv.number || '')).length
+  if (dated > 0 && dated * 2 > issued.length) {
+    const period = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}`
+    const last = issued.reduce((max, inv) => {
+      const match = (inv.number || '').match(/^(\d{6})-(\d+)$/)
+      return match && match[1] === period ? Math.max(max, Number(match[2]) || 0) : max
+    }, 0)
+    return `${period}-${String(last + 1).padStart(3, '0')}`
+  }
   const prefix = MONTH_ABBR[date.getMonth()]
   const sameMonthCount = existing.filter((inv) => (inv.number || '').startsWith(`${prefix}-`)).length
   const seq = String(sameMonthCount + 1).padStart(3, '0')
@@ -112,13 +146,29 @@ export function formatDateForInvoice(date: Date | string = new Date()) {
   return `${MONTH_ABBR[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
-export function computeTotals(items: InvoiceItem[], discount: unknown) {
-  const subtotal = (items || []).reduce(
-    (sum, item) => sum + toNumber(item.quantity) * toNumber(item.unitPrice),
-    0,
-  )
-  const total = Math.max(subtotal - toNumber(discount), 0)
-  return { subtotal, total }
+function cents(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+/** VAT as a percentage, 0–100. Accepts 18, "18" or a spreadsheet-style fraction such as 0.18. */
+export function normalizeTaxRate(value: unknown) {
+  const n = toNumber(value)
+  if (n <= 0) return 0
+  const percent = n < 1 ? n * 100 : n
+  return Math.min(Math.round(percent * 100) / 100, 100)
+}
+
+/**
+ * Line prices are net of VAT and may carry more than two decimals (a net price worked back from a
+ * round gross one), so only the results are rounded. The server computes totals the same way.
+ */
+export function computeTotals(items: InvoiceItem[], discount: unknown, taxRate: unknown = 0) {
+  const gross = (items || []).reduce((sum, item) => sum + toNumber(item.quantity) * toNumber(item.unitPrice), 0)
+  const rate = normalizeTaxRate(taxRate)
+  const subtotal = cents(gross)
+  const net = cents(Math.max(subtotal - cents(toNumber(discount)), 0))
+  const total = rate > 0 ? cents(Math.max(gross - toNumber(discount), 0) * (1 + rate / 100)) : net
+  return { subtotal, net, taxRate: rate, taxAmount: cents(total - net), total }
 }
 
 export function invoiceStatus(invoice: Pick<Invoice, 'status' | 'lifecycle' | 'total' | 'payments'> | null | undefined): InvoiceStatus {
@@ -143,10 +193,17 @@ export function clientKey(name: string | null | undefined) {
     .toLowerCase()
 }
 
+/** The calendar year an invoice belongs to, read from its free-text date. */
+export function invoiceYear(invoice: Pick<Invoice, 'date' | 'createdAt'>) {
+  const date = parseLooseDate(invoice.date) || parseLooseDate(invoice.createdAt)
+  return date ? date.getFullYear() : null
+}
+
 export function sortInvoicesChronologically(invoices: Invoice[]) {
   return [...invoices].sort((a, b) => {
-    const ta = Date.parse(a.date) || Date.parse(a.createdAt || '') || 0
-    const tb = Date.parse(b.date) || Date.parse(b.createdAt || '') || 0
+    // Invoice dates are free text (05.01.2026, JAN 5, 2026 …); Date.parse would read the first as 1 May.
+    const ta = parseLooseDate(a.date)?.getTime() || Date.parse(a.createdAt || '') || 0
+    const tb = parseLooseDate(b.date)?.getTime() || Date.parse(b.createdAt || '') || 0
     if (ta !== tb) return ta - tb
     return String(a.number || '').localeCompare(String(b.number || ''))
   })
@@ -212,6 +269,7 @@ export function draftFromInvoice(source: Invoice, existing: Invoice[]): Omit<Inv
     client: { ...source.client },
     items: (source.items || []).map((item) => ({ ...item, id: generateId() })),
     discount: source.discount,
+    taxRate: source.taxRate || 0,
     notes: source.notes || '',
     subtotal: source.subtotal,
     total: source.total,
@@ -223,122 +281,6 @@ function escapeHtml(value: unknown) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-}
-
-export function buildInvoiceHtml({
-  company,
-  client,
-  invoice,
-  pdfLabels,
-}: {
-  company: CompanyProfile
-  client: Client
-  invoice: Pick<Invoice, 'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency'>
-  pdfLabels: Record<string, string>
-}) {
-  const items = invoice.items || []
-    const { subtotal, total } = computeTotals(items, invoice.discount)
-    const paid = remainingOf(invoice) === 0 && paymentStatus(invoice) !== 'draft' ? total : total - remainingOf(invoice)
-    const due = remainingOf(invoice)
-  const symbol = currencySymbol(company.currency)
-  const exportNote = resolveExportNote(company)
-  const rows = items
-    .map(
-      (item) => `
-        <tr>
-          <td>${escapeHtml(item.description)}</td>
-          <td class="center">${escapeHtml(item.quantity)}</td>
-          <td class="right">${formatMoney(toNumber(item.unitPrice), company.currency)}</td>
-          <td class="right">${formatMoney(toNumber(item.quantity) * toNumber(item.unitPrice), company.currency)}</td>
-        </tr>`,
-    )
-    .join('')
-
-  return `<!DOCTYPE html>
-  <html lang="sq">
-  <head>
-    <meta charset="utf-8" />
-    <style>
-      * { box-sizing: border-box; }
-      body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1D2B2E; padding: 32px; font-size: 13px; }
-      .top-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2C6E7F; padding-bottom: 16px; margin-bottom: 20px; }
-      .company-block h1 { margin: 0 0 6px 0; font-size: 20px; color: #1F4E5A; }
-      .company-block p, .client-block p { margin: 2px 0; color: #444; }
-      .invoice-meta { text-align: right; }
-      .invoice-meta h2 { margin: 0 0 8px 0; font-size: 26px; letter-spacing: 2px; color: #2C6E7F; }
-      .invoice-meta p { margin: 2px 0; }
-      .blocks { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
-      .block-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6B7A7D; margin-bottom: 6px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-      thead tr { background: #2C6E7F; color: #fff; }
-      th, td { padding: 8px 10px; border-bottom: 1px solid #E1E6E7; text-align: left; font-size: 12px; }
-      th.center, td.center { text-align: center; }
-      th.right, td.right { text-align: right; }
-      .totals { width: 260px; margin-left: auto; }
-      .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
-      .totals .total-row { font-weight: 700; font-size: 16px; border-top: 2px solid #2C6E7F; margin-top: 4px; padding-top: 8px; color: #1F4E5A; }
-      .notes { margin-top: 20px; font-size: 12px; color: #555; white-space: pre-wrap; }
-      .payment { margin-top: 20px; font-size: 12px; color: #444; }
-      .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
-      .signature { width: 45%; text-align: center; border-top: 1px solid #999; padding-top: 6px; font-size: 12px; color: #555; }
-      .thank-you { text-align: center; margin-top: 30px; font-size: 13px; color: #2C6E7F; font-weight: 600; }
-      .export-law { text-align: center; margin-top: 8px; font-size: 13px; font-weight: 700; color: #1D2B2E; }
-    </style>
-  </head>
-  <body>
-    <div class="top-row">
-      <div class="company-block">
-        <h1>${escapeHtml(company.companyName)}</h1>
-        ${company.nui ? `<p>${escapeHtml(pdfLabels.nuiLabel)}: ${escapeHtml(company.nui)}</p>` : ''}
-        <p>${escapeHtml(company.streetAddress)}</p>
-        <p>${escapeHtml(company.state)} ${escapeHtml(company.zipCode)}</p>
-        <p>${escapeHtml(company.email)}</p>
-        <p>${escapeHtml(company.phone)}</p>
-      </div>
-      <div class="invoice-meta">
-        <h2>INVOICE</h2>
-        <p>${escapeHtml(pdfLabels.invoiceLabel)}: ${escapeHtml(invoice.number)}</p>
-        <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(invoice.date)}</p>
-        <p>${escapeHtml(pdfLabels.dueDateLabel)}: ${escapeHtml(invoice.dueDate || pdfLabels.onReceipt)}</p>
-      </div>
-    </div>
-    <div class="blocks">
-      <div class="client-block">
-        <div class="block-title">${escapeHtml(pdfLabels.clientLabel)}</div>
-        <p><strong>${escapeHtml(pdfLabels.fullNameLabel)}:</strong> ${escapeHtml(client.fullName)}</p>
-        <p><strong>${escapeHtml(pdfLabels.addressLabel)}:</strong> ${escapeHtml(client.address)}</p>
-        <p><strong>${escapeHtml(pdfLabels.phoneLabel)}:</strong> ${escapeHtml(client.phone)}</p>
-        ${client.email ? `<p><strong>${escapeHtml(pdfLabels.emailLabel || 'Email')}:</strong> ${escapeHtml(client.email)}</p>` : ''}
-        ${client.businessId ? `<p><strong>${escapeHtml(pdfLabels.nuiLabel)}:</strong> ${escapeHtml(client.businessId)}</p>` : ''}
-      </div>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>${escapeHtml(pdfLabels.description)}</th>
-          <th class="center">${escapeHtml(pdfLabels.quantity)}</th>
-          <th class="right">${escapeHtml(pdfLabels.unit)} (${symbol})</th>
-          <th class="right">${escapeHtml(pdfLabels.sum)}</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="totals">
-      <div><span>${escapeHtml(pdfLabels.subtotal)}</span><span>${formatMoney(subtotal, company.currency)}</span></div>
-      <div><span>${escapeHtml(pdfLabels.discount)}</span><span>${formatMoney(toNumber(invoice.discount), company.currency)}</span></div>
-      <div class="total-row"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, company.currency)}</span></div>
-      ${due > 0 && due < total ? `<div><span>${escapeHtml(pdfLabels.amountPaid || '')}</span><span>${formatMoney(paid, company.currency)}</span></div><div class="total-row"><span>${escapeHtml(pdfLabels.amountDue || pdfLabels.total)}</span><span>${formatMoney(due, company.currency)}</span></div>` : ''}
-    </div>
-    ${invoice.notes ? `<div class="notes">${escapeHtml(invoice.notes)}</div>` : ''}
-    ${company.bankName || company.iban ? `<div class="payment"><div class="block-title">${escapeHtml(pdfLabels.paymentInfo)}</div>${company.bankName ? `<p>${escapeHtml(pdfLabels.bankName)}: ${escapeHtml(company.bankName)}</p>` : ''}${company.iban ? `<p>${escapeHtml(pdfLabels.ibanLabel)}: ${escapeHtml(company.iban)}</p>` : ''}</div>` : ''}
-    <div class="thank-you">${escapeHtml(pdfLabels.thankYou)}</div>
-    ${exportNote ? `<div class="export-law">${escapeHtml(exportNote)}</div>` : ''}
-    <div class="signatures">
-      <div class="signature">${escapeHtml(company.contactPerson)}<br/>${escapeHtml(pdfLabels.issuedBy)}</div>
-      <div class="signature">${escapeHtml(client.fullName)}<br/>${escapeHtml(pdfLabels.receivedBy)}</div>
-    </div>
-  </body>
-  </html>`
 }
 
 function statementItemRows(invoices: Invoice[], currency: string, pdfLabels: Record<string, string>) {
@@ -370,6 +312,16 @@ function statementItemRows(invoices: Invoice[], currency: string, pdfLabels: Rec
           <td></td>
           <td></td>
           <td class="right">-${formatMoney(toNumber(inv.discount), currency)}</td>
+        </tr>`)
+      }
+      const vat = computeTotals(items, inv.discount, inv.taxRate)
+      if (vat.taxAmount > 0) {
+        rows.push(`<tr>
+          <td></td>
+          <td>${escapeHtml(pdfLabels.vat || 'VAT')} ${vat.taxRate}%</td>
+          <td></td>
+          <td></td>
+          <td class="right">${formatMoney(vat.taxAmount, currency)}</td>
         </tr>`)
       }
       return rows

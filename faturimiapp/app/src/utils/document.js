@@ -61,7 +61,11 @@ export function parseLooseDate(value) {
   const isoDay = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
   if (isoDay) return new Date(Number(isoDay[1]), Number(isoDay[2]) - 1, Number(isoDay[3]));
   const dmy = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-  if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+  if (dmy) {
+    // Day first, as written here; a "month" above 12 means the date was typed month first (9/30/2026).
+    const monthFirst = Number(dmy[2]) > 12 && Number(dmy[1]) <= 12;
+    return new Date(Number(dmy[3]), Number(dmy[monthFirst ? 1 : 2]) - 1, Number(dmy[monthFirst ? 2 : 1]));
+  }
   const mdy = raw.match(/^([A-Z]{3})\s+(\d{1,2}),\s*(\d{4})$/i);
   if (mdy) {
     const month = MONTH_ABBR.indexOf(mdy[1].toUpperCase());
@@ -126,7 +130,21 @@ export async function togglePaid(doc, { addPayment, voidPayment, setStatus, payl
 }
 
 export function pdfCompany(invoice, liveProfile) {
-  return invoice?.companySnapshot || liveProfile;
+  const snapshot = invoice?.companySnapshot;
+  if (!snapshot) return liveProfile;
+  return {
+    ...snapshot,
+    // Added after the first snapshots were taken; older invoices fall back to the profile.
+    vatNumber: snapshot.vatNumber ?? liveProfile?.vatNumber,
+    swift: snapshot.swift ?? liveProfile?.swift,
+    website: snapshot.website ?? liveProfile?.website,
+    industry: snapshot.industry ?? liveProfile?.industry,
+    logoData: liveProfile?.logoData,
+    signatureData: liveProfile?.signatureData,
+    stampData: liveProfile?.stampData,
+    invoiceTemplate: liveProfile?.invoiceTemplate,
+    accentColor: liveProfile?.accentColor,
+  };
 }
 
 export function pdfClient(invoice) {

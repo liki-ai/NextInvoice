@@ -9,6 +9,7 @@ const {
   issueInvoice,
   cancelInvoice,
   correctInvoice,
+  importInvoices,
   addPayment,
   voidPayment,
 } = require('../store');
@@ -32,6 +33,8 @@ function sendError(res, err) {
     DATE_REQUIRED: [400, 'Payment date is required.'],
     VOID_REASON: [400, 'A reason is required to correct a payment.'],
     PAYMENTS_EXCEED: [400, 'Correction would make recorded payments exceed the new total.'],
+    IMPORT_EMPTY: [400, 'The file has no invoices to import.'],
+    IMPORT_TOO_LARGE: [413, 'Import up to 2000 invoices at a time.'],
   };
   const mapped = map[err.message];
   if (!mapped) throw err;
@@ -56,6 +59,14 @@ router.post('/', (req, res) => {
   try {
     const saved = addInvoice(req.user.id, invoice);
     res.status(201).json({ invoice: saved });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.post('/import', (req, res) => {
+  try {
+    res.status(201).json(importInvoices(req.user.id, req.body || {}));
   } catch (err) {
     sendError(res, err);
   }

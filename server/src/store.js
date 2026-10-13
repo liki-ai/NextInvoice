@@ -11,6 +11,9 @@ const {
   paymentStatus,
   documentTotals,
   money,
+  toNumber,
+  invoiceTotals,
+  parseLooseDate,
 } = require('./domain');
 
 const DEFAULT_COMPANY_PROFILE = {
@@ -366,6 +369,11 @@ function attachInvoiceSnapshots(userId, invoice, { issued } = {}) {
   };
 }
 
+function totalFields(items, discount, taxRate) {
+  const totals = invoiceTotals(items, discount, taxRate);
+  return { subtotal: totals.subtotal, taxRate: totals.taxRate, taxAmount: totals.taxAmount, total: totals.total };
+}
+
 function addInvoice(userId, invoice) {
   const allowed = canCreateInvoice(userId);
   if (!allowed.ok) {
@@ -390,6 +398,7 @@ function addInvoice(userId, invoice) {
     revisions: Array.isArray(invoice.revisions) ? invoice.revisions : [],
     lifecycle,
     status: invoice.status === 'paid' ? 'paid' : invoice.status === 'cancelled' ? 'cancelled' : 'unpaid',
+    ...totalFields(invoice.items, invoice.discount, invoice.taxRate),
   };
   if (lifecycle === 'issued') {
     saved.number = uniqueIssuedNumber(userId, invoice.number, invoice.date);
@@ -403,7 +412,7 @@ function addInvoice(userId, invoice) {
   return hydrateInvoice(saved, db.profiles[userId]);
 }
 
-const ISSUED_LOCKED_FIELDS = ['items', 'discount', 'subtotal', 'total', 'client', 'number', 'currency', 'companySnapshot', 'clientSnapshot'];
+const ISSUED_LOCKED_FIELDS = ['items', 'discount', 'taxRate', 'subtotal', 'total', 'client', 'number', 'currency', 'companySnapshot', 'clientSnapshot'];
 
 function fieldsChanged(current, partial, keys) {
   return keys.some((key) => {
@@ -438,6 +447,7 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
     throw err;
   }
   const next = { ...current, ...partial, id: invoiceId, updatedAt: nowIso() };
+  if (lifecycle === 'draft') Object.assign(next, totalFields(next.items, next.discount, next.taxRate));
   if (lifecycle === 'draft' && partial.client) {
     next.client = clientSnapshot(partial.client);
     next.clientSnapshot = next.client;
@@ -526,7 +536,7 @@ function cancelInvoice(userId, invoiceId, reason) {
   return hydrateInvoice(list[idx], db.profiles[userId]);
 }
 
-function correctInvoice(userId, invoiceId, { items, discount, notes, reason }) {
+function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, reason }) {
   const why = String(reason || '').trim();
   if (!why) {
     const err = new Error('CORRECT_REASON');
@@ -544,11 +554,8 @@ function correctInvoice(userId, invoiceId, { items, discount, notes, reason }) {
   }
   const nextItems = Array.isArray(items) ? items : current.items;
   const nextDiscount = discount === undefined ? current.discount : discount;
-  const subtotal = (nextItems || []).reduce(
-    (sum, item) => sum + money(item.quantity) * money(item.unitPrice),
-    0,
-  );
-  const total = Math.max(money(subtotal) - money(nextDiscount), 0);
+  const totals = totalFields(nextItems, nextDiscount, taxRate === undefined ? current.taxRate : taxRate);
+  const total = totals.total;
   const hydrated = hydrateInvoice(current, db.profiles[userId]);
   if (hydrated.amountPaid > total) {
     const err = new Error('PAYMENTS_EXCEED');
@@ -561,8 +568,7 @@ function correctInvoice(userId, invoiceId, { items, discount, notes, reason }) {
     items: nextItems,
     discount: nextDiscount,
     notes: notes === undefined ? current.notes : notes,
-    subtotal: money(subtotal),
-    total: money(total),
+    ...totals,
     updatedAt: nowIso(),
     revisions: [
       ...(current.revisions || []),
@@ -570,13 +576,157 @@ function correctInvoice(userId, invoiceId, { items, discount, notes, reason }) {
         type: 'correct',
         reason: why,
         at: nowIso(),
-        previous: { items: current.items, discount: current.discount, subtotal: current.subtotal, total: current.total },
+        previous: { items: current.items, discount: current.discount, taxRate: current.taxRate, subtotal: current.subtotal, total: current.total },
       },
     ],
   };
   db.invoices[userId] = list;
   writeDb(db);
   return hydrateInvoice(list[idx], db.profiles[userId]);
+}
+
+const IMPORT_MAX_INVOICES = 2000;
+
+function sameImportedClient(existing, incoming) {
+  const idA = String(existing?.businessId || '').trim().toLowerCase();
+  const idB = String(incoming?.businessId || '').trim().toLowerCase();
+  if (idA && idB) return idA === idB;
+  const nameA = String(existing?.fullName || '').trim().toLowerCase();
+  const nameB = String(incoming?.fullName || '').trim().toLowerCase();
+  return Boolean(nameA) && nameA === nameB;
+}
+
+function invoiceSortKey(invoice) {
+  const date = parseLooseDate(invoice?.date) || parseLooseDate(invoice?.createdAt);
+  return date ? date.getTime() : 0;
+}
+
+/**
+ * Brings in a history of already-issued invoices (for example from a spreadsheet) in one write.
+ * Invoices keep their own number and date; a number that already exists is skipped, so the same
+ * file can be imported twice without duplicating anything.
+ */
+function importInvoices(userId, payload) {
+  migrateUserData(userId);
+  const incoming = Array.isArray(payload?.invoices) ? payload.invoices : [];
+  if (incoming.length === 0) throw new Error('IMPORT_EMPTY');
+  if (incoming.length > IMPORT_MAX_INVOICES) throw new Error('IMPORT_TOO_LARGE');
+
+  const db = readDb();
+  ensureUserCollections(db, userId);
+  const profile = getProfile(userId);
+  const now = nowIso();
+
+  const clients = [...db.clients[userId]];
+  const clientByKey = new Map();
+  let clientsCreated = 0;
+  for (const raw of Array.isArray(payload?.clients) ? payload.clients : []) {
+    const snap = clientSnapshot(raw);
+    if (!snap.fullName) continue;
+    let client = clients.find((item) => sameImportedClient(item, snap));
+    if (!client) {
+      client = { ...snap, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
+      clients.unshift(client);
+      clientsCreated += 1;
+    }
+    if (raw.key !== undefined) clientByKey.set(String(raw.key), client);
+  }
+
+  const existing = db.invoices[userId];
+  const taken = new Set(existing.filter((item) => item.lifecycle !== 'draft').map((item) => String(item.number || '')));
+  const created = [];
+  const skipped = [];
+  for (const raw of incoming) {
+    const number = String(raw?.number || '').trim();
+    const skip = (reason) => skipped.push({ number, reason });
+    if (!number || number.startsWith('DRAFT-')) {
+      skip('number');
+      continue;
+    }
+    if (taken.has(number)) {
+      skip('exists');
+      continue;
+    }
+    const client = clientByKey.get(String(raw.clientKey)) || (raw.client ? clientSnapshot(raw.client) : null);
+    if (!client || !client.fullName) {
+      skip('client');
+      continue;
+    }
+    const date = parseLooseDate(raw.date);
+    if (!date) {
+      skip('date');
+      continue;
+    }
+    const items = (Array.isArray(raw.items) ? raw.items : [])
+      .map((item) => ({
+        id: crypto.randomUUID(),
+        description: String(item?.description || '').trim().slice(0, 4000),
+        quantity: toNumber(item?.quantity),
+        unitPrice: toNumber(item?.unitPrice),
+      }))
+      .filter((item) => item.description || item.quantity * item.unitPrice !== 0);
+    if (items.length === 0) {
+      skip('items');
+      continue;
+    }
+    const totals = totalFields(items, raw.discount, raw.taxRate);
+    const snapshot = clientSnapshot(client);
+    const paidAmount = Math.min(money(raw.amountPaid), totals.total);
+    // Noon UTC on the invoice's day: the same calendar day in every time zone the apps run in.
+    const stamp = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12)).toISOString();
+    taken.add(number);
+    created.push({
+      id: crypto.randomUUID(),
+      number,
+      date: String(raw.date).trim(),
+      dueDate: String(raw.dueDate || '').trim(),
+      lifecycle: 'issued',
+      status: raw.paid ? 'paid' : 'unpaid',
+      client: snapshot,
+      clientId: snapshot.id || '',
+      clientSnapshot: snapshot,
+      companySnapshot: companySnapshot(profile),
+      snapshotSource: 'issued',
+      currency: profile.currency || 'EUR',
+      items,
+      discount: money(raw.discount),
+      notes: String(raw.notes || '').trim().slice(0, 8000),
+      ...totals,
+      // A deposit recorded in the source file; a fully paid invoice needs no rows (see MIGRATIONS.md).
+      payments:
+        !raw.paid && paidAmount > 0
+          ? [{ id: crypto.randomUUID(), opId: crypto.randomUUID(), amount: paidAmount, date: String(raw.date).trim(), note: 'Import', createdAt: now }]
+          : [],
+      revisions: [{ type: 'import', at: now }],
+      // Dated when the invoice was really issued, so monthly figures and the free-plan counter stay truthful.
+      createdAt: stamp,
+      issuedAt: stamp,
+      updatedAt: now,
+    });
+  }
+
+  const user = findUserById(userId);
+  if (!isPremiumUser(user)) {
+    const thisMonth = monthKey(new Date());
+    const adding = created.filter((item) => monthKey(item.createdAt) === thisMonth).length;
+    const used = invoicesCreatedThisMonth(userId);
+    if (adding > 0 && used + adding > FREE_MONTHLY_LIMIT) {
+      const err = new Error('PLAN_LIMIT');
+      err.usage = canCreateInvoice(userId);
+      throw err;
+    }
+  }
+
+  if (created.length > 0 || clientsCreated > 0) {
+    db.clients[userId] = clients;
+    // Newest first, like the rest of the list. The sort is stable, so same-day invoices keep their order.
+    db.invoices[userId] = [...created, ...existing]
+      .map((item, index) => ({ item, index, key: invoiceSortKey(item) }))
+      .sort((a, b) => b.key - a.key || String(b.item.number || '').localeCompare(String(a.item.number || '')) || a.index - b.index)
+      .map((entry) => entry.item);
+    writeDb(db);
+  }
+  return { created: created.length, clientsCreated, skipped };
 }
 
 function listObligations(userId) {
@@ -1124,6 +1274,7 @@ module.exports = {
   issueInvoice,
   cancelInvoice,
   correctInvoice,
+  importInvoices,
   exportBackup,
   restoreBackup,
   applySync,

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -11,6 +11,14 @@ import { extractCompanyInfo } from '../api/extract';
 import { stripSampleCompanyFields } from '../storage/companySamples';
 import { INDUSTRIES, normalizeIndustry } from '../utils/client';
 import { pickImageFile, proofSource } from '../utils/proof';
+import { DEFAULT_EXPORT_NOTE, usesExportNote } from '../utils/company';
+import { INVOICE_TEMPLATES, normalizeTemplate } from '../pdf/invoiceTemplates';
+
+const TEMPLATE_LABELS = {
+  classic: 'profile.templateClassic',
+  corporate: 'profile.templateCorporate',
+  minimal: 'profile.templateMinimal',
+};
 
 export default function ProfileScreen({ navigation }) {
   const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl, plan, user, token, login, signup, logout } = useApp();
@@ -23,6 +31,11 @@ export default function ProfileScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [importing, setImporting] = useState(false);
+  const scrollRef = useRef(null);
+
+  const scrollLoginIntoView = () => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  };
 
   useEffect(() => {
     setForm(stripSampleCompanyFields(companyProfile));
@@ -69,9 +82,14 @@ export default function ProfileScreen({ navigation }) {
   };
 
   return (
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
-      contentContainerStyle={{ padding: spacing.md, paddingTop: insets.top + spacing.md, paddingBottom: spacing.xl }}
+      contentContainerStyle={{ padding: spacing.md, paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + 120 }}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      automaticallyAdjustKeyboardInsets
     >
       <Text style={typography.title}>{t('more.title')}</Text>
 
@@ -92,13 +110,17 @@ export default function ProfileScreen({ navigation }) {
           onPress={async () => {
             const picked = await pickImageFile(t);
             if (!picked) return;
-            setField('logoUri', picked.proofUri);
-            setField('logoName', picked.proofName);
-            setField('logoMime', picked.proofMime);
+            setForm((prev) => ({
+              ...prev,
+              logoUri: picked.proofUri,
+              logoName: picked.proofName,
+              logoMime: picked.proofMime,
+              logoData: picked.proofData || prev.logoData,
+            }));
           }}
         >
           {logo ? (
-            <Image source={{ uri: proofSource({ proofUri: form.logoUri, proofData: form.logoData }) || logo }} style={styles.logo} />
+            <Image source={{ uri: proofSource({ proofUri: form.logoUri, proofData: form.logoData }) || logo }} style={styles.logo} resizeMode="contain" />
           ) : (
             <Ionicons name="camera-outline" size={28} color={colors.primary} />
           )}
@@ -139,6 +161,7 @@ export default function ProfileScreen({ navigation }) {
         <FormField label={t('profile.companyName')} value={form.companyName} placeholder={t('profile.phCompanyName')} onChangeText={(v) => setField('companyName', v)} />
         <FormField label={t('profile.contactPerson')} value={form.contactPerson} placeholder={t('profile.phContactPerson')} onChangeText={(v) => setField('contactPerson', v)} />
         <FormField label={t('profile.nui')} value={form.nui} placeholder={t('profile.phNui')} onChangeText={(v) => setField('nui', v)} autoCapitalize="characters" />
+        <FormField label={t('profile.vatNumber')} value={form.vatNumber || ''} placeholder={t('profile.phVatNumber')} onChangeText={(v) => setField('vatNumber', v)} autoCapitalize="characters" />
         <FormField label={t('profile.streetAddress')} value={form.streetAddress} placeholder={t('profile.phStreetAddress')} onChangeText={(v) => setField('streetAddress', v)} />
         <FormField label={t('profile.state')} value={form.state} placeholder={t('profile.phState')} onChangeText={(v) => setField('state', v)} />
         <FormField label={t('profile.zipCode')} value={form.zipCode} placeholder={t('profile.phZipCode')} onChangeText={(v) => setField('zipCode', v)} />
@@ -147,14 +170,31 @@ export default function ProfileScreen({ navigation }) {
         <FormField label={t('profile.currency')} value={form.currency} placeholder={t('profile.phCurrency')} onChangeText={(v) => setField('currency', v.toUpperCase())} autoCapitalize="characters" maxLength={3} />
         <FormField label={t('profile.bankName')} value={form.bankName || ''} placeholder={t('profile.phBankName')} onChangeText={(v) => setField('bankName', v)} />
         <FormField label={t('profile.iban')} value={form.iban || ''} placeholder={t('profile.phIban')} onChangeText={(v) => setField('iban', v)} autoCapitalize="characters" />
-        <FormField
-          label={t('profile.exportNote')}
-          value={form.exportNote ?? 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'}
-          placeholder={t('profile.phExportNote')}
-          onChangeText={(v) => setField('exportNote', v)}
-          multiline
-          numberOfLines={2}
-        />
+        <FormField label={t('profile.swift')} value={form.swift || ''} placeholder={t('profile.phSwift')} onChangeText={(v) => setField('swift', v.toUpperCase())} autoCapitalize="characters" maxLength={11} />
+        {usesExportNote(form) ? (
+          <FormField
+            label={t('profile.exportNote')}
+            value={form.exportNote ?? DEFAULT_EXPORT_NOTE}
+            placeholder={t('profile.phExportNote')}
+            onChangeText={(v) => setField('exportNote', v)}
+            multiline
+            numberOfLines={2}
+          />
+        ) : null}
+      </Section>
+
+      <Section title={t('profile.sectionInvoice')}>
+        <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.invoiceHint')}</Text>
+        <View style={styles.chipRow}>
+          {INVOICE_TEMPLATES.map((value) => {
+            const active = normalizeTemplate(form.invoiceTemplate) === value;
+            return (
+              <Pressable key={value} style={[styles.chip, active && styles.chipActive]} onPress={() => setField('invoiceTemplate', value)}>
+                <Text style={active ? styles.chipTextActive : styles.chipText}>{t(TEMPLATE_LABELS[value])}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </Section>
 
       {__DEV__ ? (
@@ -204,8 +244,21 @@ export default function ProfileScreen({ navigation }) {
           <Button title={t('docs.logout')} variant="secondary" onPress={() => void logout()} />
         ) : (
           <>
-            <FormField label={t('docs.email')} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-            <FormField label={t('docs.password')} value={password} onChangeText={setPassword} secureTextEntry />
+            <FormField
+              label={t('docs.email')}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              onFocus={scrollLoginIntoView}
+            />
+            <FormField
+              label={t('docs.password')}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              onFocus={scrollLoginIntoView}
+            />
             <Button
               title={authBusy ? t('common.loading') : t('docs.login')}
               onPress={async () => {
@@ -238,6 +291,7 @@ export default function ProfileScreen({ navigation }) {
         )}
       </Section>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -41,6 +41,8 @@ export function composeClient(fields: Record<string, unknown>) {
     email: String(fields.email || '').trim(),
     address: String(fields.address || '').trim(),
     businessId: String(fields.businessId || '').trim(),
+    vatNumber: String(fields.vatNumber || '').trim(),
+    fiscalNumber: String(fields.fiscalNumber || '').trim(),
     notes: String(fields.notes || '').trim(),
     measurements: (fields.measurements as Record<string, string>) || {},
     photos: Array.isArray(fields.photos) ? fields.photos : [],

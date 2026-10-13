@@ -105,6 +105,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
   const [savingDraft, setSavingDraft] = useState(false);
   const [items, setItems] = useState(() => (existing ? itemsFromInvoice(existing) : [emptyItem()]));
   const [discount, setDiscount] = useState(() => String(existing?.discount ?? '0'));
+  // A new invoice starts from the VAT rate saved in the company profile.
+  const [taxRate, setTaxRate] = useState(() => String(existing?.taxRate ?? companyProfile?.defaultTaxRate ?? 0));
   const [notes, setNotes] = useState(() => existing?.notes || '');
   const [showDiscount, setShowDiscount] = useState(() => Number(existing?.discount) > 0);
   const [showNotes, setShowNotes] = useState(() => Boolean(existing?.notes));
@@ -128,7 +130,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
     setClient(invoiceClientFields(found));
   }, [route?.params?.clientId, clients]);
 
-  const { subtotal, total } = computeTotals(items, discount);
+  const { subtotal, total, taxAmount, taxRate: appliedTaxRate } = computeTotals(items, discount, taxRate);
 
   const applyClient = (item) => {
     setClientId(item.id);
@@ -199,7 +201,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       Alert.alert(t('common.error'), t('newInvoice.validationItems'));
       return null;
     }
-    const totals = computeTotals(validItems, discount);
+    const totals = computeTotals(validItems, discount, taxRate);
     return {
       number: invoiceNumber,
       date,
@@ -208,6 +210,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
       clientId,
       items: validItems,
       discount,
+      taxRate: totals.taxRate,
+      taxAmount: totals.taxAmount,
       notes,
       subtotal: totals.subtotal,
       total: totals.total,
@@ -222,6 +226,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
     dueDate,
     items,
     discount,
+    taxRate,
     notes,
     canAutosaveDraft,
   };
@@ -240,7 +245,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       });
       try {
         const validItems = (snap.items || []).filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0);
-        const totals = computeTotals(validItems, snap.discount);
+        const totals = computeTotals(validItems, snap.discount, snap.taxRate);
         const payload = {
           number: snap.invoiceNumber,
           date: snap.date,
@@ -249,6 +254,8 @@ export default function NewInvoiceScreen({ navigation, route }) {
           clientId: snap.clientId,
           items: validItems,
           discount: snap.discount,
+          taxRate: totals.taxRate,
+          taxAmount: totals.taxAmount,
           notes: snap.notes,
           subtotal: totals.subtotal,
           total: totals.total,
@@ -288,7 +295,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       void persistDraft({ silent: true });
     }, 700);
     return () => clearTimeout(timer);
-  }, [canAutosaveDraft, clientId, client, items, discount, notes, invoiceNumber, date, dueDate, persistDraft]);
+  }, [canAutosaveDraft, clientId, client, items, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft]);
 
   useEffect(() => {
     const unsub = navigation.addListener('beforeRemove', (e) => {
@@ -310,6 +317,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       client,
       items: items.filter((it) => it.description.trim()),
       discount,
+      taxRate: appliedTaxRate,
       notes,
       subtotal,
       total,
@@ -320,7 +328,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
       invoice: draft,
       pdfLabels: t('pdf'),
     });
-  }, [previewVisible, invoiceNumber, date, client, items, discount, notes, subtotal, total, companyProfile, t]);
+  }, [previewVisible, invoiceNumber, date, client, items, discount, appliedTaxRate, notes, subtotal, total, companyProfile, t]);
 
   const handleExtract = async (file) => {
     const photo = file?.uri ? file : null;
@@ -450,6 +458,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
         await correctInvoice(existingId, {
           items: payload.items,
           discount: payload.discount,
+          taxRate: payload.taxRate,
           notes: payload.notes,
           reason: t('newInvoice.saveChanges'),
         });
@@ -752,6 +761,7 @@ export default function NewInvoiceScreen({ navigation, route }) {
               keyboardType="numeric"
             />
           ) : null}
+          <FormField label={t('newInvoice.taxRate')} value={String(taxRate)} onChangeText={setTaxRate} keyboardType="numeric" />
           {showNotes ? (
             <FormField
               label={t('newInvoice.notes')}
@@ -770,6 +780,14 @@ export default function NewInvoiceScreen({ navigation, route }) {
             <View style={styles.totalsRow}>
               <Text style={typography.muted}>{t('newInvoice.discount')}</Text>
               <Text style={typography.body}>{formatMoney(toNumber(discount), companyProfile.currency)}</Text>
+            </View>
+          ) : null}
+          {appliedTaxRate > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={typography.muted}>
+                {t('newInvoice.tax')} {appliedTaxRate}%
+              </Text>
+              <Text style={typography.body}>{formatMoney(taxAmount, companyProfile.currency)}</Text>
             </View>
           ) : null}
           <View style={styles.totalsRow}>

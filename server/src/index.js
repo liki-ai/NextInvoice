@@ -16,6 +16,7 @@ const billingRouter = require('./routes/billing');
 const { handleStripeWebhook } = require('./routes/billing');
 const { initStore } = require('./store');
 const { hasPostgres } = require('./persist');
+const { billingHealth } = require('./billing/stripe');
 
 const app = express();
 
@@ -35,7 +36,13 @@ app.get('/', (_req, res) => {
   });
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true, persist: hasPostgres() ? 'postgres' : 'file' }));
+app.get('/health', (_req, res) =>
+  res.json({
+    ok: true,
+    persist: hasPostgres() ? 'postgres' : 'file',
+    billing: billingHealth(),
+  }),
+);
 
 app.use('/api/auth', authRouter);
 app.use('/api/invoices', invoicesRouter);

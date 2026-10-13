@@ -174,6 +174,7 @@ export default function RootNavigator() {
           headerShown: false,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
+          tabBarHideOnKeyboard: true,
           tabBarStyle: styles.tabBar,
           tabBarItemStyle: styles.tabBarItem,
           tabBarLabelStyle: styles.tabBarLabel,

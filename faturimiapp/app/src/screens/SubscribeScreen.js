@@ -23,7 +23,7 @@ function isSkuMissingError(err) {
 }
 
 export default function SubscribeScreen({ navigation }) {
-  const { settings, plan, setPlanFromPurchase, clearPlan, invoices, token, refreshAccountPlan } = useApp();
+  const { settings, plan, setPlanFromPurchase, clearPlan, invoices, token, user, refreshAccountPlan } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
@@ -178,12 +178,14 @@ export default function SubscribeScreen({ navigation }) {
     setBusy(true);
     setStatus(t('billing.restoring'));
     try {
-      if (token) {
-        const account = await refreshAccountPlan();
-        if (account?.plan === 'premium') {
-          Alert.alert(t('billing.restoreTitle'), t('billing.success'));
-          return;
-        }
+      if (!token) {
+        Alert.alert(t('billing.restoreTitle'), t('billing.restoreNeedLogin'));
+        return;
+      }
+      const account = await refreshAccountPlan();
+      if (account?.plan === 'premium') {
+        Alert.alert(t('billing.restoreTitle'), t('billing.success'));
+        return;
       }
       const purchases = await getAvailablePurchases();
       const owned = (purchases || []).filter((p) => IAP_PRODUCT_IDS.includes(p.productId));
@@ -247,6 +249,13 @@ export default function SubscribeScreen({ navigation }) {
           </Pressable>
         ) : null}
         {status ? <Text style={[typography.muted, { marginTop: spacing.sm }]}>{status}</Text> : null}
+        {token ? (
+          <Text style={[typography.muted, { marginTop: spacing.md, fontSize: 12 }]}>
+            {t('billing.signedInAs', { email: user?.email || '' })}
+          </Text>
+        ) : (
+          <Text style={[styles.warn, { marginTop: spacing.md }]}>{t('billing.stripeLoginHint')}</Text>
+        )}
         {skuError && !isPremium ? (
           <Text style={[styles.warn, { marginTop: spacing.md }]}>{skuError}</Text>
         ) : null}

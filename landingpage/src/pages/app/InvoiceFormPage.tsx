@@ -19,6 +19,8 @@ import {
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { localizeCompanyProfile } from '../../lib/companySamples'
+import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
+import { TemplateSwitch } from '../../components/TemplateSwitch'
 import { clientDisplayName, clientMatchesQuery, composeClient, findMatchingClient, frequentClients } from '../../lib/client'
 import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catalog'
 import { fileToSupportedImageDataUrl } from '../../lib/proof'
@@ -49,6 +51,7 @@ export function InvoiceFormPage() {
     dueDate: existing?.dueDate || '',
     items: existing?.items || [],
     discount: String(existing?.discount ?? '0'),
+    taxRate: String(existing?.taxRate ?? '0'),
     notes: existing?.notes || '',
     canSaveOnly: true,
   })
@@ -73,6 +76,13 @@ export function InvoiceFormPage() {
       : [emptyItem()],
   )
   const [discount, setDiscount] = useState(String(existing?.discount ?? '0'))
+  const [taxRate, setTaxRate] = useState(() => String(existing?.taxRate ?? profile?.defaultTaxRate ?? 0))
+  // A new invoice starts from the VAT rate in Settings, unless the rate was already set by hand.
+  const taxTouched = useRef(Boolean(existing))
+  useEffect(() => {
+    if (taxTouched.current || profile?.defaultTaxRate === undefined) return
+    setTaxRate(String(profile.defaultTaxRate))
+  }, [profile?.defaultTaxRate])
   const [notes, setNotes] = useState(existing?.notes || '')
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState(false)
@@ -96,6 +106,8 @@ export function InvoiceFormPage() {
         : [emptyItem()],
     )
     setDiscount(String(existing.discount ?? '0'))
+    taxTouched.current = true
+    setTaxRate(String(existing.taxRate ?? 0))
     setNotes(existing.notes || '')
   }, [existing?.id])
 
@@ -121,6 +133,8 @@ export function InvoiceFormPage() {
       })),
     )
     setDiscount(String(source.discount ?? '0'))
+    taxTouched.current = true
+    setTaxRate(String(source.taxRate ?? 0))
     setNotes(source.notes || '')
   }, [isEditing, (location as any).state, invoices])
 
@@ -141,7 +155,7 @@ export function InvoiceFormPage() {
   }, [isEditing, searchParams, clients])
 
   const currency = profile?.currency || 'EUR'
-  const { subtotal, total } = computeTotals(items, discount)
+  const { subtotal, total, taxAmount, taxRate: appliedTaxRate } = computeTotals(items, discount, taxRate)
   const issued = Boolean(existing && existing.lifecycle !== 'draft')
   const canSaveOnly = !issued
   const [correctReason, setCorrectReason] = useState('')
@@ -165,6 +179,7 @@ export function InvoiceFormPage() {
     dueDate,
     items,
     discount,
+    taxRate,
     notes,
     canSaveOnly,
   }
@@ -182,7 +197,7 @@ export function InvoiceFormPage() {
     })
     try {
       const validItems = (snap.items || []).filter((it) => String(it.description || '').trim() && toNumber(it.unitPrice) >= 0)
-      const totals = computeTotals(validItems, snap.discount)
+      const totals = computeTotals(validItems, snap.discount, snap.taxRate)
       const payload = {
         number: snap.invoiceNumber,
         date: snap.date,
@@ -191,6 +206,7 @@ export function InvoiceFormPage() {
         clientId: snap.clientId,
         items: validItems,
         discount: snap.discount,
+        taxRate: totals.taxRate,
         notes: snap.notes,
         subtotal: totals.subtotal,
         total: totals.total,
@@ -218,7 +234,7 @@ export function InvoiceFormPage() {
       void persistDraft()
     }, 700)
     return () => window.clearTimeout(timer)
-  }, [canSaveOnly, clientId, client, items, discount, notes, invoiceNumber, date, dueDate, persistDraft])
+  }, [canSaveOnly, clientId, client, items, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
 
   const draft = useMemo(
     () => ({
@@ -228,12 +244,16 @@ export function InvoiceFormPage() {
       client,
       items,
       discount,
+      taxRate: appliedTaxRate,
       notes,
       subtotal,
       total,
     }),
-    [invoiceNumber, date, dueDate, client, items, discount, notes, subtotal, total],
+    [invoiceNumber, date, dueDate, client, items, discount, appliedTaxRate, notes, subtotal, total],
   )
+
+  const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
+  const template = templateChoice || normalizeTemplate(profile?.invoiceTemplate)
 
   const previewHtml = useMemo(() => {
     if (!preview || !profile) return ''
@@ -242,8 +262,9 @@ export function InvoiceFormPage() {
       client,
       invoice: draft,
       pdfLabels: dict.pdf,
+      template,
     })
-  }, [preview, profile, client, draft, dict.pdf, t])
+  }, [preview, profile, client, draft, template, dict.pdf, t])
 
   function updateItem(id: string, field: keyof InvoiceItem, value: string) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)))
@@ -346,7 +367,7 @@ export function InvoiceFormPage() {
       setError(t('newInvoice.validationItems'))
       return null
     }
-    const totals = computeTotals(validItems, discount)
+    const totals = computeTotals(validItems, discount, taxRate)
     return {
       number: invoiceNumber,
       date,
@@ -355,6 +376,7 @@ export function InvoiceFormPage() {
       clientId,
       items: validItems,
       discount,
+      taxRate: totals.taxRate,
       notes,
       subtotal: totals.subtotal,
       total: totals.total,
@@ -429,7 +451,7 @@ export function InvoiceFormPage() {
       }
       let savedId = persistedIdRef.current || invoiceId
       if (issued && invoiceId) {
-        await correctInvoice(invoiceId, { items: payload.items, discount: payload.discount, notes: payload.notes, reason: correctReason.trim() })
+        await correctInvoice(invoiceId, { items: payload.items, discount: payload.discount, taxRate: payload.taxRate, notes: payload.notes, reason: correctReason.trim() })
         savedId = invoiceId
       } else if (savedId) {
         await updateInvoice(savedId, payload)
@@ -445,6 +467,7 @@ export function InvoiceFormPage() {
           client,
           invoice: { ...payload, number: invoice.number },
           pdfLabels: dict.pdf,
+          template,
         })
         downloadHtmlAsPdf(html, `${invoice.number}.pdf`)
       }
@@ -713,7 +736,34 @@ export function InvoiceFormPage() {
             <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
             <Field label={t('newInvoice.date')} value={date} onChange={(e) => setDate(e.target.value)} />
             <Field label={t('newInvoice.dueDate')} value={dueDate} placeholder={t('newInvoice.phDueDate')} onChange={(e) => setDueDate(e.target.value)} />
-            <Field label={t('newInvoice.discount')} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <Field label={t('newInvoice.discount')} value={discount} inputMode="decimal" onChange={(e) => setDiscount(e.target.value)} />
+            <div className="mb-5">
+              <Field
+                label={t('newInvoice.taxRate')}
+                value={taxRate}
+                inputMode="decimal"
+                onChange={(e) => {
+                  taxTouched.current = true
+                  setTaxRate(e.target.value)
+                }}
+              />
+              <div className="mt-2 flex gap-1.5">
+                {[0, 8, 18].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    aria-pressed={appliedTaxRate === rate}
+                    onClick={() => {
+                      taxTouched.current = true
+                      setTaxRate(String(rate))
+                    }}
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${appliedTaxRate === rate ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/65 hover:border-brand/30'}`}
+                  >
+                    {rate}%
+                  </button>
+                ))}
+              </div>
+            </div>
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Card>
           <Card>
@@ -726,6 +776,14 @@ export function InvoiceFormPage() {
                 <div className="flex justify-between text-brand-ink/55">
                   <span>{t('newInvoice.discount')}</span>
                   <span>{formatMoney(toNumber(discount), currency)}</span>
+                </div>
+              ) : null}
+              {appliedTaxRate > 0 ? (
+                <div className="flex justify-between text-brand-ink/55">
+                  <span>
+                    {t('newInvoice.tax')} {appliedTaxRate}%
+                  </span>
+                  <span>{formatMoney(taxAmount, currency)}</span>
                 </div>
               ) : null}
               <div className="flex justify-between border-t border-brand-ink/10 pt-3 font-display text-2xl font-medium">
@@ -854,6 +912,7 @@ export function InvoiceFormPage() {
             </>
           }
         >
+          <TemplateSwitch value={template} onChange={setTemplateChoice} />
           <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
         </Modal>
       ) : null}

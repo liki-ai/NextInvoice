@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
+import { FileSpreadsheet, FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { Button, Modal } from '../../components/ui'
 import { PaymentModal } from '../../components/PaymentModal'
+import { ImportInvoicesModal } from '../../components/ImportInvoicesModal'
 import {
   buildInvoiceHtml,
   buildInvoiceListHtml,
@@ -16,9 +17,10 @@ import {
   formatStatementFileDate,
   invoiceListFileName,
   invoiceStatus,
+  invoiceYear,
 } from '../../lib/invoice'
 import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
-import { localizeCompanyProfile } from '../../lib/companySamples'
+import { companyForPdf, localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
@@ -39,6 +41,7 @@ export function InvoiceListPage() {
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [payId, setPayId] = useState<string | null>(null)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -47,6 +50,35 @@ export function InvoiceListPage() {
   const currency = profile?.currency || 'EUR'
   const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
   const addedId = searchParams.get('added')
+
+  // The list is split by year. The current year shows unless another is picked; the choice lives in the URL.
+  const currentYear = new Date().getFullYear()
+  const yearCounts = useMemo(() => {
+    const counts = new Map<number, number>([[currentYear, 0]])
+    for (const item of invoices) {
+      const itemYear = invoiceYear(item) ?? currentYear
+      counts.set(itemYear, (counts.get(itemYear) || 0) + 1)
+    }
+    return [...counts.entries()].sort((a, b) => b[0] - a[0])
+  }, [invoices, currentYear])
+  const yearParam = searchParams.get('year')
+  const year: number | 'all' = yearParam === 'all' ? 'all' : yearCounts.some(([value]) => String(value) === yearParam) ? Number(yearParam) : currentYear
+  const yearInvoices = useMemo(
+    () => (year === 'all' ? invoices : invoices.filter((item) => (invoiceYear(item) ?? currentYear) === year)),
+    [invoices, year, currentYear],
+  )
+
+  function setYear(next: number | 'all') {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev)
+        if (next === currentYear) params.delete('year')
+        else params.set('year', String(next))
+        return params
+      },
+      { replace: true },
+    )
+  }
 
   useEffect(() => {
     if (!addedId) return undefined
@@ -77,8 +109,8 @@ export function InvoiceListPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const list = !q
-      ? invoices
-      : invoices.filter((item) => {
+      ? yearInvoices
+      : yearInvoices.filter((item) => {
           const hay = `${item.number} ${item.client?.fullName || ''} ${item.date}`.toLowerCase()
           return hay.includes(q)
         })
@@ -90,16 +122,16 @@ export function InvoiceListPage() {
       const status = invoiceStatus(item)
       return status === 'unpaid' || status === 'partial'
     })
-  }, [invoices, query, statusFilter])
+  }, [yearInvoices, query, statusFilter])
 
-  const unpaidClients = useMemo(() => clientUnpaidSummaries(invoices), [invoices])
+  const unpaidClients = useMemo(() => clientUnpaidSummaries(yearInvoices), [yearInvoices])
   const statementTotal = unpaidClients.reduce((sum, item) => sum + item.unpaidTotal, 0)
   const unpaidInvoiceTotal = formatMoneyList(
-    totalsByCurrency(invoices, (item) => (invoiceStatus(item) === 'paid' ? 0 : remainingOf(item))),
+    totalsByCurrency(yearInvoices, (item) => (invoiceStatus(item) === 'paid' ? 0 : remainingOf(item))),
     formatMoney,
   )
   const paidInvoiceTotal = formatMoneyList(
-    totalsByCurrency(invoices, (item) => (invoiceStatus(item) === 'paid' ? Number(item.total) || 0 : 0)),
+    totalsByCurrency(yearInvoices, (item) => (invoiceStatus(item) === 'paid' ? Number(item.total) || 0 : 0)),
     formatMoney,
   )
 
@@ -130,7 +162,7 @@ export function InvoiceListPage() {
     try {
       if (item.lifecycle === 'draft') await issueInvoice(item.id)
       const html = buildInvoiceHtml({
-        company: item.companySnapshot || localizeCompanyProfile(profile, t),
+        company: companyForPdf(item, profile, t),
         client: item.clientSnapshot || item.client,
         invoice: item,
         pdfLabels: { ...dict.pdf, amountDue: t('docs.amountDue'), amountPaid: t('docs.amountPaid') },
@@ -179,8 +211,44 @@ export function InvoiceListPage() {
         <div>
           <h1 className="font-display text-4xl font-medium tracking-tight">{t('invoiceList.title')}</h1>
           <p className="mt-2 text-sm text-brand-ink/55">{t('invoiceList.subtitle')}</p>
+          {invoices.length > 0 ? (
+            <div className="mt-4 flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={t('invoiceList.year')}>
+              {yearCounts.map(([value, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={year === value}
+                  onClick={() => setYear(value)}
+                  className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold tabular-nums transition ${year === value ? 'bg-brand-ink text-white' : 'border border-brand-ink/10 bg-white text-brand-ink/65 hover:border-brand/30 hover:text-brand-ink'}`}
+                >
+                  {value}
+                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] ${year === value ? 'bg-white/15 text-white/85' : 'bg-brand-bg text-brand-ink/50'}`}>{count}</span>
+                </button>
+              ))}
+              {yearCounts.length > 1 ? (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={year === 'all'}
+                  onClick={() => setYear('all')}
+                  className={`rounded-xl px-3.5 py-2 text-sm font-semibold transition ${year === 'all' ? 'bg-brand-ink text-white' : 'border border-brand-ink/10 bg-white text-brand-ink/65 hover:border-brand/30 hover:text-brand-ink'}`}
+                >
+                  {t('invoiceList.allYears')}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-4 py-2.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            {t('importer.button')}
+          </button>
           {filtered.length > 0 ? (
             <button
               type="button"
@@ -528,6 +596,8 @@ export function InvoiceListPage() {
           onSave={(payment) => addInvoicePayment(payId, payment)}
         />
       ) : null}
+
+      {importOpen ? <ImportInvoicesModal onClose={() => setImportOpen(false)} /> : null}
     </div>
   )
 }

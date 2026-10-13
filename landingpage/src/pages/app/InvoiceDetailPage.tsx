@@ -6,7 +6,9 @@ import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal } from '../../components/ui'
 import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, invoiceStatus } from '../../lib/invoice'
 import { activePayments, daysOverdue, isInvoiceSent, remainingOf, reminderText, visiblePaymentStatus } from '../../lib/document'
-import { localizeCompanyProfile } from '../../lib/companySamples'
+import { companyForPdf } from '../../lib/companySamples'
+import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
+import { TemplateSwitch } from '../../components/TemplateSwitch'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 import { ProofField } from '../../components/ProofField'
 
@@ -20,9 +22,10 @@ export function InvoiceDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [copied, setCopied] = useState(false)
+  const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
   const invoice = invoices.find((item) => item.id === invoiceId)
-  const liveCompany = profile ? localizeCompanyProfile(profile, t) : null
-  const company = invoice?.companySnapshot || liveCompany
+  const company = useMemo(() => (profile ? companyForPdf(invoice, profile, t) : invoice?.companySnapshot || null), [invoice, profile, t])
+  const template = templateChoice || normalizeTemplate(company?.invoiceTemplate)
   const client = invoice?.clientSnapshot || invoice?.client
   const currency = invoice?.currency || company?.currency || 'EUR'
   const status = invoice ? invoiceStatus(invoice) : 'unpaid'
@@ -38,8 +41,9 @@ export function InvoiceDetailPage() {
       client,
       invoice,
       pdfLabels: { ...dict.pdf, amountDue: t('docs.amountDue'), amountPaid: t('docs.amountPaid') },
+      template,
     })
-  }, [invoice, company, client, preview, dict.pdf, t])
+  }, [invoice, company, client, preview, template, dict.pdf, t])
 
   if (!invoice) {
     return <p className="text-brand-ink/60">{loading ? t('common.loading') : t('invoiceList.empty')}</p>
@@ -100,6 +104,7 @@ export function InvoiceDetailPage() {
       client,
       invoice: current,
       pdfLabels: { ...dict.pdf, amountDue: t('docs.amountDue'), amountPaid: t('docs.amountPaid') },
+      template,
     })
     downloadHtmlAsPdf(doc, `${current.number}.pdf`)
     void updateInvoice(current.id, { sent: true, sentAt: new Date().toISOString() })
@@ -207,6 +212,11 @@ export function InvoiceDetailPage() {
             <p className="text-sm text-brand-ink/55">{client?.phone}</p>
             {client?.email ? <p className="text-sm text-brand-ink/55">{client.email}</p> : null}
             {client?.businessId ? <p className="text-sm text-brand-ink/55">{client.businessId}</p> : null}
+            {client?.vatNumber ? (
+              <p className="text-sm text-brand-ink/55">
+                {t('clients.vatNumber')}: {client.vatNumber}
+              </p>
+            ) : null}
           </Card>
 
           <Card className="overflow-hidden p-0">
@@ -311,6 +321,14 @@ export function InvoiceDetailPage() {
               <span>{t('newInvoice.discount')}</span>
               <span>{formatMoney(Number(invoice.discount) || 0, currency)}</span>
             </div>
+            {Number(invoice.taxRate) > 0 ? (
+              <div className="flex justify-between text-brand-ink/60">
+                <span>
+                  {t('newInvoice.tax')} {invoice.taxRate}%
+                </span>
+                <span>{formatMoney(Number(invoice.taxAmount) || 0, currency)}</span>
+              </div>
+            ) : null}
             <div className="flex justify-between border-t border-brand-ink/10 pt-3 font-display text-2xl font-medium">
               <span>{t('newInvoice.total')}</span>
               <span>{formatMoney(invoice.total, currency)}</span>
@@ -373,6 +391,7 @@ export function InvoiceDetailPage() {
             </>
           }
         >
+          <TemplateSwitch value={template} onChange={setTemplateChoice} />
           <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={html} />
         </Modal>
       ) : null}

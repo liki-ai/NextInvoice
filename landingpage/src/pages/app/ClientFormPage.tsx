@@ -21,6 +21,8 @@ export function ClientFormPage() {
   const [email, setEmail] = useState(existing?.email || '')
   const [address, setAddress] = useState(existing?.address || '')
   const [businessId, setBusinessId] = useState(existing?.businessId || '')
+  const [vatNumber, setVatNumber] = useState(existing?.vatNumber || '')
+  const [fiscalNumber, setFiscalNumber] = useState(existing?.fiscalNumber || '')
   const [measurements, setMeasurements] = useState<Record<string, string>>(existing?.measurements || {})
   const [photos, setPhotos] = useState(existing?.photos || [])
   const [viewPhoto, setViewPhoto] = useState<(typeof photos)[number] | null>(null)
@@ -35,11 +37,13 @@ export function ClientFormPage() {
         email,
         address,
         businessId,
+        vatNumber,
+        fiscalNumber,
         notes: existing?.notes || '',
         measurements: fashion ? measurements : existing?.measurements || {},
         photos: fashion ? photos : existing?.photos || [],
       }),
-    [fullName, phone, email, address, businessId, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
+    [fullName, phone, email, address, businessId, vatNumber, fiscalNumber, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
   )
 
   async function persist(thenInvoice: boolean) {
@@ -47,7 +51,8 @@ export function ClientFormPage() {
       setError(t('clients.validationName'))
       return
     }
-    if (!payload.phone) {
+    // Clients brought in from a spreadsheet often have no phone; editing them must not demand one.
+    if (!payload.phone && !(existing && !existing.phone)) {
       setError(t('clients.validationPhone'))
       return
     }
@@ -88,6 +93,8 @@ export function ClientFormPage() {
           <div className="sm:col-span-2">
             <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={businessId} onChange={(e) => setBusinessId(e.target.value)} />
           </div>
+          <Field label={`${t('clients.fiscalNumber')} (${t('common.optional')})`} value={fiscalNumber} onChange={(e) => setFiscalNumber(e.target.value)} />
+          <Field label={`${t('clients.vatNumber')} (${t('common.optional')})`} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
         </div>
 
         {fashion ? (
