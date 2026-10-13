@@ -7,8 +7,8 @@ import { api } from '../../lib/api'
 import { Button, Modal } from '../../components/ui'
 import { PaymentModal } from '../../components/PaymentModal'
 import { ImportInvoicesModal } from '../../components/ImportInvoicesModal'
+import { SendInvoiceModal } from '../../components/SendInvoiceModal'
 import {
-  buildInvoiceHtml,
   buildInvoiceListHtml,
   clientUnpaidSummaries,
   downloadHtmlAsPdf,
@@ -20,7 +20,7 @@ import {
   invoiceYear,
 } from '../../lib/invoice'
 import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
-import { companyForPdf, localizeCompanyProfile } from '../../lib/companySamples'
+import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
@@ -49,7 +49,7 @@ export function InvoiceListPage() {
   const [bulkError, setBulkError] = useState('')
   const selectAllRef = useRef<HTMLInputElement>(null)
   const [payId, setPayId] = useState<string | null>(null)
-  const [sendingId, setSendingId] = useState<string | null>(null)
+  const [sendId, setSendId] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [pulseId, setPulseId] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -174,6 +174,7 @@ export function InvoiceListPage() {
     }
   }
 
+  const sendTarget = sendId ? invoices.find((item) => item.id === sendId) : undefined
   const unpaidClients = useMemo(() => clientUnpaidSummaries(yearInvoices), [yearInvoices])
   const statementTotal = unpaidClients.reduce((sum, item) => sum + item.unpaidTotal, 0)
   const unpaidInvoiceTotal = formatMoneyList(
@@ -204,26 +205,6 @@ export function InvoiceListPage() {
       return `${t('invoiceList.statusPaid')} ${formatAmountShort(totals.amountPaid)} (-${formatAmountShort(totals.amountDue)})`
     }
     return statusLabel(status)
-  }
-
-  async function onShareInvoice(item: (typeof invoices)[number]) {
-    if (!profile || visiblePaymentStatus(item) === 'cancelled') return
-    setSendingId(item.id)
-    try {
-      if (item.lifecycle === 'draft') await issueInvoice(item.id)
-      const html = buildInvoiceHtml({
-        company: companyForPdf(item, profile, t),
-        client: item.clientSnapshot || item.client,
-        invoice: item,
-        pdfLabels: { ...dict.pdf, amountDue: t('docs.amountDue'), amountPaid: t('docs.amountPaid') },
-      })
-      downloadHtmlAsPdf(html, `${item.number}.pdf`)
-      await updateInvoice(item.id, { sent: true, sentAt: new Date().toISOString() })
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : t('common.error'))
-    } finally {
-      setSendingId(null)
-    }
   }
 
   function statusLabel(status: ReturnType<typeof visiblePaymentStatus>) {
@@ -505,9 +486,8 @@ export function InvoiceListPage() {
                   const sent = isInvoiceSent(item)
                   const canPay = due > 0 && visible !== 'cancelled'
                   const paying = busyId === item.id
-                  const sending = sendingId === item.id
                   const markPaidOrUnpaid = async () => {
-                    if (paying || sending) return
+                    if (paying) return
                     setBusyId(item.id)
                     try {
                       let doc = item
@@ -558,21 +538,15 @@ export function InvoiceListPage() {
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          title={sent ? t('docs.sent') : t('docs.notSent')}
-                          disabled={sending}
-                          onClick={() => void onShareInvoice(item)}
-                          className={`inline-flex h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[11px] font-semibold ${
-                            sent ? 'bg-brand text-white' : 'border border-brand-ink/12 bg-[#F3F4F4] text-brand-ink/55'
+                          title={sent ? t('docs.sent') : t('send.action')}
+                          disabled={visible === 'cancelled'}
+                          onClick={() => setSendId(item.id)}
+                          className={`inline-flex h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[11px] font-semibold transition ${
+                            sent ? 'bg-brand/10 text-brand hover:bg-brand/15' : 'border border-brand bg-white text-brand hover:bg-brand hover:text-white'
                           }`}
                         >
-                          {sending ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <>
-                              <Send className="h-3.5 w-3.5" strokeWidth={sent ? 2.5 : 1.75} />
-                              {sent ? t('docs.sent') : t('docs.notSent')}
-                            </>
-                          )}
+                          {sent ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                          {sent ? t('docs.sent') : t('send.action')}
                         </button>
                         <button
                           type="button"
@@ -700,6 +674,8 @@ export function InvoiceListPage() {
       ) : null}
 
       {importOpen ? <ImportInvoicesModal onClose={() => setImportOpen(false)} /> : null}
+
+      {sendTarget ? <SendInvoiceModal invoice={sendTarget} onClose={() => setSendId(null)} /> : null}
 
       {bulkOpen && chosen.length > 0 ? (
         <Modal

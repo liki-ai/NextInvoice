@@ -828,6 +828,69 @@ function markInvoicesPaid(userId, { ids, date } = {}) {
   return { paid, skipped };
 }
 
+/**
+ * The link code for showing one invoice to its recipient without a login. Created the first time
+ * the invoice is shared and kept, so a link already sent keeps working.
+ */
+function shareInvoice(userId, invoiceId) {
+  migrateUserData(userId);
+  const db = readDb();
+  const list = db.invoices[userId] || [];
+  const idx = list.findIndex((item) => item.id === invoiceId);
+  if (idx === -1) return null;
+  if ((list[idx].lifecycle || 'issued') === 'draft') throw new Error('DRAFT_SHARE');
+  if (!list[idx].shareToken) {
+    list[idx] = { ...list[idx], shareToken: crypto.randomBytes(18).toString('base64url') };
+    db.invoices[userId] = list;
+    writeDb(db);
+  }
+  return list[idx].shareToken;
+}
+
+/** What a recipient may see through a share link: the invoice as printed, nothing internal. */
+function sharedInvoice(token) {
+  const code = String(token || '');
+  if (code.length < 16) return null;
+  const db = readDb();
+  for (const [userId, list] of Object.entries(db.invoices || {})) {
+    const raw = (list || []).find((item) => item.shareToken === code);
+    if (!raw) continue;
+    const invoice = hydrateInvoice(raw, db.profiles[userId]);
+    const client = invoice.clientSnapshot || invoice.client || {};
+    return {
+      invoice: {
+        number: invoice.number,
+        date: invoice.date,
+        dueDate: invoice.dueDate || '',
+        lifecycle: invoice.lifecycle,
+        status: invoice.status,
+        currency: invoice.currency,
+        items: (invoice.items || []).map((item) => ({ id: item.id, description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
+        discount: invoice.discount,
+        taxRate: invoice.taxRate,
+        notes: invoice.notes || '',
+        subtotal: invoice.subtotal,
+        total: invoice.total,
+        amountPaid: invoice.amountPaid,
+        amountDue: invoice.amountDue,
+        payments: (invoice.payments || []).filter((item) => !item.voidedAt).map((item) => ({ id: item.id, amount: item.amount, date: item.date })),
+        companySnapshot: invoice.companySnapshot || null,
+        client: {
+          fullName: client.fullName || '',
+          address: client.address || '',
+          phone: client.phone || '',
+          email: client.email || '',
+          businessId: client.businessId || '',
+          vatNumber: client.vatNumber || '',
+          fiscalNumber: client.fiscalNumber || '',
+        },
+      },
+      profile: db.profiles[userId] || null,
+    };
+  }
+  return null;
+}
+
 function listObligations(userId) {
   migrateUserData(userId);
   const db = readDb();
@@ -1376,6 +1439,8 @@ module.exports = {
   correctInvoice,
   importInvoices,
   markInvoicesPaid,
+  shareInvoice,
+  sharedInvoice,
   exportBackup,
   restoreBackup,
   applySync,

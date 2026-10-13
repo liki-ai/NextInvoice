@@ -56,6 +56,8 @@ export type Invoice = {
   issuedAt?: string
   sent?: boolean
   sentAt?: string
+  /** Code of the link the recipient opens to see this invoice without a login. */
+  shareToken?: string
   createdAt?: string
   updatedAt?: string
   proofUri?: string

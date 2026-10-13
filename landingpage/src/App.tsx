@@ -6,6 +6,7 @@ import { Home } from './pages/Home'
 import { LoginPage, SignupPage, ForgotPage, ResetPage } from './pages/AuthPages'
 
 const AppArea = lazy(() => import('./pages/app/AppArea'))
+const PublicInvoicePage = lazy(() => import('./pages/PublicInvoicePage'))
 
 function AppFallback() {
   const { t } = useI18n()
@@ -23,6 +24,14 @@ export default function App() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/forgot" element={<ForgotPage />} />
             <Route path="/reset" element={<ResetPage />} />
+            <Route
+              path="/i/:token"
+              element={
+                <Suspense fallback={<AppFallback />}>
+                  <PublicInvoicePage />
+                </Suspense>
+              }
+            />
             <Route
               path="/app/*"
               element={

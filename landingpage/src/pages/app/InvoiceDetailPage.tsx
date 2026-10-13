@@ -9,6 +9,7 @@ import { activePayments, daysOverdue, isInvoiceSent, remainingOf, reminderText, 
 import { companyForPdf } from '../../lib/companySamples'
 import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
 import { TemplateSwitch } from '../../components/TemplateSwitch'
+import { SendInvoiceModal } from '../../components/SendInvoiceModal'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 import { ProofField } from '../../components/ProofField'
 
@@ -22,6 +23,7 @@ export function InvoiceDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [copied, setCopied] = useState(false)
+  const [sendOpen, setSendOpen] = useState(false)
   const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
   const invoice = invoices.find((item) => item.id === invoiceId)
   const company = useMemo(() => (profile ? companyForPdf(invoice, profile, t) : invoice?.companySnapshot || null), [invoice, profile, t])
@@ -135,11 +137,11 @@ export function InvoiceDetailPage() {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => void onDownload()}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${sent ? 'bg-brand text-white' : 'border border-brand-ink/12 bg-brand-ink/8 text-brand-ink/55'}`}
+              onClick={() => setSendOpen(true)}
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition ${sent ? 'bg-brand/10 text-brand hover:bg-brand/15' : 'border border-brand bg-white text-brand hover:bg-brand hover:text-white'}`}
             >
               <Send className="h-3 w-3" />
-              {sent ? t('docs.sent') : t('docs.notSent')}
+              {sent ? t('docs.sent') : t('send.action')}
             </button>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -395,6 +397,8 @@ export function InvoiceDetailPage() {
           <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={html} />
         </Modal>
       ) : null}
+
+      {sendOpen ? <SendInvoiceModal invoice={current} onClose={() => setSendOpen(false)} /> : null}
 
       {cancelOpen ? (
         <Modal

@@ -480,6 +480,38 @@ const translations = {
       sampleLine2: 'Mirëmbajtje mujore',
       sampleLine3: 'Konsulencë',
     },
+    send: {
+      action: 'Dërgo',
+      title: 'Dërgo faturën {number}',
+      to: 'Për',
+      toPlaceholder: 'email@klienti.com',
+      subject: 'Subjekti',
+      message: 'Mesazhi',
+      messageLanguage: 'Gjuha e mesazhit',
+      defaultSubject: 'Faturë {number} nga {company}',
+      defaultBody: 'Përshëndetje,\n\nJu dërgojmë faturën {number} të datës {date}, në vlerë {total}.\nAfati i pagesës: {due}.\n\nFaturën mund ta shikoni dhe ta shkarkoni këtu:\n{link}\n{payment}\nFaleminderit,\n{sender}',
+      paymentLine: 'Të dhënat për pagesë: {details}',
+      link: 'Lidhja e faturës',
+      linkHint: 'Klienti e hap faturën nga kjo lidhje dhe e shkarkon si PDF, pa llogari. E sheh kushdo që e ka lidhjen.',
+      preparing: 'Duke përgatitur lidhjen...',
+      copyLink: 'Kopjo lidhjen',
+      copied: 'U kopjua',
+      openMail: 'Hap në email',
+      openGmail: 'Hap në Gmail',
+      copyMessage: 'Kopjo mesazhin',
+      downloadPdf: 'Shkarko PDF',
+      howTo: 'Email-i hapet me marrësin, subjektin dhe mesazhin të plotësuar; ti vetëm shtyp Dërgo.',
+      markSent: 'Shëno si të dërguar',
+      markUnsent: 'Shëno si të padërguar',
+      sentOn: 'E dërguar më {date}',
+      sentNoDate: 'E shënuar si e dërguar',
+      notSentYet: 'Ende e padërguar',
+      draftNote: 'Kjo faturë është ende draft. Për ta dërguar duhet lëshuar; pas kësaj numri dhe shumat nuk ndryshohen më lirisht.',
+      issueAndPrepare: 'Lësho faturën dhe përgatit email-in',
+      publicInvalid: 'Kjo lidhje e faturës nuk është e vlefshme.',
+      publicDownload: 'Shkarko / Printo',
+      publicFrom: 'Faturë nga {company}',
+    },
     importer: {
       button: 'Importo nga Excel',
       title: 'Importo faturat nga Excel',
@@ -1054,6 +1086,38 @@ const translations = {
       sampleLine1: 'Software development (hours)',
       sampleLine2: 'Monthly maintenance',
       sampleLine3: 'Consulting',
+    },
+    send: {
+      action: 'Send',
+      title: 'Send invoice {number}',
+      to: 'To',
+      toPlaceholder: 'email@client.com',
+      subject: 'Subject',
+      message: 'Message',
+      messageLanguage: 'Message language',
+      defaultSubject: 'Invoice {number} from {company}',
+      defaultBody: 'Hello,\n\nPlease find invoice {number} dated {date}, for {total}.\nPayment due: {due}.\n\nYou can view and download the invoice here:\n{link}\n{payment}\nThank you,\n{sender}',
+      paymentLine: 'Payment details: {details}',
+      link: 'Invoice link',
+      linkHint: 'The client opens the invoice from this link and downloads it as a PDF, no account needed. Anyone with the link can see it.',
+      preparing: 'Preparing the link...',
+      copyLink: 'Copy link',
+      copied: 'Copied',
+      openMail: 'Open in email',
+      openGmail: 'Open in Gmail',
+      copyMessage: 'Copy message',
+      downloadPdf: 'Download PDF',
+      howTo: 'The email opens with the recipient, subject and message filled in; you only press Send.',
+      markSent: 'Mark as sent',
+      markUnsent: 'Mark as not sent',
+      sentOn: 'Sent on {date}',
+      sentNoDate: 'Marked as sent',
+      notSentYet: 'Not sent yet',
+      draftNote: 'This invoice is still a draft. It has to be issued before sending; after that its number and amounts are no longer freely editable.',
+      issueAndPrepare: 'Issue the invoice and prepare the email',
+      publicInvalid: 'This invoice link is not valid.',
+      publicDownload: 'Download / Print',
+      publicFrom: 'Invoice from {company}',
     },
     importer: {
       button: 'Import from Excel',
@@ -1630,6 +1694,38 @@ const translations = {
       sampleLine2: 'Manutenzione mensile',
       sampleLine3: 'Consulenza',
     },
+    send: {
+      action: 'Invia',
+      title: 'Invia la fattura {number}',
+      to: 'A',
+      toPlaceholder: 'email@cliente.com',
+      subject: 'Oggetto',
+      message: 'Messaggio',
+      messageLanguage: 'Lingua del messaggio',
+      defaultSubject: 'Fattura {number} da {company}',
+      defaultBody: 'Buongiorno,\n\nLe inviamo la fattura {number} del {date}, per un importo di {total}.\nScadenza del pagamento: {due}.\n\nPuò visualizzare e scaricare la fattura qui:\n{link}\n{payment}\nGrazie,\n{sender}',
+      paymentLine: 'Dati per il pagamento: {details}',
+      link: 'Link della fattura',
+      linkHint: 'Il cliente apre la fattura da questo link e la scarica in PDF, senza account. Chiunque abbia il link può vederla.',
+      preparing: 'Preparazione del link...',
+      copyLink: 'Copia link',
+      copied: 'Copiato',
+      openMail: 'Apri nell’email',
+      openGmail: 'Apri in Gmail',
+      copyMessage: 'Copia messaggio',
+      downloadPdf: 'Scarica PDF',
+      howTo: 'L’email si apre con destinatario, oggetto e messaggio già compilati; devi solo premere Invia.',
+      markSent: 'Segna come inviata',
+      markUnsent: 'Segna come non inviata',
+      sentOn: 'Inviata il {date}',
+      sentNoDate: 'Segnata come inviata',
+      notSentYet: 'Non ancora inviata',
+      draftNote: 'Questa fattura è ancora una bozza. Va emessa prima dell’invio; dopo, numero e importi non sono più liberamente modificabili.',
+      issueAndPrepare: 'Emetti la fattura e prepara l’email',
+      publicInvalid: 'Questo link della fattura non è valido.',
+      publicDownload: 'Scarica / Stampa',
+      publicFrom: 'Fattura da {company}',
+    },
     importer: {
       button: 'Importa da Excel',
       title: 'Importa fatture da Excel',
@@ -1749,6 +1845,19 @@ function getNested(obj: unknown, path: string): unknown {
   }, obj)
 }
 
+/** A string in one particular language, whatever language the interface is showing. */
+export function translateIn(lang: Lang, key: string, params?: Record<string, string | number>) {
+  const value = getNested(translations[lang], key) ?? getNested(translations.sq, key) ?? key
+  if (typeof value !== 'string') return key
+  if (!params) return value
+  return value.replace(/\{(\w+)\}/g, (_m, k: string) => (params[k] !== undefined ? String(params[k]) : `{${k}}`))
+}
+
+/** The labels printed on an invoice, in one particular language. */
+export function pdfLabelsIn(lang: Lang): Record<string, string> {
+  return { ...translations[lang].pdf, amountDue: translations[lang].docs.amountDue, amountPaid: translations[lang].docs.amountPaid }
+}
+
 type I18nValue = {
   lang: Lang
   setLang: (lang: Lang) => void
@@ -1770,12 +1879,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const t = useCallback(
-    (key: string, params?: Record<string, string | number>) => {
-      const value = getNested(translations[lang], key) ?? getNested(translations.sq, key) ?? key
-      if (typeof value !== 'string') return key
-      if (!params) return value
-      return value.replace(/\{(\w+)\}/g, (_m, k: string) => (params[k] !== undefined ? String(params[k]) : `{${k}}`))
-    },
+    (key: string, params?: Record<string, string | number>) => translateIn(lang, key, params),
     [lang],
   )
 

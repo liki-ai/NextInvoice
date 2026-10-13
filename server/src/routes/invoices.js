@@ -11,6 +11,7 @@ const {
   correctInvoice,
   importInvoices,
   markInvoicesPaid,
+  shareInvoice,
   addPayment,
   voidPayment,
 } = require('../store');
@@ -36,6 +37,7 @@ function sendError(res, err) {
     PAYMENTS_EXCEED: [400, 'Correction would make recorded payments exceed the new total.'],
     IMPORT_EMPTY: [400, 'The file has no invoices to import.'],
     BULK_EMPTY: [400, 'Select at least one invoice.'],
+    DRAFT_SHARE: [409, 'Issue the invoice before sharing it.'],
     IMPORT_TOO_LARGE: [413, 'Import up to 2000 invoices at a time.'],
   };
   const mapped = map[err.message];
@@ -77,6 +79,16 @@ router.post('/import', (req, res) => {
 router.post('/mark-paid', (req, res) => {
   try {
     res.json(markInvoicesPaid(req.user.id, req.body || {}));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.post('/:id/share', (req, res) => {
+  try {
+    const token = shareInvoice(req.user.id, req.params.id);
+    if (!token) return res.status(404).json({ error: 'Invoice not found.' });
+    res.json({ token });
   } catch (err) {
     sendError(res, err);
   }
