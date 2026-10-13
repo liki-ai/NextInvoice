@@ -211,14 +211,23 @@ export function InvoiceDetailPage() {
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('invoiceDetail.issuedTo')}</h2>
             <p className="mt-3 text-lg font-semibold">{client?.fullName}</p>
             <p className="mt-1 text-sm text-brand-ink/55">{client?.address}</p>
-            <p className="text-sm text-brand-ink/55">{client?.phone}</p>
-            {client?.email ? <p className="text-sm text-brand-ink/55">{client.email}</p> : null}
-            {client?.businessId ? <p className="text-sm text-brand-ink/55">{client.businessId}</p> : null}
+            {client?.businessId ? (
+              <p className="text-sm text-brand-ink/55">
+                {dict.pdf.nuiLabel}: {client.businessId}
+              </p>
+            ) : null}
+            {client?.fiscalNumber ? (
+              <p className="text-sm text-brand-ink/55">
+                {t('clients.fiscalNumber')}: {client.fiscalNumber}
+              </p>
+            ) : null}
             {client?.vatNumber ? (
               <p className="text-sm text-brand-ink/55">
                 {t('clients.vatNumber')}: {client.vatNumber}
               </p>
             ) : null}
+            <p className="text-sm text-brand-ink/55">{client?.phone}</p>
+            {client?.email ? <p className="text-sm text-brand-ink/55">{client.email}</p> : null}
           </Card>
 
           <Card className="overflow-hidden p-0">

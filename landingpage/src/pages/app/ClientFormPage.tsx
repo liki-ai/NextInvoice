@@ -97,13 +97,13 @@ export function ClientFormPage() {
           <div className="sm:col-span-2">
             <Field label={t('newInvoice.address')} value={address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setAddress(e.target.value)} />
           </div>
-          <Field label={t('newInvoice.phone')} value={phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setPhone(e.target.value)} />
-          <Field label={`${t('docs.email')} (${t('common.optional')})`} value={email} onChange={(e) => setEmail(e.target.value)} />
           <div className="sm:col-span-2">
-            <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={businessId} onChange={(e) => setBusinessId(e.target.value)} />
+            <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={businessId} inputMode="numeric" onChange={(e) => setBusinessId(e.target.value)} />
           </div>
           <Field label={`${t('clients.fiscalNumber')} (${t('common.optional')})`} value={fiscalNumber} onChange={(e) => setFiscalNumber(e.target.value)} />
           <Field label={`${t('clients.vatNumber')} (${t('common.optional')})`} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
+          <Field label={t('newInvoice.phone')} value={phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setPhone(e.target.value)} />
+          <Field label={`${t('docs.email')} (${t('common.optional')})`} value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
 
         <div className="mt-6 border-t border-brand-ink/8 pt-5">

@@ -187,12 +187,26 @@ function clientLines(v) {
   const { client, L } = v;
   return [
     client.address,
-    client.phone,
-    client.email,
     client.businessId ? `${L.nuiLabel}: ${client.businessId}` : '',
     client.fiscalNumber ? `${L.fiscalLabel || 'Fiscal No'}: ${client.fiscalNumber}` : '',
     client.vatNumber ? `${L.vatLabel || 'VAT'}: ${client.vatNumber}` : '',
+    client.phone,
+    client.email,
   ].filter((line) => String(line || '').trim());
+}
+
+/** The client's details as label and value, for a layout that keeps the labels in a column of their own. */
+function clientRows(v) {
+  const { client, L } = v;
+  const rows = [
+    [L.addressLabel, client.address],
+    [L.nuiLabel, client.businessId],
+    [L.fiscalLabel || 'Fiscal No', client.fiscalNumber],
+    [L.vatLabel || 'VAT', client.vatNumber],
+    ['', client.phone],
+    ['', client.email],
+  ];
+  return rows.filter(([, value]) => String(value || '').trim());
 }
 
 /* ------------------------------------------------------------------ classic */
@@ -257,11 +271,11 @@ function classicTemplate(v) {
       <div class="label">${esc(L.clientLabel)}</div>
       <p><strong>${esc(L.fullNameLabel)}:</strong> ${esc(client.fullName)}</p>
       ${client.address ? `<p><strong>${esc(L.addressLabel)}:</strong> ${esc(client.address)}</p>` : ''}
-      ${client.phone ? `<p><strong>${esc(L.phoneLabel)}:</strong> ${esc(client.phone)}</p>` : ''}
-      ${client.email ? `<p><strong>${esc(L.emailLabel || 'Email')}:</strong> ${esc(client.email)}</p>` : ''}
       ${client.businessId ? `<p><strong>${esc(L.nuiLabel)}:</strong> ${esc(client.businessId)}</p>` : ''}
       ${client.fiscalNumber ? `<p><strong>${esc(L.fiscalLabel || 'Fiscal No')}:</strong> ${esc(client.fiscalNumber)}</p>` : ''}
       ${client.vatNumber ? `<p><strong>${esc(L.vatLabel || 'VAT')}:</strong> ${esc(client.vatNumber)}</p>` : ''}
+      ${client.phone ? `<p><strong>${esc(L.phoneLabel)}:</strong> ${esc(client.phone)}</p>` : ''}
+      ${client.email ? `<p><strong>${esc(L.emailLabel || 'Email')}:</strong> ${esc(client.email)}</p>` : ''}
     </div>
     <table class="items">
       <thead>
@@ -400,11 +414,8 @@ function corporateTemplate(v) {
     <div class="parties">
       <table>
         <tr><td class="k">${esc(L.customer || L.clientLabel)}:</td><td>${esc(client.fullName)}</td></tr>
-        ${clientLines(v)
-          .map(
-            (text, index) =>
-              `<tr><td class="k">${index === 0 && client.address ? `${esc(L.addressLabel)}:` : ''}</td><td>${esc(text)}</td></tr>`,
-          )
+        ${clientRows(v)
+          .map(([label, value]) => `<tr><td class="k">${label ? `${esc(label)}:` : ''}</td><td>${esc(value)}</td></tr>`)
           .join('')}
       </table>
       <table>

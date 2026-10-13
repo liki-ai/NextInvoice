@@ -206,7 +206,7 @@ const translations = {
 			pickClient: "Zgjidh klientin",
 			addClient: "Shto klient",
 			email: "Email",
-			businessId: "Identifikuesi i biznesit",
+			businessId: "Numri Unik Identifikues (NUI)",
 			similarClient: "Ka një klient me të njëjtin emër dhe telefon/email. Nuk u bashkua automatikisht.",
 			backup: "Ruajtje rezervë",
 			backupExport: "Shkarko kopjen rezervë",
@@ -727,7 +727,7 @@ const translations = {
 			bankName: "Banka",
 			ibanLabel: "IBAN",
 			fullNameLabel: "Full Name",
-			addressLabel: "Address",
+			addressLabel: "Adresa",
 			phoneLabel: "Phone No",
 			statementTitle: "PREVENTIVI",
 			billedTo: "FATURUAR PËR",
@@ -953,7 +953,7 @@ const translations = {
 			pickClient: "Choose a client",
 			addClient: "Add client",
 			email: "Email",
-			businessId: "Business ID",
+			businessId: "Unique identification number (NUI)",
 			similarClient: "A client with the same name and phone/email already exists. They were not merged.",
 			backup: "Backup",
 			backupExport: "Download backup",
@@ -1700,7 +1700,7 @@ const translations = {
 			pickClient: "Scegli un cliente",
 			addClient: "Aggiungi cliente",
 			email: "Email",
-			businessId: "Identificativo aziendale",
+			businessId: "Numero identificativo univoco (NUI)",
 			similarClient: "Esiste già un cliente con lo stesso nome e telefono/email. Non sono stati uniti.",
 			backup: "Backup",
 			backupExport: "Scarica backup",
@@ -2221,7 +2221,7 @@ const translations = {
 			bankName: "Banca",
 			ibanLabel: "IBAN",
 			fullNameLabel: "Full Name",
-			addressLabel: "Address",
+			addressLabel: "Indirizzo",
 			phoneLabel: "Phone No",
 			statementTitle: "PREVENTIVI",
 			billedTo: "FATTURARE A",
@@ -2457,12 +2457,24 @@ function clientLines(v) {
 	const { client, L } = v;
 	return [
 		client.address,
-		client.phone,
-		client.email,
 		client.businessId ? `${L.nuiLabel}: ${client.businessId}` : "",
 		client.fiscalNumber ? `${L.fiscalLabel || "Fiscal No"}: ${client.fiscalNumber}` : "",
-		client.vatNumber ? `${L.vatLabel || "VAT"}: ${client.vatNumber}` : ""
+		client.vatNumber ? `${L.vatLabel || "VAT"}: ${client.vatNumber}` : "",
+		client.phone,
+		client.email
 	].filter((line) => String(line || "").trim());
+}
+/** The client's details as label and value, for a layout that keeps the labels in a column of their own. */
+function clientRows(v) {
+	const { client, L } = v;
+	return [
+		[L.addressLabel, client.address],
+		[L.nuiLabel, client.businessId],
+		[L.fiscalLabel || "Fiscal No", client.fiscalNumber],
+		[L.vatLabel || "VAT", client.vatNumber],
+		["", client.phone],
+		["", client.email]
+	].filter(([, value]) => String(value || "").trim());
 }
 function classicTemplate(v) {
 	const { company, client, invoice, L, accent, money } = v;
@@ -2524,11 +2536,11 @@ function classicTemplate(v) {
       <div class="label">${esc(L.clientLabel)}</div>
       <p><strong>${esc(L.fullNameLabel)}:</strong> ${esc(client.fullName)}</p>
       ${client.address ? `<p><strong>${esc(L.addressLabel)}:</strong> ${esc(client.address)}</p>` : ""}
-      ${client.phone ? `<p><strong>${esc(L.phoneLabel)}:</strong> ${esc(client.phone)}</p>` : ""}
-      ${client.email ? `<p><strong>${esc(L.emailLabel || "Email")}:</strong> ${esc(client.email)}</p>` : ""}
       ${client.businessId ? `<p><strong>${esc(L.nuiLabel)}:</strong> ${esc(client.businessId)}</p>` : ""}
       ${client.fiscalNumber ? `<p><strong>${esc(L.fiscalLabel || "Fiscal No")}:</strong> ${esc(client.fiscalNumber)}</p>` : ""}
       ${client.vatNumber ? `<p><strong>${esc(L.vatLabel || "VAT")}:</strong> ${esc(client.vatNumber)}</p>` : ""}
+      ${client.phone ? `<p><strong>${esc(L.phoneLabel)}:</strong> ${esc(client.phone)}</p>` : ""}
+      ${client.email ? `<p><strong>${esc(L.emailLabel || "Email")}:</strong> ${esc(client.email)}</p>` : ""}
     </div>
     <table class="items">
       <thead>
@@ -2652,7 +2664,7 @@ function corporateTemplate(v) {
     <div class="parties">
       <table>
         <tr><td class="k">${esc(L.customer || L.clientLabel)}:</td><td>${esc(client.fullName)}</td></tr>
-        ${clientLines(v).map((text, index) => `<tr><td class="k">${index === 0 && client.address ? `${esc(L.addressLabel)}:` : ""}</td><td>${esc(text)}</td></tr>`).join("")}
+        ${clientRows(v).map(([label, value]) => `<tr><td class="k">${label ? `${esc(label)}:` : ""}</td><td>${esc(value)}</td></tr>`).join("")}
       </table>
       <table>
         <tr><td class="k">${esc(L.invoiceLabel)} #:</td><td>${esc(invoice.number)}</td></tr>
@@ -2957,11 +2969,25 @@ function companyForPdf(invoice, profile, t) {
 	const live = localizeCompanyProfile(profile, t);
 	const snapshot = invoice?.companySnapshot;
 	if (!snapshot) return live;
+	const filled = {};
+	for (const key of [
+		"companyName",
+		"contactPerson",
+		"nui",
+		"vatNumber",
+		"streetAddress",
+		"state",
+		"zipCode",
+		"email",
+		"phone",
+		"website",
+		"bankName",
+		"iban",
+		"swift"
+	]) if (!String(snapshot[key] ?? "").trim() && String(live[key] ?? "").trim()) filled[key] = live[key];
 	return {
 		...snapshot,
-		vatNumber: snapshot.vatNumber ?? live.vatNumber,
-		swift: snapshot.swift ?? live.swift,
-		website: snapshot.website ?? live.website,
+		...filled,
 		industry: snapshot.industry ?? live.industry,
 		logoData: live.logoData,
 		signatureData: live.signatureData,

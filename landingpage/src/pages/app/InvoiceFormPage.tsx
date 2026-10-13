@@ -700,6 +700,11 @@ export function InvoiceFormPage() {
                     {client.address}
                   </p>
                 ) : null}
+                {client.businessId ? (
+                  <p className="mt-1 pl-6">
+                    {dict.pdf.nuiLabel}: {client.businessId}
+                  </p>
+                ) : null}
                 {client.phone ? (
                   <p className="mt-1 flex items-start gap-2">
                     <Phone className="mt-0.5 h-4 w-4 shrink-0 text-brand-ink/40" />
@@ -707,7 +712,6 @@ export function InvoiceFormPage() {
                   </p>
                 ) : null}
                 {client.email ? <p className="mt-1 pl-6">{client.email}</p> : null}
-                {client.businessId ? <p className="mt-1 pl-6">{client.businessId}</p> : null}
               </div>
             ) : null}
           </Card>
@@ -987,9 +991,9 @@ export function InvoiceFormPage() {
           <div className="space-y-1 p-6">
             <Field label={t('newInvoice.fullName')} value={addForm.fullName} placeholder={t('newInvoice.phFullName')} onChange={(e) => setAddForm((c) => ({ ...c, fullName: e.target.value }))} />
             <Field label={t('newInvoice.address')} value={addForm.address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setAddForm((c) => ({ ...c, address: e.target.value }))} />
+            <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={addForm.businessId} inputMode="numeric" onChange={(e) => setAddForm((c) => ({ ...c, businessId: e.target.value }))} />
             <Field label={t('newInvoice.phone')} value={addForm.phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setAddForm((c) => ({ ...c, phone: e.target.value }))} />
             <Field label={`${t('docs.email')} (${t('common.optional')})`} value={addForm.email} onChange={(e) => setAddForm((c) => ({ ...c, email: e.target.value }))} />
-            <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={addForm.businessId} onChange={(e) => setAddForm((c) => ({ ...c, businessId: e.target.value }))} />
           </div>
         </Modal>
       ) : null}

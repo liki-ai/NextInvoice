@@ -308,6 +308,37 @@ function findUserById(id) {
   return db.users.find((u) => u.id === id) || null;
 }
 
+const CLIENT_IDENTITY_FIELDS = ['businessId', 'vatNumber', 'fiscalNumber'];
+
+/**
+ * An invoice as the apps and the recipient see it. An issued invoice keeps the client as it was
+ * when issued; identification numbers (NUI, VAT, fiscal) that were still blank then and have since
+ * been entered on the client are shown too, since leaving them off the invoice helps nobody.
+ * Nothing that was on the invoice is ever replaced, and nothing is written back.
+ */
+function hydrateFor(db, userId, raw) {
+  const invoice = hydrateInvoice(raw, db.profiles[userId]);
+  const snapshot = invoice.clientSnapshot || {};
+  const blank = CLIENT_IDENTITY_FIELDS.filter((key) => !String(snapshot[key] || '').trim());
+  if (blank.length === 0) return invoice;
+  const clients = (db.clients && db.clients[userId]) || [];
+  const id = invoice.clientId || snapshot.id;
+  let record = id ? clients.find((item) => item.id === id) : null;
+  if (!record) {
+    const name = String(snapshot.fullName || '').trim().toLowerCase();
+    const sameName = name ? clients.filter((item) => String(item.fullName || '').trim().toLowerCase() === name) : [];
+    if (sameName.length === 1) record = sameName[0];
+  }
+  if (!record) return invoice;
+  const gained = {};
+  for (const key of blank) {
+    const value = String(record[key] || '').trim();
+    if (value) gained[key] = value;
+  }
+  if (Object.keys(gained).length === 0) return invoice;
+  return { ...invoice, client: { ...(invoice.client || {}), ...gained }, clientSnapshot: { ...snapshot, ...gained } };
+}
+
 function getProfile(userId) {
   const db = readDb();
   migrateUserData(userId);
@@ -327,7 +358,7 @@ function listInvoices(userId) {
   migrateUserData(userId);
   const db = readDb();
   const profile = db.profiles[userId];
-  return [...(db.invoices[userId] || [])].map((item) => hydrateInvoice(item, profile));
+  return [...(db.invoices[userId] || [])].map((item) => hydrateFor(db, userId, item));
 }
 
 function getInvoice(userId, invoiceId) {
@@ -454,7 +485,7 @@ function addInvoice(userId, invoice) {
   const lifecycle = invoice.lifecycle === 'draft' ? 'draft' : 'issued';
   const id = invoice.id || crypto.randomUUID();
   const existing = db.invoices[userId].find((item) => item.id === id);
-  if (existing) return hydrateInvoice(existing, db.profiles[userId]);
+  if (existing) return hydrateFor(db, userId, existing);
   const createdAt = invoice.createdAt || nowIso();
   let saved = {
     ...invoice,
@@ -476,7 +507,7 @@ function addInvoice(userId, invoice) {
   }
   db.invoices[userId] = [saved, ...db.invoices[userId].filter((item) => item.id !== id)];
   writeDb(db);
-  return hydrateInvoice(saved, db.profiles[userId]);
+  return hydrateFor(db, userId, saved);
 }
 
 const ISSUED_LOCKED_FIELDS = ['items', 'discount', 'taxRate', 'subtotal', 'total', 'client', 'number', 'currency', 'companySnapshot', 'clientSnapshot'];
@@ -522,7 +553,7 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
   list[idx] = next;
   db.invoices[userId] = list;
   writeDb(db);
-  return hydrateInvoice(list[idx], db.profiles[userId]);
+  return hydrateFor(db, userId, list[idx]);
 }
 
 function deleteInvoice(userId, invoiceId) {
@@ -552,7 +583,7 @@ function issueInvoice(userId, invoiceId) {
     throw err;
   }
   if (current.lifecycle === 'issued' && current.issuedAt) {
-    return hydrateInvoice(current, db.profiles[userId]);
+    return hydrateFor(db, userId, current);
   }
   const issued = attachInvoiceSnapshots(
     userId,
@@ -568,7 +599,7 @@ function issueInvoice(userId, invoiceId) {
   list[idx] = issued;
   db.invoices[userId] = list;
   writeDb(db);
-  return hydrateInvoice(issued, db.profiles[userId]);
+  return hydrateFor(db, userId, issued);
 }
 
 function cancelInvoice(userId, invoiceId, reason) {
@@ -600,7 +631,7 @@ function cancelInvoice(userId, invoiceId, reason) {
   };
   db.invoices[userId] = list;
   writeDb(db);
-  return hydrateInvoice(list[idx], db.profiles[userId]);
+  return hydrateFor(db, userId, list[idx]);
 }
 
 /** The lines of an invoice reduced to what makes its amounts, for telling whether they changed. */
@@ -640,8 +671,8 @@ function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, da
   const nextNotes = notes === undefined ? current.notes : notes;
   const datesChanged = nextDate !== current.date || nextDueDate !== (current.dueDate || '');
   // Nothing to record: the form was saved as it was opened.
-  if (!amountsChanged && !datesChanged && (nextNotes || '') === (current.notes || '')) return hydrateInvoice(current, db.profiles[userId]);
-  const hydrated = hydrateInvoice(current, db.profiles[userId]);
+  if (!amountsChanged && !datesChanged && (nextNotes || '') === (current.notes || '')) return hydrateFor(db, userId, current);
+  const hydrated = hydrateFor(db, userId, current);
   if (hydrated.amountPaid > total) {
     const err = new Error('PAYMENTS_EXCEED');
     err.amountPaid = hydrated.amountPaid;
@@ -669,7 +700,7 @@ function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, da
   };
   db.invoices[userId] = list;
   writeDb(db);
-  return hydrateInvoice(list[idx], db.profiles[userId]);
+  return hydrateFor(db, userId, list[idx]);
 }
 
 const IMPORT_MAX_INVOICES = 2000;
@@ -899,7 +930,7 @@ function recordInvoiceEmail(userId, invoiceId, { from, to, cc, subject, attached
   list[idx] = { ...list[idx], sent: true, sentAt: at, emails: emails.slice(-EMAIL_LOG_MAX), updatedAt: at };
   db.invoices[userId] = list;
   writeDb(db);
-  return hydrateInvoice(list[idx], db.profiles[userId]);
+  return hydrateFor(db, userId, list[idx]);
 }
 
 /** What a recipient may see through a share link: the invoice as printed, nothing internal. */
@@ -910,7 +941,7 @@ function sharedInvoice(token) {
   for (const [userId, list] of Object.entries(db.invoices || {})) {
     const raw = (list || []).find((item) => item.shareToken === code);
     if (!raw) continue;
-    const invoice = hydrateInvoice(raw, db.profiles[userId]);
+    const invoice = hydrateFor(db, userId, raw);
     const client = invoice.clientSnapshot || invoice.client || {};
     return {
       invoice: {
@@ -1028,7 +1059,7 @@ function deleteObligation(userId, obligationId) {
 }
 
 function collectionDoc(userId, kind, id) {
-  if (kind === 'invoice') return { listKey: 'invoices', doc: getInvoice(userId, id), hydrate: (item) => hydrateInvoice(item, getProfile(userId)) };
+  if (kind === 'invoice') return { listKey: 'invoices', doc: getInvoice(userId, id), hydrate: (item) => hydrateFor(readDb(), userId, item) };
   return { listKey: 'obligations', doc: getObligation(userId, id), hydrate: hydrateObligation };
 }
 
@@ -1077,7 +1108,7 @@ function addPayment(userId, kind, docId, payment, options = {}) {
     };
   } else {
     if (savedPayment.opId && payments.some((item) => item.opId && item.opId === savedPayment.opId)) {
-      return isInvoice ? hydrateInvoice(current, db.profiles[userId]) : hydrateObligation(current);
+      return isInvoice ? hydrateFor(db, userId, current) : hydrateObligation(current);
     }
     payments.push(savedPayment);
   }
@@ -1085,7 +1116,7 @@ function addPayment(userId, kind, docId, payment, options = {}) {
   if (isInvoice) db.invoices[userId] = list;
   else db.obligations[userId] = list;
   writeDb(db);
-  return isInvoice ? hydrateInvoice(list[idx], db.profiles[userId]) : hydrateObligation(list[idx]);
+  return isInvoice ? hydrateFor(db, userId, list[idx]) : hydrateObligation(list[idx]);
 }
 
 function voidPayment(userId, kind, docId, paymentId, reason) {
@@ -1110,7 +1141,7 @@ function voidPayment(userId, kind, docId, paymentId, reason) {
   if (isInvoice) db.invoices[userId] = list;
   else db.obligations[userId] = list;
   writeDb(db);
-  return isInvoice ? hydrateInvoice(list[idx], db.profiles[userId]) : hydrateObligation(list[idx]);
+  return isInvoice ? hydrateFor(db, userId, list[idx]) : hydrateObligation(list[idx]);
 }
 
 function listClients(userId) {

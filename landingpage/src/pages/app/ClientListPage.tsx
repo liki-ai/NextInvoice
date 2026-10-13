@@ -12,7 +12,7 @@ function initials(name: string) {
 
 export function ClientListPage() {
   const { clients, removeClient, loading } = useAppData()
-  const { t } = useI18n()
+  const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
 
   const sorted = useMemo(
@@ -62,7 +62,7 @@ export function ClientListPage() {
               <span>{t('clients.title')}</span>
               <span>{t('profile.phone')}</span>
               <span>{t('profile.email')}</span>
-              <span>{t('docs.businessId')}</span>
+              <span>{dict.pdf.nuiLabel}</span>
               <span />
             </div>
             {visible.length === 0 ? <p className="px-5 py-8 text-center text-sm text-brand-ink/55">{t('common.noResults')}</p> : null}
