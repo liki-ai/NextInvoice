@@ -40,6 +40,11 @@ export type Invoice = {
   /** VAT as a percentage (18 = 18%). Line prices are net; VAT is added after the discount. */
   taxRate?: number
   taxAmount?: number
+  /**
+   * The prices were typed with VAT included. Stored unit prices are always net; this only tells
+   * the form to show them with VAT again when the invoice is reopened.
+   */
+  pricesIncludeTax?: boolean
   notes?: string
   subtotal: number
   total: number
@@ -171,6 +176,18 @@ export function normalizeTaxRate(value: unknown) {
  * Line prices are net of VAT and may carry more than two decimals (a net price worked back from a
  * round gross one), so only the results are rounded. The server computes totals the same way.
  */
+/**
+ * The net price to store for a price typed with VAT included. Kept to 8 decimals so that
+ * quantity × price × VAT comes back to exactly the amount that was typed.
+ */
+export function netFromGross(gross: unknown, taxRate: unknown) {
+  return Math.round((toNumber(gross) / (1 + normalizeTaxRate(taxRate) / 100)) * 1e8) / 1e8
+}
+
+export function grossFromNet(net: unknown, taxRate: unknown) {
+  return cents(toNumber(net) * (1 + normalizeTaxRate(taxRate) / 100))
+}
+
 export function computeTotals(items: InvoiceItem[], discount: unknown, taxRate: unknown = 0) {
   const gross = (items || []).reduce((sum, item) => sum + toNumber(item.quantity) * toNumber(item.unitPrice), 0)
   const rate = normalizeTaxRate(taxRate)
@@ -279,6 +296,7 @@ export function draftFromInvoice(source: Invoice, existing: Invoice[]): Omit<Inv
     items: (source.items || []).map((item) => ({ ...item, id: generateId() })),
     discount: source.discount,
     taxRate: source.taxRate || 0,
+    pricesIncludeTax: Boolean(source.pricesIncludeTax),
     notes: source.notes || '',
     subtotal: source.subtotal,
     total: source.total,

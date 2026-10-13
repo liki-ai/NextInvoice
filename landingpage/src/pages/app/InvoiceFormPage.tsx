@@ -13,8 +13,11 @@ import {
   generateId,
   generateInvoiceNumber,
   draftFromInvoice,
+  grossFromNet,
+  netFromGross,
   startingTaxRate,
   toNumber,
+  type Invoice,
   type InvoiceItem,
 } from '../../lib/invoice'
 import { api } from '../../lib/api'
@@ -28,6 +31,16 @@ import { fileToSupportedImageDataUrl } from '../../lib/proof'
 
 function emptyItem(): InvoiceItem {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' }
+}
+
+/** A saved invoice's lines as the form edits them: with VAT added back if that is how they were typed. */
+function formItems(source: { items?: Invoice['items']; taxRate?: number; pricesIncludeTax?: boolean }, freshIds = false): InvoiceItem[] {
+  return (source.items || []).map((it) => ({
+    id: freshIds ? generateId() : it.id || generateId(),
+    description: it.description || '',
+    quantity: String(it.quantity ?? '1'),
+    unitPrice: source.pricesIncludeTax && String(it.unitPrice ?? '') !== '' ? String(grossFromNet(it.unitPrice, source.taxRate)) : String(it.unitPrice ?? ''),
+  }))
 }
 
 export function InvoiceFormPage() {
@@ -53,6 +66,7 @@ export function InvoiceFormPage() {
     items: existing?.items || [],
     discount: String(existing?.discount ?? '0'),
     taxRate: String(existing?.taxRate ?? '0'),
+    pricesIncludeTax: Boolean(existing?.pricesIncludeTax),
     notes: existing?.notes || '',
     canSaveOnly: true,
   })
@@ -66,15 +80,10 @@ export function InvoiceFormPage() {
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()))
   const [dueDate, setDueDate] = useState(() => existing?.dueDate || '')
-  const [items, setItems] = useState<InvoiceItem[]>(() =>
-    existing?.items?.length
-      ? existing.items.map((it) => ({
-          id: it.id || generateId(),
-          description: it.description || '',
-          quantity: String(it.quantity ?? '1'),
-          unitPrice: String(it.unitPrice ?? ''),
-        }))
-      : [emptyItem()],
+  const [items, setItems] = useState<InvoiceItem[]>(() => (existing?.items?.length ? formItems(existing) : [emptyItem()]))
+  // Prices typed with VAT included: the total is what was typed and the subtotal is worked back from it.
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(() =>
+    existing ? Boolean(existing.pricesIncludeTax) : localStorage.getItem('nextinvoice.pricesIncludeTax') === '1',
   )
   const [discount, setDiscount] = useState(String(existing?.discount ?? '0'))
   const [taxRate, setTaxRate] = useState(() => String(existing?.taxRate ?? profile?.defaultTaxRate ?? 0))
@@ -118,16 +127,8 @@ export function InvoiceFormPage() {
     setInvoiceNumber(existing.number)
     setDate(existing.date)
     setDueDate(existing.dueDate || '')
-    setItems(
-      existing.items?.length
-        ? existing.items.map((it) => ({
-            id: it.id || generateId(),
-            description: it.description || '',
-            quantity: String(it.quantity ?? '1'),
-            unitPrice: String(it.unitPrice ?? ''),
-          }))
-        : [emptyItem()],
-    )
+    setItems(existing.items?.length ? formItems(existing) : [emptyItem()])
+    setPricesIncludeTax(Boolean(existing.pricesIncludeTax))
     setDiscount(String(existing.discount ?? '0'))
     taxTouched.current = true
     setTaxRate(String(existing.taxRate ?? 0))
@@ -147,14 +148,8 @@ export function InvoiceFormPage() {
     setInvoiceNumber(draftCopy.number)
     setDate(draftCopy.date)
     setDueDate(draftCopy.dueDate || '')
-    setItems(
-      (source.items || []).map((it) => ({
-        id: generateId(),
-        description: it.description || '',
-        quantity: String(it.quantity ?? '1'),
-        unitPrice: String(it.unitPrice ?? ''),
-      })),
-    )
+    setItems(formItems(source, true))
+    setPricesIncludeTax(Boolean(source.pricesIncludeTax))
     setDiscount(String(source.discount ?? '0'))
     taxTouched.current = true
     setTaxRate(String(source.taxRate ?? 0))
@@ -181,7 +176,12 @@ export function InvoiceFormPage() {
   }, [isEditing, searchParams, clients])
 
   const currency = profile?.currency || 'EUR'
-  const { subtotal, total, taxAmount, taxRate: appliedTaxRate } = computeTotals(items, discount, taxRate)
+  // The lines as they are stored and invoiced: net of VAT, whichever way they were typed.
+  const netItems = useMemo(
+    () => (pricesIncludeTax ? items.map((it) => (String(it.unitPrice).trim() === '' ? it : { ...it, unitPrice: netFromGross(it.unitPrice, taxRate) })) : items),
+    [items, pricesIncludeTax, taxRate],
+  )
+  const { subtotal, total, taxAmount, taxRate: appliedTaxRate } = computeTotals(netItems, discount, taxRate)
   const issued = Boolean(existing && existing.lifecycle !== 'draft')
   const canSaveOnly = !issued
   const [correctReason, setCorrectReason] = useState('')
@@ -203,7 +203,8 @@ export function InvoiceFormPage() {
     invoiceNumber,
     date,
     dueDate,
-    items,
+    items: netItems,
+    pricesIncludeTax,
     discount,
     taxRate,
     notes,
@@ -231,6 +232,7 @@ export function InvoiceFormPage() {
         client: { ...snap.client, id: snap.clientId },
         clientId: snap.clientId,
         items: validItems,
+        pricesIncludeTax: snap.pricesIncludeTax,
         discount: snap.discount,
         taxRate: totals.taxRate,
         notes: snap.notes,
@@ -260,7 +262,7 @@ export function InvoiceFormPage() {
       void persistDraft()
     }, 700)
     return () => window.clearTimeout(timer)
-  }, [canSaveOnly, clientId, client, items, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
+  }, [canSaveOnly, clientId, client, items, pricesIncludeTax, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
 
   const draft = useMemo(
     () => ({
@@ -268,14 +270,14 @@ export function InvoiceFormPage() {
       date,
       dueDate,
       client,
-      items,
+      items: netItems,
       discount,
       taxRate: appliedTaxRate,
       notes,
       subtotal,
       total,
     }),
-    [invoiceNumber, date, dueDate, client, items, discount, appliedTaxRate, notes, subtotal, total],
+    [invoiceNumber, date, dueDate, client, netItems, discount, appliedTaxRate, notes, subtotal, total],
   )
 
   const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
@@ -391,7 +393,7 @@ export function InvoiceFormPage() {
       setError(t('newInvoice.validationClient'))
       return null
     }
-    const validItems = items.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0)
+    const validItems = netItems.filter((it) => it.description.trim() && toNumber(it.unitPrice) >= 0)
     if (validItems.length === 0) {
       setError(t('newInvoice.validationItems'))
       return null
@@ -404,6 +406,7 @@ export function InvoiceFormPage() {
       client: { ...client, id: clientId },
       clientId,
       items: validItems,
+      pricesIncludeTax,
       discount,
       taxRate: totals.taxRate,
       notes,
@@ -686,7 +689,10 @@ export function InvoiceFormPage() {
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold">{t('newInvoice.itemDescription')}</th>
                     <th className="w-24 px-3 py-3 text-left font-semibold">{t('newInvoice.itemQuantity')}</th>
-                    <th className="w-32 px-3 py-3 text-left font-semibold">{t('newInvoice.itemUnitPrice')}</th>
+                    <th className="w-32 px-3 py-3 text-left font-semibold">
+                      {t('newInvoice.itemUnitPrice')}
+                      {pricesIncludeTax && appliedTaxRate > 0 ? <span className="block normal-case tracking-normal text-brand-ink/40">{t('newInvoice.withTax')}</span> : null}
+                    </th>
                     <th className="w-28 px-3 py-3 text-right font-semibold">{t('newInvoice.itemTotal')}</th>
                     <th className="w-12 px-3 py-3" />
                   </tr>
@@ -790,6 +796,23 @@ export function InvoiceFormPage() {
                 ))}
               </div>
               {taxFromClient ? <p className="mt-2 text-xs text-brand-ink/45">{t('newInvoice.taxFromClient')}</p> : null}
+              {appliedTaxRate > 0 ? (
+                <label className="mt-3 flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={pricesIncludeTax}
+                    onChange={(e) => {
+                      setPricesIncludeTax(e.target.checked)
+                      localStorage.setItem('nextinvoice.pricesIncludeTax', e.target.checked ? '1' : '0')
+                    }}
+                    className="mt-0.5 h-4 w-4 accent-[#2C6E7F]"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold">{t('newInvoice.pricesIncludeTax')}</span>
+                    <span className="block text-xs text-brand-ink/45">{t('newInvoice.pricesIncludeTaxHint')}</span>
+                  </span>
+                </label>
+              ) : null}
             </div>
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Card>
