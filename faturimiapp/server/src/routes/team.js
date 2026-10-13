@@ -44,7 +44,8 @@ function describe(user) {
 }
 
 function inviteLink(token) {
-  return `${appUrl()}/signup?invite=${encodeURIComponent(token)}`;
+  // With the slash: that address is a real page on the site, so the link answers 200.
+  return `${appUrl()}/signup/?invite=${encodeURIComponent(token)}`;
 }
 
 /** The owner, and the person asking, are never the target of a role change or a removal. */
