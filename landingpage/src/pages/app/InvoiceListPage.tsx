@@ -121,7 +121,14 @@ export function InvoiceListPage() {
           return hay.includes(q)
         })
 
-    if (statusFilter === 'all') return list
+    // What is still owed leads the list; within each group the order stays as it was.
+    if (statusFilter === 'all') {
+      const owed = (item: (typeof list)[number]) => {
+        const status = invoiceStatus(item)
+        return status === 'unpaid' || status === 'partial'
+      }
+      return [...list.filter(owed), ...list.filter((item) => !owed(item))]
+    }
     if (statusFilter === 'overdue') return list.filter((item) => isOverdue(item))
     if (statusFilter === 'paid') return list.filter((item) => invoiceStatus(item) === 'paid')
     return list.filter((item) => {
