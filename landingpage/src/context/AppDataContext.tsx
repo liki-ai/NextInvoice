@@ -5,7 +5,7 @@ import type { CompanyProfile, Invoice } from '../lib/invoice'
 import type { Obligation } from '../lib/obligation'
 import type { ClientRecord, Payment } from '../lib/document'
 import type { CatalogItem } from '../lib/catalog'
-import type { InvoiceEmailInput, MailSettingsInput, MailState } from '../lib/mail'
+import type { InvoiceEmailInput, MailSettingsInput, MailState, ReminderInput } from '../lib/mail'
 import { useI18n, isLang } from '../i18n'
 
 type PaymentInput = { amount: number; date: string; method?: string; note?: string; opId?: string }
@@ -52,6 +52,10 @@ type DataValue = {
   testMail: (message: { from?: string; subject: string; body: string }) => Promise<{ to: string }>
   /** Emails the invoice from the company mailbox and marks it sent. */
   sendInvoiceEmail: (id: string, message: InvoiceEmailInput) => Promise<{ invoice: Invoice; attached: boolean }>
+  /** Brings recorded payments in line with a bank statement: per invoice, the payments it replaces and the transfers it shows. */
+  reconcileInvoices: (changes: { id: string; void: string[]; add: { amount: number; date: string }[] }[]) => Promise<{ invoices: Invoice[]; skipped: number }>
+  /** Emails one client a payment reminder for the given invoices (or just notes one) and marks them reminded. */
+  remindInvoices: (reminder: ReminderInput) => Promise<{ invoices: Invoice[]; attached: number }>
   downloadBackup: () => Promise<void>
   restoreBackup: (backup: unknown) => Promise<void>
 }
@@ -277,6 +281,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return res
   }, [])
 
+  const reconcileInvoices = useCallback(async (changes: { id: string; void: string[]; add: { amount: number; date: string }[] }[]) => {
+    const res = await api<{ invoices: Invoice[]; skipped: number }>('/api/invoices/reconcile', { method: 'POST', body: { changes } })
+    const updated = new Map(res.invoices.map((item) => [item.id, item]))
+    setInvoices((prev) => prev.map((item) => updated.get(item.id) || item))
+    return res
+  }, [])
+
+  const remindInvoices = useCallback(async (reminder: ReminderInput) => {
+    const res = await api<{ invoices: Invoice[]; attached: number }>('/api/invoices/remind', { method: 'POST', body: reminder })
+    const updated = new Map(res.invoices.map((item) => [item.id, item]))
+    setInvoices((prev) => prev.map((item) => updated.get(item.id) || item))
+    return res
+  }, [])
+
   const downloadBackup = useCallback(async () => {
     const backup = await api<Record<string, unknown>>('/api/sync/backup')
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
@@ -331,6 +349,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       removeMail,
       testMail,
       sendInvoiceEmail,
+      remindInvoices,
+      reconcileInvoices,
       downloadBackup,
       restoreBackup,
     }),
@@ -370,6 +390,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       removeMail,
       testMail,
       sendInvoiceEmail,
+      remindInvoices,
+      reconcileInvoices,
       downloadBackup,
       restoreBackup,
     ],

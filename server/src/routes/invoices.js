@@ -11,12 +11,13 @@ const {
   correctInvoice,
   importInvoices,
   markInvoicesPaid,
+  reconcilePayments,
   shareInvoice,
   addPayment,
   voidPayment,
 } = require('../store');
 
-const { sendInvoiceEmail, sendMailError } = require('./mail');
+const { sendInvoiceEmail, sendPaymentReminder, sendMailError } = require('./mail');
 
 const router = express.Router();
 router.use(authRequired);
@@ -41,6 +42,8 @@ function sendError(res, err) {
     IMPORT_EMPTY: [400, 'The file has no invoices to import.'],
     BULK_EMPTY: [400, 'Select at least one invoice.'],
     DRAFT_SHARE: [409, 'Issue the invoice before sharing it.'],
+    REMIND_NOT_OWED: [409, 'A reminder can only cover issued invoices that are still owed.'],
+    REMIND_CLIENTS: [400, 'A reminder covers the invoices of one client.'],
     IMPORT_TOO_LARGE: [413, 'Import up to 2000 invoices at a time.'],
   };
   const mapped = map[err.message];
@@ -84,6 +87,29 @@ router.post('/mark-paid', (req, res) => {
     res.json(markInvoicesPaid(req.user.id, req.body || {}));
   } catch (err) {
     sendError(res, err);
+  }
+});
+
+router.post('/reconcile', (req, res) => {
+  try {
+    res.json(reconcilePayments(req.user.id, req.body || {}));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.post('/remind', async (req, res, next) => {
+  try {
+    const result = await sendPaymentReminder(req.user, req.body || {});
+    if (!result) return res.status(404).json({ error: 'Invoice not found.' });
+    res.json(result);
+  } catch (err) {
+    if (sendMailError(res, err)) return;
+    try {
+      sendError(res, err);
+    } catch (unknown) {
+      next(unknown);
+    }
   }
 });
 

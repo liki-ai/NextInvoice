@@ -25,6 +25,9 @@ export type MailSettingsInput = { host: string; port: number; user: string; pass
 
 export type InvoiceEmailInput = { from: string; to: string; cc?: string; subject: string; body: string; lang: string; attachPdf: boolean }
 
+/** A payment reminder for one client's invoices; with `record` nothing is sent, it is only noted. */
+export type ReminderInput = { ids: string[]; record?: boolean; from?: string; to?: string; cc?: string; subject?: string; body?: string; lang?: string; attachPdf?: boolean }
+
 export const MAIL_PROVIDERS = [
   { id: 'google', labelKey: 'mail.providerGoogle', host: 'smtp.gmail.com', port: 587 },
   { id: 'googleRelay', labelKey: 'mail.providerGoogleRelay', host: 'smtp-relay.gmail.com', port: 587 },

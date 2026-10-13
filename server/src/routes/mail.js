@@ -1,7 +1,7 @@
 const express = require('express');
 const { authRequired, managerRequired } = require('../auth');
 const { appUrl } = require('../mail');
-const { getProfile, getInvoice, shareInvoice, getMailSettings, saveMailSettings, recordInvoiceEmail } = require('../store');
+const { getProfile, getInvoice, shareInvoice, getMailSettings, saveMailSettings, recordInvoiceEmail, recordInvoiceReminder } = require('../store');
 const { countSend, deliver, mailReady, messageHtml, parseRecipients, pickSender, publicMailSettings, sanitizeMailSettings, verifyConnection } = require('../mailer');
 const { pdfAvailable, htmlToPdf } = require('../pdf');
 
@@ -102,6 +102,63 @@ async function sendInvoiceEmail(user, invoiceId, body) {
   return { invoice: saved, attached: attachments.length > 0 };
 }
 
+const REMINDER_MAX = 25;
+const REMINDER_PDF_MAX = 10;
+
+function sameClient(a, b) {
+  const idA = a.clientId || (a.client && a.client.id);
+  const idB = b.clientId || (b.client && b.client.id);
+  if (idA && idB) return idA === idB;
+  const name = (invoice) => String((invoice.client && invoice.client.fullName) || '').trim().toLowerCase();
+  return Boolean(name(a)) && name(a) === name(b);
+}
+
+/**
+ * Reminds one client to pay: a single email naming every chosen invoice that is still owed, with
+ * the invoices attached, and a note on each of them that the reminder went out. With `record`
+ * set nothing is sent; it only notes a reminder the user delivered some other way.
+ */
+async function sendPaymentReminder(user, body) {
+  const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String))];
+  if (ids.length === 0 || ids.length > REMINDER_MAX) throw new Error('BULK_EMPTY');
+  const invoices = ids.map((id) => getInvoice(user.id, id));
+  if (invoices.some((invoice) => !invoice)) return null;
+  if (invoices.some((invoice) => invoice.lifecycle === 'draft' || invoice.lifecycle === 'cancelled' || !(Number(invoice.amountDue) > 0))) throw new Error('REMIND_NOT_OWED');
+  if (invoices.some((invoice) => !sameClient(invoice, invoices[0]))) throw new Error('REMIND_CLIENTS');
+
+  if (body.record === true) {
+    return { invoices: recordInvoiceReminder(user.id, ids, { emailed: false }), attached: 0 };
+  }
+
+  const settings = getMailSettings(user.id);
+  if (!mailReady(settings)) throw code('MAIL_NOT_CONFIGURED');
+  const profile = getProfile(user.id);
+  const sender = pickSender(settings, user, profile.companyName, body.from);
+  const to = parseRecipients(body.to, { required: true });
+  const cc = parseRecipients(body.cc);
+  const { subject, text } = messageParts(body);
+
+  const render = invoiceRender();
+  const lang = render && render.isLang(body.lang) ? body.lang : profile.language || 'sq';
+  const attachments = [];
+  if (body.attachPdf !== false && canAttachPdf() && invoices.length <= REMINDER_PDF_MAX) {
+    try {
+      for (const invoice of invoices) {
+        const pdf = await htmlToPdf(render.renderInvoiceHtml({ invoice, profile, lang }));
+        attachments.push({ filename: `${String(invoice.number || 'invoice').replace(/[^\w.-]+/g, '_')}.pdf`, content: pdf, contentType: 'application/pdf' });
+      }
+    } catch (err) {
+      console.error('[mail] reminder PDF failed', err);
+      throw code('PDF_FAILED');
+    }
+  }
+
+  countSend(user.id);
+  await deliver(settings, { sender, to, cc, subject, text, html: messageHtml(text, { accent: profile.accentColor }), attachments });
+  const saved = recordInvoiceReminder(user.id, ids, { from: sender.email, to, cc, subject, emailed: true });
+  return { invoices: saved, attached: attachments.length };
+}
+
 router.get('/', (req, res) => {
   res.json(describe(req.user));
 });
@@ -151,4 +208,5 @@ router.post('/test', async (req, res, next) => {
 
 module.exports = router;
 module.exports.sendInvoiceEmail = sendInvoiceEmail;
+module.exports.sendPaymentReminder = sendPaymentReminder;
 module.exports.sendMailError = sendMailError;

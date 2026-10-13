@@ -10,6 +10,7 @@ import { companyForPdf } from '../../lib/companySamples'
 import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
 import { TemplateSwitch } from '../../components/TemplateSwitch'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
+import { PaymentModal } from '../../components/PaymentModal'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 import { ProofField } from '../../components/ProofField'
 
@@ -24,6 +25,7 @@ export function InvoiceDetailPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [copied, setCopied] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
   const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
   const invoice = invoices.find((item) => item.id === invoiceId)
   const company = useMemo(() => (profile ? companyForPdf(invoice, profile, t) : invoice?.companySnapshot || null), [invoice, profile, t])
@@ -367,6 +369,11 @@ export function InvoiceDetailPage() {
                 {t('invoiceList.statusPaid')}
               </Button>
             ) : null}
+            {status !== 'draft' && status !== 'cancelled' && due > 0 ? (
+              <Button type="button" variant="secondary" onClick={() => setPayOpen(true)}>
+                {t('docs.payPartial')}
+              </Button>
+            ) : null}
             {status !== 'cancelled' && status !== 'draft' ? (
               <Button type="button" variant="secondary" disabled={busy} onClick={() => setCancelOpen(true)}>
                 {t('docs.cancelInvoice')}
@@ -386,6 +393,8 @@ export function InvoiceDetailPage() {
           ) : null}
         </Card>
       </div>
+
+      {payOpen ? <PaymentModal doc={current} currency={currency} onClose={() => setPayOpen(false)} onSave={(payment) => addInvoicePayment(current.id, payment)} /> : null}
 
       {preview ? (
         <Modal

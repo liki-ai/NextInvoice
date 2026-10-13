@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { FileSpreadsheet, FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Bell, BellRing, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { Button, Modal } from '../../components/ui'
-import { PaymentModal } from '../../components/PaymentModal'
+import { RemindPaymentModal } from '../../components/RemindPaymentModal'
 import { ImportInvoicesModal } from '../../components/ImportInvoicesModal'
+import { BankMatchModal } from '../../components/BankMatchModal'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
 import {
   buildInvoiceListHtml,
@@ -16,7 +17,9 @@ import {
   formatStatementFileDate,
   invoiceListFileName,
   invoiceStatus,
+  invoiceSubject,
   invoiceYear,
+  lastReminderTime,
 } from '../../lib/invoice'
 import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
@@ -47,7 +50,8 @@ export function InvoiceListPage() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkError, setBulkError] = useState('')
   const selectAllRef = useRef<HTMLInputElement>(null)
-  const [payId, setPayId] = useState<string | null>(null)
+  const [remindId, setRemindId] = useState<string | null>(null)
+  const [bankOpen, setBankOpen] = useState(false)
   const [sendId, setSendId] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [pulseId, setPulseId] = useState<string | null>(null)
@@ -116,7 +120,7 @@ export function InvoiceListPage() {
     const list = !q
       ? yearInvoices
       : yearInvoices.filter((item) => {
-          const hay = `${item.number} ${item.client?.fullName || ''} ${item.date}`.toLowerCase()
+          const hay = `${item.number} ${item.client?.fullName || ''} ${item.date} ${invoiceSubject(item)}`.toLowerCase()
           return hay.includes(q)
         })
 
@@ -135,6 +139,14 @@ export function InvoiceListPage() {
       return status === 'unpaid' || status === 'partial'
     })
   }, [yearInvoices, query, statusFilter])
+
+  // A list is sent to one client, so the button for it shows only once a search has narrowed the
+  // rows to a single client.
+  const oneClient = useMemo(() => {
+    if (!query.trim() || filtered.length === 0) return false
+    const key = (item: (typeof filtered)[number]) => item.clientId || item.client?.id || String(item.client?.fullName || '').trim().toLowerCase()
+    return filtered.every((item) => key(item) === key(filtered[0]))
+  }, [query, filtered])
 
   // Rows that can be ticked: issued invoices with something still owed, among those on screen.
   const payable = useMemo(
@@ -181,6 +193,7 @@ export function InvoiceListPage() {
   }
 
   const sendTarget = sendId ? invoices.find((item) => item.id === sendId) : undefined
+  const remindTarget = remindId ? invoices.find((item) => item.id === remindId) : undefined
   const unpaidInvoiceTotal = formatMoneyList(
     totalsByCurrency(yearInvoices, (item) => (invoiceStatus(item) === 'paid' ? 0 : remainingOf(item))),
     formatMoney,
@@ -284,14 +297,14 @@ export function InvoiceListPage() {
             <FileSpreadsheet className="h-4 w-4" />
             {t('importer.button')}
           </button>
-          {filtered.length > 0 ? (
+          {invoices.length > 0 ? (
             <button
               type="button"
-              onClick={() => setPreview(true)}
+              onClick={() => setBankOpen(true)}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-4 py-2.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
             >
-              <Send className="h-4 w-4" />
-              {send.cta}
+              <Landmark className="h-4 w-4" />
+              {t('bank.button')}
             </button>
           ) : null}
           <Link
@@ -383,6 +396,16 @@ export function InvoiceListPage() {
               placeholder={t('invoiceList.search')}
               className="w-full bg-transparent text-sm outline-none placeholder:text-brand-ink/35"
             />
+            {oneClient ? (
+              <button
+                type="button"
+                onClick={() => setPreview(true)}
+                className="-my-1 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-brand-ink/12 bg-white px-3 py-1.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
+              >
+                <Send className="h-4 w-4" />
+                {send.cta}
+              </button>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2 px-4 py-3">
@@ -468,10 +491,11 @@ export function InvoiceListPage() {
                 {filtered.map((item) => {
                   const status = invoiceStatus(item)
                   const visible = visiblePaymentStatus(item)
+                  const subject = invoiceSubject(item)
                   const late = daysOverdue(item)
-                  const due = remainingOf(item) || (status === 'draft' ? Number(item.total) || 0 : 0)
                   const sent = isInvoiceSent(item)
-                  const canPay = due > 0 && visible !== 'cancelled'
+                  const canRemind = (status === 'unpaid' || status === 'partial') && remainingOf(item) > 0
+                  const reminded = item.reminders?.length || 0
                   const paying = busyId === item.id
                   const markPaidOrUnpaid = async () => {
                     if (paying) return
@@ -512,8 +536,9 @@ export function InvoiceListPage() {
                         {item.number}
                       </Link>
                     </td>
-                    <td className="w-full min-w-[140px] max-w-0 truncate px-4 py-2.5" title={item.client?.fullName}>
-                      {item.client?.fullName}
+                    <td className="w-full min-w-[140px] max-w-0 px-4 py-2.5" title={[item.client?.fullName, subject].filter(Boolean).join(' — ')}>
+                      <span className="block truncate">{item.client?.fullName}</span>
+                      {subject ? <span className="block truncate text-xs text-brand-ink/45">{subject}</span> : null}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-brand-ink/70">
                       <div className="font-medium">{item.date}</div>
@@ -579,16 +604,15 @@ export function InvoiceListPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5">
                       <div className="flex justify-end gap-1">
-                        {canPay ? (
+                        {canRemind ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              if (item.lifecycle === 'draft') void issueInvoice(item.id).then(() => setPayId(item.id))
-                              else setPayId(item.id)
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
+                            onClick={() => setRemindId(item.id)}
+                            title={reminded ? t('remind.lastSent', { date: lastReminderTime(item) }) : undefined}
+                            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-semibold ${reminded ? 'bg-[#FFF6E5] text-[#8A5A00] hover:bg-[#FCEBC8]' : 'text-brand hover:bg-brand/5'}`}
                           >
-                            {t('docs.payPartial')}
+                            {reminded ? <BellRing className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+                            {reminded ? t('remind.sentCount', { count: reminded }) : t('remind.action')}
                           </button>
                         ) : null}
                         {status === 'draft' ? (
@@ -651,16 +675,11 @@ export function InvoiceListPage() {
         </Modal>
       ) : null}
 
-      {payId ? (
-        <PaymentModal
-          doc={invoices.find((item) => item.id === payId) || {}}
-          currency={invoices.find((item) => item.id === payId)?.currency || currency}
-          onClose={() => setPayId(null)}
-          onSave={(payment) => addInvoicePayment(payId, payment)}
-        />
-      ) : null}
+      {remindTarget ? <RemindPaymentModal invoice={remindTarget} onClose={() => setRemindId(null)} /> : null}
 
       {importOpen ? <ImportInvoicesModal onClose={() => setImportOpen(false)} /> : null}
+
+      {bankOpen ? <BankMatchModal onClose={() => setBankOpen(false)} /> : null}
 
       {sendTarget ? <SendInvoiceModal invoice={sendTarget} onClose={() => setSendId(null)} /> : null}
 

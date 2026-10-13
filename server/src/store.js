@@ -1105,6 +1105,75 @@ function recordInvoiceEmail(userId, invoiceId, { from, to, cc, subject, attached
   return hydrateFor(db, userId, list[idx]);
 }
 
+/**
+ * Brings recorded payments in line with a bank statement, in one write. Each change names an
+ * invoice, the recorded payments the statement replaces (they are voided, never deleted) and the
+ * transfers the statement shows for it. A change that would pay more than the invoice's total,
+ * or that touches a draft or cancelled invoice, is skipped.
+ */
+function reconcilePayments(userId, { changes } = {}) {
+  const wanted = new Map((Array.isArray(changes) ? changes : []).map((change) => [String(change && change.id), change]));
+  if (wanted.size === 0) throw new Error('BULK_EMPTY');
+  if (wanted.size > 2000) throw new Error('IMPORT_TOO_LARGE');
+  migrateUserData(userId);
+  const db = readDb();
+  const now = nowIso();
+  const touched = [];
+  db.invoices[userId] = (db.invoices[userId] || []).map((invoice) => {
+    const change = wanted.get(String(invoice.id));
+    if (!change) return invoice;
+    const lifecycle = invoice.lifecycle || 'issued';
+    const voids = new Set((Array.isArray(change.void) ? change.void : []).map(String));
+    const added = (Array.isArray(change.add) ? change.add : []).map((payment) => ({
+      id: crypto.randomUUID(),
+      opId: crypto.randomUUID(),
+      amount: money(payment && payment.amount),
+      date: String((payment && payment.date) || '').trim(),
+      method: 'bank',
+      note: '',
+      createdAt: now,
+    }));
+    const payments = [
+      ...(invoice.payments || []).map((item) => (voids.has(String(item.id)) && !item.voidedAt ? { ...item, voidedAt: now, voidReason: 'bank' } : item)),
+      ...added,
+    ];
+    const next = { ...invoice, payments, updatedAt: now };
+    // A hand-set "paid" with no payment behind it would keep the invoice paid; the statement decides now.
+    if (next.status === 'paid') next.status = 'unpaid';
+    const totals = documentTotals(next);
+    if (lifecycle !== 'issued' || added.some((payment) => !(payment.amount > 0) || !payment.date) || totals.paidCents > totals.totalCents + 1) {
+      return invoice;
+    }
+    touched.push(next);
+    return next;
+  });
+  if (touched.length > 0) writeDb(db);
+  return { invoices: touched.map((item) => hydrateFor(db, userId, item)), skipped: wanted.size - touched.length };
+}
+
+/**
+ * Notes on each of the invoices that the client was reminded to pay: one entry per reminder,
+ * naming every invoice the same message covered. Returns the invoices as they now stand.
+ */
+function recordInvoiceReminder(userId, invoiceIds, { from, to, cc, subject, emailed }) {
+  const wanted = new Set((Array.isArray(invoiceIds) ? invoiceIds : []).map(String));
+  const db = readDb();
+  const list = db.invoices[userId] || [];
+  const at = nowIso();
+  const numbers = list.filter((item) => wanted.has(String(item.id))).map((item) => String(item.number || ''));
+  const entry = { at, from: from || '', to: to || [], cc: cc || [], subject: subject || '', emailed: Boolean(emailed), invoices: numbers };
+  const touched = [];
+  db.invoices[userId] = list.map((item) => {
+    if (!wanted.has(String(item.id))) return item;
+    const reminders = [...(Array.isArray(item.reminders) ? item.reminders : []), entry];
+    const next = { ...item, reminders: reminders.slice(-EMAIL_LOG_MAX), updatedAt: at };
+    touched.push(next);
+    return next;
+  });
+  if (touched.length > 0) writeDb(db);
+  return touched.map((item) => hydrateFor(db, userId, item));
+}
+
 /** What a recipient may see through a share link: the invoice as printed, nothing internal. */
 function sharedInvoice(token) {
   const code = String(token || '');
@@ -1711,6 +1780,8 @@ module.exports = {
   getMailSettings,
   saveMailSettings,
   recordInvoiceEmail,
+  recordInvoiceReminder,
+  reconcilePayments,
   exportBackup,
   restoreBackup,
   applySync,

@@ -1,4 +1,4 @@
-import { parseLooseDate, paymentStatus, remainingOf } from './document'
+import { documentTotals, parseLooseDate, paymentStatus, remainingOf, totalsByCurrency } from './document'
 
 export { buildInvoiceHtml } from './invoiceTemplates'
 
@@ -60,6 +60,10 @@ export type Invoice = {
   shareToken?: string
   /** Each time the invoice was emailed from the app, oldest first. */
   emails?: { at: string; from: string; to: string[]; cc?: string[]; subject: string; attached?: boolean }[]
+  /** Each payment reminder that covered this invoice, oldest first; `invoices` names all it covered. */
+  reminders?: { at: string; from?: string; to?: string[]; cc?: string[]; subject?: string; emailed?: boolean; invoices?: string[] }[]
+  /** What happened to the invoice after it was first saved (imported, corrected …), oldest first. */
+  revisions?: { type?: string; at?: string }[]
   createdAt?: string
   updatedAt?: string
   proofUri?: string
@@ -206,6 +210,26 @@ export function invoiceStatus(invoice: Pick<Invoice, 'status' | 'lifecycle' | 't
   return paymentStatus(invoice)
 }
 
+/**
+ * One line saying what an invoice is for, shown under the client in lists. An imported invoice
+ * keeps its project description as the first line of its notes; any other invoice is described
+ * by its first line item, with a count of the rest.
+ */
+export function invoiceSubject(invoice: Pick<Invoice, 'items' | 'notes' | 'revisions'> | null | undefined) {
+  const firstLine = (value: unknown) =>
+    String(value || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean) || ''
+  if (invoice?.revisions?.some((entry) => entry.type === 'import')) {
+    const project = firstLine(invoice.notes)
+    if (project) return project
+  }
+  const lines = (invoice?.items || []).map((item) => firstLine(item.description)).filter(Boolean)
+  if (lines.length === 0) return ''
+  return lines.length > 1 ? `${lines[0]} +${lines.length - 1}` : lines[0]
+}
+
 export function uniqueClients(invoices: Invoice[]): Client[] {
   const seen = new Map<string, Client>()
   for (const item of invoices) {
@@ -271,6 +295,66 @@ export function clientUnpaidSummaries(invoices: Invoice[]): ClientUnpaidSummary[
     .filter((group) => group.unpaid.length > 0)
     .map((group) => ({ ...group, unpaid: sortInvoicesChronologically(group.unpaid) }))
     .sort((a, b) => a.client.fullName.localeCompare(b.client.fullName))
+}
+
+/**
+ * Every issued invoice of the same client that still has something owed, oldest first: what one
+ * payment reminder to that client covers. The client is matched by id, or by name without one.
+ */
+export function owedInvoicesOfClient(invoices: Invoice[], invoice: Invoice) {
+  const idOf = (inv: Invoice) => inv.clientId || inv.client?.id || ''
+  const nameOf = (inv: Invoice) => String(inv.client?.fullName || '').trim().toLowerCase()
+  const same = (inv: Invoice) => (idOf(inv) && idOf(invoice) ? idOf(inv) === idOf(invoice) : Boolean(nameOf(inv)) && nameOf(inv) === nameOf(invoice))
+  return sortInvoicesChronologically(invoices.filter((inv) => same(inv) && remainingOf(inv) > 0))
+}
+
+/** A stored moment as "13.10.2026, 16:05"; empty when there is none. */
+export function formatStamp(value?: string) {
+  const date = new Date(value || '')
+  if (Number.isNaN(date.getTime())) return ''
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()}, ${two(date.getHours())}:${two(date.getMinutes())}`
+}
+
+/** When this invoice was last covered by a payment reminder; empty if never. */
+export function lastReminderTime(invoice: Pick<Invoice, 'reminders'>) {
+  return formatStamp(invoice.reminders?.[invoice.reminders.length - 1]?.at)
+}
+
+export type ClientMoney = {
+  invoiced: { currency: string; amount: number }[]
+  paid: { currency: string; amount: number }[]
+  invoicedSum: number
+  paidSum: number
+}
+
+/**
+ * What each client has been invoiced and has paid, over issued invoices (drafts and cancelled
+ * ones do not count). Keyed by client id; an invoice that carries no client id is matched to
+ * the client of the same name.
+ */
+export function clientMoneyTotals(clients: { id: string; fullName?: string }[], invoices: Invoice[]) {
+  const idByName = new Map<string, string>()
+  for (const client of clients) {
+    const name = String(client.fullName || '').trim().toLowerCase()
+    if (name && !idByName.has(name)) idByName.set(name, client.id)
+  }
+  const groups = new Map<string, Invoice[]>()
+  for (const inv of invoices) {
+    const id = inv.clientId || inv.client?.id || idByName.get(String(inv.client?.fullName || '').trim().toLowerCase())
+    if (!id) continue
+    const group = groups.get(id)
+    if (group) group.push(inv)
+    else groups.set(id, [inv])
+  }
+  const sum = (rows: { amount: number }[]) => Math.round(rows.reduce((total, row) => total + row.amount, 0) * 100) / 100
+  const totals = new Map<string, ClientMoney>()
+  for (const [id, list] of groups) {
+    const invoiced = totalsByCurrency(list, (inv) => documentTotals(inv).total)
+    const paid = totalsByCurrency(list, (inv) => Math.round((documentTotals(inv).total - remainingOf(inv)) * 100) / 100)
+    totals.set(id, { invoiced, paid, invoicedSum: sum(invoiced), paidSum: sum(paid) })
+  }
+  return totals
 }
 
 export function formatStatementFileDate(date: Date | string = new Date()) {
