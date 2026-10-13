@@ -16,6 +16,7 @@ function authErrorMessage(err: unknown, t: (key: string) => string) {
   if (code === 'RESET_INVALID') return t('auth.resetInvalid')
   if (code === 'INVITE_INVALID') return t('auth.inviteInvalid')
   if (code === 'MAIL_NOT_CONFIGURED') return t('auth.mailNotConfigured')
+  if (code === 'RESET_MAIL_FAILED') return t('auth.resetMailFailed')
   return err instanceof Error ? err.message : t('common.error')
 }
 

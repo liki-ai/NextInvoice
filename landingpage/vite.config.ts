@@ -15,8 +15,9 @@ export default defineConfig({
         copyFileSync(resolve(outDir, 'index.html'), resolve(outDir, '404.html'))
         // Invoice links sent to clients (/i/?t=…) get a real page, so they answer 200 rather than
         // the 404 status that the fallback above carries.
-        // The same goes for invitation links (/signup/?invite=…), which also arrive by email.
-        for (const page of ['i', 'signup']) {
+        // The same goes for invitation links (/signup/?invite=…) and password-reset links
+        // (/reset/?token=…), which also arrive by email.
+        for (const page of ['i', 'signup', 'reset']) {
           mkdirSync(resolve(outDir, page), { recursive: true })
           copyFileSync(resolve(outDir, 'index.html'), resolve(outDir, page, 'index.html'))
         }

@@ -100,19 +100,39 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// A few reset emails per address per hour at most, so the form cannot be used to flood a mailbox.
+const RESET_WINDOW_MS = 60 * 60 * 1000;
+const RESET_MAX = 3;
+const recentResets = new Map();
+
+function resetAllowed(email) {
+  const key = String(email).toLowerCase();
+  const now = Date.now();
+  const times = (recentResets.get(key) || []).filter((at) => now - at < RESET_WINDOW_MS);
+  const allowed = times.length < RESET_MAX;
+  if (allowed) times.push(now);
+  recentResets.set(key, times);
+  return allowed;
+}
+
 router.post('/forgot', async (req, res) => {
   try {
     const email = String(req.body?.email || '').trim();
     if (!validEmail(email)) {
       return res.status(400).json({ error: 'Enter a valid email address.' });
     }
+    // The same answer whether or not the address has an account, and when it has asked too often.
+    if (!resetAllowed(email)) {
+      return res.json({ ok: true });
+    }
     const { user, token } = await createPasswordReset(email);
     if (!user || !token) {
       return res.json({ ok: true });
     }
-    const resetUrl = `${appUrl()}/reset?token=${encodeURIComponent(token)}`;
+    // With the slash: that address is a real page on the site, so the link answers 200.
+    const resetUrl = `${appUrl()}/reset/?token=${encodeURIComponent(token)}`;
     try {
-      await sendPasswordResetEmail(user.email, resetUrl);
+      await sendPasswordResetEmail(user, resetUrl);
     } catch (err) {
       if (err.message === 'MAIL_NOT_CONFIGURED') {
         const payload = { ok: true };
@@ -125,13 +145,15 @@ router.post('/forgot', async (req, res) => {
         }
         if (!developerMachine) {
           return res.status(503).json({
-            error: 'Password reset email is not configured yet. Try logging in, or set RESEND_API_KEY on the server.',
+            error: 'A reset email cannot be sent for this account yet: its company has not connected a mailbox.',
             code: 'MAIL_NOT_CONFIGURED',
           });
         }
         return res.json(payload);
       }
-      throw err;
+      // The mail server refused or could not be reached; say so rather than promise an email.
+      console.error('[forgot] reset email failed', err.mailCode || err.message, err.detail || '');
+      return res.status(503).json({ error: 'The reset email could not be sent. Try again in a little while.', code: 'RESET_MAIL_FAILED' });
     }
     return res.json({ ok: true });
   } catch (err) {
