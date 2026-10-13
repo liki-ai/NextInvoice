@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, Users, Wallet, X, type LucideIcon } from 'lucide-react'
+import { FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider, useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -48,6 +48,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
         key: 'nav.profile',
         active: (pathname) => pathname.startsWith('/app/profile') || pathname.startsWith('/app/upgrade'),
       },
+      { to: '/app/users', icon: UserCog, key: 'nav.users', active: (pathname) => pathname.startsWith('/app/users') },
     ],
   },
 ]

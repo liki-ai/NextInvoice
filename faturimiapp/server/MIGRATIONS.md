@@ -40,6 +40,9 @@ Accounts, profiles, invoices, clients, items and obligations are stored in Postg
 | `users`, `passwordResets` | one document each |
 | `profiles/<userId>`, `invoices/<userId>`, `clients/<userId>`, `items/<userId>`, `obligations/<userId>`, `syncOps/<userId>`, `migrations/<userId>` | one document per user |
 | `mail/<userId>` | the company's mailbox connection for sending invoices; its password is encrypted with a key derived from `MAIL_SECRET` (or `JWT_SECRET`), so changing that secret means entering the mailbox password again |
+| `invites/<userId>` | open invitations to join that company; only a hash of each invitation link is kept |
+
+A company can have several users. The one who signed up owns the data: everything above is stored under their id. A user they add or invite is another entry in `users` with `companyId` (that owner) and `role` (`admin` or `member`), and works in the owner's documents. Removing a user deletes only their entry in `users`.
 
 - A save writes only the documents that changed, in one transaction. A failed save is retried until it goes through; meanwhile `GET /health` reports `"durable": false` and the error.
 - On a deploy the old process receives SIGTERM and finishes its writes before exiting.

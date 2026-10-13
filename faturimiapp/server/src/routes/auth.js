@@ -3,7 +3,9 @@ const bcrypt = require('bcryptjs');
 const {
   createUser,
   findUserByEmail,
-  publicUser,
+  sessionUser,
+  findInvite,
+  acceptInvite,
   createPasswordReset,
   resetPasswordWithToken,
 } = require('../store');
@@ -27,12 +29,22 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters.' });
     }
 
+    // Joining a company from an invitation: the address is the invited one, whatever was typed.
+    const inviteToken = String(req.body?.invite || '');
+    if (inviteToken) {
+      if (!findInvite(inviteToken)) {
+        return res.status(400).json({ error: 'This invitation is no longer valid. Ask for a new one.', code: 'INVITE_INVALID' });
+      }
+      const member = await acceptInvite(inviteToken, await bcrypt.hash(password, 12));
+      return res.status(201).json({ token: signToken(member), user: sessionUser(member) });
+    }
+
     const existing = findUserByEmail(email);
     if (existing) {
       const matches = await bcrypt.compare(password, existing.passwordHash);
       if (matches) {
         const token = signToken(existing);
-        return res.json({ token, user: publicUser(existing) });
+        return res.json({ token, user: sessionUser(existing) });
       }
       return res.status(409).json({
         error: 'An account with this email already exists. Log in or reset your password.',
@@ -43,8 +55,11 @@ router.post('/signup', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await createUser({ email, passwordHash, language: req.body?.language, industry: req.body?.industry });
     const token = signToken(user);
-    return res.status(201).json({ token, user: publicUser(user) });
+    return res.status(201).json({ token, user: sessionUser(user) });
   } catch (err) {
+    if (err.message === 'INVITE_INVALID') {
+      return res.status(400).json({ error: 'This invitation is no longer valid. Ask for a new one.', code: 'INVITE_INVALID' });
+    }
     if (err.message === 'EMAIL_TAKEN') {
       return res.status(409).json({
         error: 'An account with this email already exists. Log in or reset your password.',
@@ -78,7 +93,7 @@ router.post('/login', async (req, res) => {
       });
     }
     const token = signToken(user);
-    return res.json({ token, user: publicUser(user) });
+    return res.json({ token, user: sessionUser(user) });
   } catch (err) {
     console.error('[login]', err);
     return res.status(500).json({ error: 'Could not sign in.' });
@@ -141,11 +156,19 @@ router.post('/reset', async (req, res) => {
       });
     }
     const authToken = signToken(user);
-    return res.json({ ok: true, token: authToken, user: publicUser(user) });
+    return res.json({ ok: true, token: authToken, user: sessionUser(user) });
   } catch (err) {
     console.error('[reset]', err);
     return res.status(500).json({ error: 'Could not reset the password.' });
   }
+});
+
+/** What the sign-up page shows someone who opened an invitation link. */
+router.get('/invite/:token', (req, res) => {
+  const found = findInvite(req.params.token);
+  if (!found) return res.status(404).json({ error: 'This invitation is no longer valid. Ask for a new one.', code: 'INVITE_INVALID' });
+  res.set('Cache-Control', 'private, no-store');
+  return res.json({ email: found.invite.email, role: found.invite.role, companyName: found.companyName });
 });
 
 router.get('/me', authRequired, (req, res) => {

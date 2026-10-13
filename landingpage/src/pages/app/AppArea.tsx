@@ -15,6 +15,7 @@ import { ClientListPage } from './ClientListPage'
 import { ClientFormPage } from './ClientFormPage'
 import { ItemListPage } from './ItemListPage'
 import { ItemFormPage } from './ItemFormPage'
+import { UsersPage } from './UsersPage'
 
 /** Everything behind login. Loaded on demand, so visitors to the landing page do not download the app. */
 export default function AppArea() {
@@ -39,6 +40,7 @@ export default function AppArea() {
         <Route path="obligations/new" element={<ObligationFormPage />} />
         <Route path="obligations/:obligationId/edit" element={<ObligationFormPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="users" element={<UsersPage />} />
         <Route path="clients" element={<ClientListPage />} />
         <Route path="clients/new" element={<ClientFormPage />} />
         <Route path="clients/:clientId" element={<ClientFormPage />} />

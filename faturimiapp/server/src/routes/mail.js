@@ -1,5 +1,5 @@
 const express = require('express');
-const { authRequired } = require('../auth');
+const { authRequired, managerRequired } = require('../auth');
 const { appUrl } = require('../mail');
 const { getProfile, getInvoice, shareInvoice, getMailSettings, saveMailSettings, recordInvoiceEmail } = require('../store');
 const { countSend, deliver, mailReady, messageHtml, parseRecipients, pickSender, publicMailSettings, sanitizeMailSettings, verifyConnection } = require('../mailer');
@@ -110,7 +110,7 @@ router.get('/', (req, res) => {
  * Saves the connection only after the mail server has accepted the mailbox and its password, so a
  * saved connection is one that works. Changing just the list of senders needs no new sign-in.
  */
-router.put('/', async (req, res, next) => {
+router.put('/', managerRequired, async (req, res, next) => {
   try {
     const settings = sanitizeMailSettings(req.body, getMailSettings(req.user.id), req.user.email);
     if (!settings.host || !settings.user || !settings.pass) throw code('MAIL_INCOMPLETE');
@@ -125,7 +125,7 @@ router.put('/', async (req, res, next) => {
   }
 });
 
-router.delete('/', (req, res) => {
+router.delete('/', managerRequired, (req, res) => {
   saveMailSettings(req.user.id, null);
   res.json(describe(req.user));
 });

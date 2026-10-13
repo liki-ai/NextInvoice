@@ -1,9 +1,10 @@
 const express = require('express');
-const { authRequired } = require('../auth');
+const { authRequired, managerRequired } = require('../auth');
 const {
   canCreateInvoice,
   setUserPlan,
   publicUser,
+  sessionUser,
   findUserById,
   findUserByStripeCustomerId,
   findUserByIapOriginalId,
@@ -23,11 +24,12 @@ router.get('/usage', authRequired, (req, res) => {
 });
 
 router.get('/me', authRequired, (req, res) => {
-  const stored = findUserById(req.user.id);
-  res.json({ user: stored ? publicUser(stored) : req.user, usage: canCreateInvoice(req.user.id) });
+  // The person signed in, with the plan of the company they work in as it is right now.
+  const stored = findUserById(req.user.accountId);
+  res.json({ user: (stored && sessionUser(stored)) || req.user, usage: canCreateInvoice(req.user.id) });
 });
 
-router.post('/checkout', authRequired, async (req, res) => {
+router.post('/checkout', authRequired, managerRequired, async (req, res) => {
   try {
     const stripe = stripeClient();
     const price = priceId();
@@ -114,7 +116,7 @@ router.get('/checkout/status', authRequired, async (req, res) => {
     return res.json({
       status: session.status,
       usage: canCreateInvoice(req.user.id),
-      user: publicUser(findUserById(req.user.id)),
+      user: sessionUser(findUserById(req.user.accountId)) || publicUser(findUserById(req.user.id)),
     });
   } catch (err) {
     console.error('[billing/checkout/status]', err);
@@ -122,7 +124,7 @@ router.get('/checkout/status', authRequired, async (req, res) => {
   }
 });
 
-router.post('/portal', authRequired, async (req, res) => {
+router.post('/portal', authRequired, managerRequired, async (req, res) => {
   try {
     const stripe = stripeClient();
     if (!stripe) return res.status(503).json({ error: 'Stripe is not configured.' });
@@ -142,7 +144,7 @@ router.post('/portal', authRequired, async (req, res) => {
 });
 
 /** Dev-only fallback. Disabled unless BILLING_ALLOW_MOCK=1 */
-router.post('/subscribe', authRequired, (req, res) => {
+router.post('/subscribe', authRequired, managerRequired, (req, res) => {
   if (process.env.BILLING_ALLOW_MOCK !== '1') {
     return res.status(410).json({
       error: 'Mock subscribe is disabled. Use Stripe Checkout or IAP.',

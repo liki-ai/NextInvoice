@@ -2,8 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api, getToken, setToken } from '../lib/api'
 
 export type User = {
+  /** The company this person works in: the key all its invoices and clients are stored under. */
   id: string
+  /** The person's own account. */
+  accountId?: string
   email: string
+  /** owner and admin run the company's settings and users; member works with its documents. */
+  role?: 'owner' | 'admin' | 'member'
+  companyName?: string
   createdAt?: string
   plan?: 'free' | 'premium'
   billingSource?: string | null
@@ -15,7 +21,8 @@ type AuthValue = {
   token: string | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string, extras?: { language?: string; industry?: string }) => Promise<void>
+  /** With `invite`, joins the company that sent the invitation instead of opening a new one. */
+  signup: (email: string, password: string, extras?: { language?: string; industry?: string; invite?: string }) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -89,10 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user)
   }, [])
 
-  const signup = useCallback(async (email: string, password: string, extras?: { language?: string; industry?: string }) => {
+  const signup = useCallback(async (email: string, password: string, extras?: { language?: string; industry?: string; invite?: string }) => {
     const res = await api<{ token: string; user: User }>('/api/auth/signup', {
       method: 'POST',
-      body: { email, password, language: extras?.language, industry: extras?.industry },
+      body: { email, password, language: extras?.language, industry: extras?.industry, invite: extras?.invite },
       token: null,
     })
     setToken(res.token)

@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n'
@@ -6,6 +6,7 @@ import { Button, Field } from '../components/ui'
 import { LanguagePicker } from '../components/LangSwitch'
 import { INDUSTRIES, type Industry } from '../lib/client'
 import { api, setToken } from '../lib/api'
+import { cn } from '../lib/cn'
 
 function authErrorMessage(err: unknown, t: (key: string) => string) {
   const code = err && typeof err === 'object' && 'code' in err ? String((err as { code?: string }).code || '') : ''
@@ -13,6 +14,7 @@ function authErrorMessage(err: unknown, t: (key: string) => string) {
   if (code === 'WRONG_PASSWORD') return t('auth.wrongPassword')
   if (code === 'EMAIL_TAKEN') return t('auth.emailTaken')
   if (code === 'RESET_INVALID') return t('auth.resetInvalid')
+  if (code === 'INVITE_INVALID') return t('auth.inviteInvalid')
   if (code === 'MAIL_NOT_CONFIGURED') return t('auth.mailNotConfigured')
   return err instanceof Error ? err.message : t('common.error')
 }
@@ -99,9 +101,30 @@ export function LoginPage() {
 }
 
 export function SignupPage() {
-  const { user, loading, signup } = useAuth()
+  const { user, loading, signup, logout } = useAuth()
   const { t, lang } = useI18n()
   const navigate = useNavigate()
+  // An invitation link (/signup?invite=…) joins the inviting company rather than opening a new one.
+  const [search] = useSearchParams()
+  const invite = search.get('invite') || ''
+  const [invitation, setInvitation] = useState<{ email: string; companyName: string } | null>(null)
+  const [inviteFailed, setInviteFailed] = useState(false)
+  useEffect(() => {
+    if (!invite) return undefined
+    let cancelled = false
+    api<{ email: string; companyName: string }>(`/api/auth/invite/${encodeURIComponent(invite)}`, { token: null })
+      .then((res) => {
+        if (cancelled) return
+        setInvitation(res)
+        setEmail(res.email)
+      })
+      .catch(() => {
+        if (!cancelled) setInviteFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [invite])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -109,7 +132,34 @@ export function SignupPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  if (!loading && user) return <Navigate to="/app" replace />
+  if (!loading && user && !invite) return <Navigate to="/app" replace />
+
+  if (invite && (inviteFailed || (!loading && user) || !invitation)) {
+    return (
+      <AuthLayout>
+        <div className="rounded-2xl border border-brand-ink/8 bg-white p-8 shadow-sm">
+          <LanguagePicker variant="full" className="mb-6" />
+          {inviteFailed ? (
+            <>
+              <p className="text-sm leading-6 text-[#C0503A]">{t('auth.inviteInvalid')}</p>
+              <Link to="/login" className="mt-6 inline-block text-sm font-semibold text-brand">
+                {t('auth.loginCta')}
+              </Link>
+            </>
+          ) : !loading && user ? (
+            <>
+              <p className="text-sm leading-6 text-brand-ink/70">{t('auth.inviteSignedIn', { email: user.email })}</p>
+              <Button type="button" className="mt-6 w-full" onClick={logout}>
+                {t('nav.logout')}
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-brand-ink/60">{t('common.loading')}</p>
+          )}
+        </div>
+      </AuthLayout>
+    )
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -120,7 +170,7 @@ export function SignupPage() {
     }
     setSubmitting(true)
     try {
-      await signup(email, password, { language: lang, industry })
+      await signup(email, password, invite ? { invite } : { language: lang, industry })
       navigate('/app', { replace: true })
     } catch (err) {
       setError(authErrorMessage(err, t))
@@ -133,14 +183,23 @@ export function SignupPage() {
     <AuthLayout>
       <form onSubmit={onSubmit} className="rounded-2xl border border-brand-ink/8 bg-white p-8 shadow-sm">
         <LanguagePicker variant="full" className="mb-6" />
-        <h1 className="font-display text-3xl font-medium">{t('auth.signupTitle')}</h1>
-        <p className="mt-2 text-sm text-brand-ink/55">{t('auth.passwordHint')}</p>
+        <h1 className="font-display text-3xl font-medium">{invitation ? t('auth.inviteTitle', { company: invitation.companyName || 'Next Invoice' }) : t('auth.signupTitle')}</h1>
+        <p className="mt-2 text-sm text-brand-ink/55">{invitation ? t('auth.inviteIntro') : t('auth.passwordHint')}</p>
         <div className="mt-6">
-          <Field label={t('auth.email')} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Field
+            label={t('auth.email')}
+            type="email"
+            autoComplete="email"
+            required
+            readOnly={Boolean(invitation)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={invitation ? 'bg-brand-bg text-brand-ink/60' : undefined}
+          />
           <Field label={t('auth.password')} type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
           <Field label={t('auth.confirmPassword')} type="password" autoComplete="new-password" required minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('industry.label')}</p>
-          <div className="mb-2 flex flex-wrap gap-2">
+          <p className={cn('mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45', invitation && 'hidden')}>{t('industry.label')}</p>
+          <div className={cn('mb-2 flex flex-wrap gap-2', invitation && 'hidden')}>
             {INDUSTRIES.map((value) => (
               <button
                 key={value}
@@ -155,7 +214,7 @@ export function SignupPage() {
         </div>
         {error ? <p className="mb-4 text-sm text-[#C0503A]">{error}</p> : null}
         <Button type="submit" disabled={submitting} className="w-full">
-          {submitting ? t('common.loading') : t('auth.signupCta')}
+          {submitting ? t('common.loading') : invitation ? t('auth.inviteCta') : t('auth.signupCta')}
         </Button>
         <p className="mt-6 text-center text-sm text-brand-ink/55">
           {t('auth.hasAccount')}{' '}

@@ -7,6 +7,7 @@ import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, Select, TextArea } from '../../components/ui'
 import { LanguagePicker } from '../../components/LangSwitch'
 import { MailSettingsCard } from '../../components/MailSettingsCard'
+import { canManageCompany } from '../../lib/team'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { CURRENCIES, DEFAULT_EXPORT_NOTE, normalizeTaxRate, usesExportNote, type CompanyProfile } from '../../lib/invoice'
@@ -190,6 +191,8 @@ export function ProfilePage() {
   const { profile, saveProfile, downloadBackup, restoreBackup } = useAppData()
   const { t, dict, lang } = useI18n()
   const navigate = useNavigate()
+  // A plain user of the company sees its settings but cannot change them.
+  const manager = canManageCompany(user)
   const baseline = useMemo(() => (profile ? toForm(profile) : null), [profile])
   const [form, setForm] = useState<CompanyProfile | null>(baseline)
   const [notice, setNotice] = useState('')
@@ -335,9 +338,10 @@ export function ProfilePage() {
     <div className="mx-auto max-w-[1180px]">
       <h1 className="font-display text-4xl font-medium tracking-tight">{t('profile.title')}</h1>
       <p className="mt-2 text-sm text-brand-ink/55">{t('profile.subtitle')}</p>
+      {manager ? null : <p className="mt-5 rounded-xl bg-[#FFF6E5] px-4 py-3 text-sm font-medium text-[#8A5A00]">{t('profile.memberNotice')}</p>}
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0 space-y-6">
+        <fieldset disabled={!manager} className="m-0 min-w-0 space-y-6 border-0 p-0">
           <SettingsSection title={t('profile.sectionBusiness')} hint={t('profile.businessHint')}>
             <div className="mb-6">
               <ImageSlot
@@ -529,8 +533,8 @@ export function ProfilePage() {
             </div>
           </SettingsSection>
 
-          <MailSettingsCard />
-        </div>
+          {manager ? <MailSettingsCard /> : null}
+        </fieldset>
 
         <aside className="space-y-6 lg:sticky lg:top-8">
           <Card>
@@ -546,7 +550,7 @@ export function ProfilePage() {
               </Link>
             </div>
             <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('profile.languageSectionTitle')}</p>
-            <LanguagePicker variant="full" showLabel={false} className="mt-2.5" onChange={(code) => void saveProfile({ language: code }).catch(() => undefined)} />
+            <LanguagePicker variant="full" showLabel={false} className="mt-2.5" onChange={(code) => (manager ? void saveProfile({ language: code }).catch(() => undefined) : undefined)} />
             <button
               type="button"
               onClick={() => {
@@ -560,6 +564,7 @@ export function ProfilePage() {
             </button>
           </Card>
 
+          <fieldset disabled={!manager} className={cn('m-0 min-w-0 space-y-6 border-0 p-0', !manager && 'hidden')}>
           <Card>
             <h2 className="text-base font-semibold">{t('profile.importSectionTitle')}</h2>
             <p className="mt-1 text-sm leading-6 text-brand-ink/55">{t('profile.importDescription')}</p>
@@ -618,6 +623,7 @@ export function ProfilePage() {
               </label>
             </div>
           </Card>
+          </fieldset>
         </aside>
       </div>
 

@@ -1,5 +1,5 @@
 const express = require('express');
-const { authRequired } = require('../auth');
+const { authRequired, managerRequired } = require('../auth');
 const { applySync, snapshotForUser, exportBackup, restoreBackup } = require('../store');
 
 const router = express.Router();
@@ -47,7 +47,7 @@ router.get('/backup', (req, res) => {
   res.json(exportBackup(req.user.id));
 });
 
-router.post('/backup/restore', (req, res) => {
+router.post('/backup/restore', managerRequired, (req, res) => {
   try {
     const restored = restoreBackup(req.user.id, req.body || {});
     res.json(restored);

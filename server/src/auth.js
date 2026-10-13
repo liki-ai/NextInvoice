@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { findUserById, publicUser } = require('./store');
+const { findUserById, sessionUser } = require('./store');
 
 function jwtSecret() {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET
@@ -20,14 +20,23 @@ function authRequired(req, res, next) {
   try {
     const payload = jwt.verify(token, jwtSecret());
     const user = findUserById(payload.sub);
-    if (!user) {
+    // A user taken out of their company, or whose company is gone, is no longer signed in.
+    const session = user ? sessionUser(user) : null;
+    if (!session) {
       return res.status(401).json({ error: 'Authentication required.' });
     }
-    req.user = publicUser(user);
+    // req.user.id is the company's data key; req.user.accountId and .email are the person's own.
+    req.user = session;
     return next();
   } catch {
     return res.status(401).json({ error: 'Authentication required.' });
   }
 }
 
-module.exports = { signToken, authRequired };
+/** For what only the owner and administrators may do: company settings, users, billing. Use after authRequired. */
+function managerRequired(req, res, next) {
+  if (req.user && (req.user.role === 'owner' || req.user.role === 'admin')) return next();
+  return res.status(403).json({ error: 'Only an administrator of the company can do this.', code: 'MANAGER_ONLY' });
+}
+
+module.exports = { signToken, authRequired, managerRequired };

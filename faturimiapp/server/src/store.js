@@ -60,6 +60,7 @@ async function initStore() {
   if (!cache.syncOps) cache.syncOps = {};
   if (!cache.migrations) cache.migrations = {};
   if (!cache.mail) cache.mail = {};
+  if (!cache.invites) cache.invites = {};
   if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
   return cache;
 }
@@ -255,6 +256,177 @@ function publicUser(user) {
     billingSource: user.billingSource || null,
     planExpiresAt: user.planExpiresAt || null,
   };
+}
+
+// ---- companies with several users --------------------------------------------------------------
+// The person who signed up owns the company's data (it is stored under their id). People they add
+// are users of their own, with their own password, who work in that same data.
+
+const MEMBER_ROLES = ['admin', 'member'];
+const TEAM_MAX = 25;
+const INVITE_DAYS = 14;
+
+/** The account whose data this user works in: their own, or the company they were added to. */
+function companyOwner(user) {
+  if (!user) return null;
+  return user.companyId ? findUserById(user.companyId) : user;
+}
+
+/** owner: signed up the company. admin: may change settings and users. member: works with invoices only. */
+function roleOf(user) {
+  if (!user.companyId) return 'owner';
+  return user.role === 'admin' ? 'admin' : 'member';
+}
+
+/**
+ * The signed-in person as the apps see them. `id` is the company's data key, which every route
+ * reads and writes under; `accountId` and `email` are the person's own.
+ */
+function sessionUser(user) {
+  const owner = companyOwner(user);
+  if (!owner) return null;
+  const profile = readDb().profiles[owner.id] || {};
+  return {
+    ...publicUser(owner),
+    id: owner.id,
+    accountId: user.id,
+    email: user.email,
+    createdAt: user.createdAt,
+    role: roleOf(user),
+    companyName: profile.companyName || '',
+  };
+}
+
+function teamError(code) {
+  const err = new Error(code);
+  err.teamCode = code;
+  return err;
+}
+
+function liveInvites(db, ownerId) {
+  const now = Date.now();
+  return ((db.invites && db.invites[ownerId]) || []).filter((item) => new Date(item.expiresAt).getTime() > now);
+}
+
+function describeInvite(invite) {
+  return { id: invite.id, email: invite.email, role: invite.role, createdAt: invite.createdAt, expiresAt: invite.expiresAt, invitedBy: invite.invitedBy || '' };
+}
+
+function listTeam(ownerId) {
+  const db = readDb();
+  const people = db.users.filter((item) => item.id === ownerId || item.companyId === ownerId);
+  people.sort((a, b) => (a.id === ownerId ? -1 : b.id === ownerId ? 1 : String(a.createdAt || '').localeCompare(String(b.createdAt || ''))));
+  return {
+    members: people.map((item) => ({ id: item.id, email: item.email, role: roleOf(item), createdAt: item.createdAt, addedBy: item.addedBy || '' })),
+    invites: liveInvites(db, ownerId).map(describeInvite),
+  };
+}
+
+function memberRole(value) {
+  return MEMBER_ROLES.includes(value) ? value : 'member';
+}
+
+function assertRoomInTeam(db, ownerId, { replacingInvite } = {}) {
+  const members = db.users.filter((item) => item.companyId === ownerId).length;
+  const invites = liveInvites(db, ownerId).length - (replacingInvite ? 1 : 0);
+  if (members + invites >= TEAM_MAX) throw teamError('TEAM_FULL');
+}
+
+/** A user created by an administrator, with a password the administrator chose for them. */
+function addMember(ownerId, { email, passwordHash, role, addedBy }) {
+  return withWriteLock(async () => {
+    const db = readDb();
+    const normalized = normalizeEmail(email);
+    if (db.users.some((item) => item.email === normalized)) throw teamError('EMAIL_TAKEN');
+    const pending = liveInvites(db, ownerId).some((item) => item.email === normalized);
+    assertRoomInTeam(db, ownerId, { replacingInvite: pending });
+    const user = { id: crypto.randomUUID(), email: normalized, passwordHash, createdAt: nowIso(), companyId: ownerId, role: memberRole(role), addedBy: addedBy || '' };
+    db.users.push(user);
+    if (db.invites[ownerId]) db.invites[ownerId] = db.invites[ownerId].filter((item) => item.email !== normalized);
+    await writeDb(db);
+    return user;
+  });
+}
+
+function setMemberRole(ownerId, memberId, role) {
+  const db = readDb();
+  const user = db.users.find((item) => item.id === memberId && item.companyId === ownerId);
+  if (!user) return null;
+  user.role = memberRole(role);
+  writeDb(db);
+  return { id: user.id, email: user.email, role: roleOf(user), createdAt: user.createdAt };
+}
+
+/** Takes a user out of the company. Their sign-in stops working at once; what they entered stays. */
+function removeMember(ownerId, memberId) {
+  const db = readDb();
+  const user = db.users.find((item) => item.id === memberId && item.companyId === ownerId);
+  if (!user) return false;
+  db.users = db.users.filter((item) => item.id !== memberId);
+  db.passwordResets = (db.passwordResets || []).filter((item) => item.userId !== memberId);
+  writeDb(db);
+  return true;
+}
+
+/** An invitation to join the company. Only its hash is kept; the link itself goes to the invited person. */
+function createInvite(ownerId, { email, role, invitedBy }) {
+  const db = readDb();
+  const normalized = normalizeEmail(email);
+  if (db.users.some((item) => item.email === normalized)) throw teamError('EMAIL_TAKEN');
+  const current = liveInvites(db, ownerId);
+  assertRoomInTeam(db, ownerId, { replacingInvite: current.some((item) => item.email === normalized) });
+  const token = crypto.randomBytes(24).toString('base64url');
+  const invite = {
+    id: crypto.randomUUID(),
+    email: normalized,
+    role: memberRole(role),
+    tokenHash: hashToken(token),
+    createdAt: nowIso(),
+    expiresAt: new Date(Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+    invitedBy: invitedBy || '',
+  };
+  // One open invitation per address: a new one replaces the old link. Expired ones are dropped here too.
+  db.invites[ownerId] = [...current.filter((item) => item.email !== normalized), invite];
+  writeDb(db);
+  return { invite: describeInvite(invite), token };
+}
+
+function revokeInvite(ownerId, inviteId) {
+  const db = readDb();
+  const list = (db.invites && db.invites[ownerId]) || [];
+  if (!list.some((item) => item.id === inviteId)) return false;
+  db.invites[ownerId] = list.filter((item) => item.id !== inviteId);
+  writeDb(db);
+  return true;
+}
+
+function findInvite(token) {
+  const code = String(token || '');
+  if (code.length < 20) return null;
+  const hash = hashToken(code);
+  const db = readDb();
+  for (const ownerId of Object.keys(db.invites || {})) {
+    const invite = liveInvites(db, ownerId).find((item) => item.tokenHash === hash);
+    if (!invite) continue;
+    if (!db.users.some((item) => item.id === ownerId)) return null;
+    return { ownerId, invite: describeInvite(invite), companyName: (db.profiles[ownerId] || {}).companyName || '' };
+  }
+  return null;
+}
+
+/** The invited person sets their password and becomes a user of the company. The link works once. */
+function acceptInvite(token, passwordHash) {
+  return withWriteLock(async () => {
+    const found = findInvite(token);
+    if (!found) throw teamError('INVITE_INVALID');
+    const db = readDb();
+    if (db.users.some((item) => item.email === found.invite.email)) throw teamError('EMAIL_TAKEN');
+    const user = { id: crypto.randomUUID(), email: found.invite.email, passwordHash, createdAt: nowIso(), companyId: found.ownerId, role: found.invite.role, addedBy: found.invite.invitedBy };
+    db.users.push(user);
+    db.invites[found.ownerId] = (db.invites[found.ownerId] || []).filter((item) => item.id !== found.invite.id);
+    await writeDb(db);
+    return user;
+  });
 }
 
 function normalizeLang(value) {
@@ -1482,6 +1654,15 @@ module.exports = {
   DEFAULT_COMPANY_PROFILE,
   FREE_MONTHLY_LIMIT,
   publicUser,
+  sessionUser,
+  listTeam,
+  addMember,
+  setMemberRole,
+  removeMember,
+  createInvite,
+  revokeInvite,
+  findInvite,
+  acceptInvite,
   isPremiumUser,
   initStore,
   flushStore,

@@ -1,5 +1,5 @@
 const express = require('express');
-const { authRequired } = require('../auth');
+const { authRequired, managerRequired } = require('../auth');
 const { getProfile, updateProfile } = require('../store');
 const { INDUSTRIES, INVOICE_TEMPLATES, normalizeTaxRate } = require('../domain');
 
@@ -69,7 +69,7 @@ router.get('/', (req, res) => {
   res.json({ profile: getProfile(req.user.id) });
 });
 
-router.put('/', (req, res) => {
+router.put('/', managerRequired, (req, res) => {
   let partial;
   try {
     partial = sanitizeProfile(req.body);
