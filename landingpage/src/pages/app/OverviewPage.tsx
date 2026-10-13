@@ -23,6 +23,7 @@ import {
   type PeriodPreset,
 } from '../../lib/overview'
 import { localizeCompanyProfile } from '../../lib/companySamples'
+import { InsightsPanel } from '../../components/InsightsPanel'
 
 const PRESETS: PeriodPreset[] = ['this_month', 'this_year', 'month', 'year', 'custom']
 
@@ -62,7 +63,7 @@ function overviewPdfLabels(t: (key: string, params?: Record<string, string | num
 }
 
 export function OverviewPage() {
-  const { invoices, obligations, profile, loading } = useAppData()
+  const { invoices, obligations, clients, profile, loading } = useAppData()
   const { t, dict } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -367,6 +368,8 @@ export function OverviewPage() {
           )}
         </Card>
       </div>
+
+      <InsightsPanel invoices={invoices} obligations={obligations} clients={clients} currency={currency} fallbackCurrency={fallbackCurrency} />
 
       {preview ? (
         <Modal
