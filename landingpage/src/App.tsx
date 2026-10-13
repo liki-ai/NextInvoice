@@ -25,6 +25,14 @@ export default function App() {
             <Route path="/forgot" element={<ForgotPage />} />
             <Route path="/reset" element={<ResetPage />} />
             <Route
+              path="/i"
+              element={
+                <Suspense fallback={<AppFallback />}>
+                  <PublicInvoicePage />
+                </Suspense>
+              }
+            />
+            <Route
               path="/i/:token"
               element={
                 <Suspense fallback={<AppFallback />}>

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { copyFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 export default defineConfig({
@@ -13,6 +13,10 @@ export default defineConfig({
       closeBundle() {
         const outDir = resolve(__dirname, '../docs')
         copyFileSync(resolve(outDir, 'index.html'), resolve(outDir, '404.html'))
+        // Invoice links sent to clients (/i/?t=…) get a real page, so they answer 200 rather than
+        // the 404 status that the fallback above carries.
+        mkdirSync(resolve(outDir, 'i'), { recursive: true })
+        copyFileSync(resolve(outDir, 'index.html'), resolve(outDir, 'i', 'index.html'))
       },
     },
   ],

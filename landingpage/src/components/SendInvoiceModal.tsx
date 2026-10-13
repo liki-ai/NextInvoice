@@ -9,7 +9,7 @@ import { cn } from '../lib/cn'
 import { Button, Field, Modal, TextArea } from './ui'
 
 function shareUrl(token: string) {
-  return `${window.location.origin}/i/${token}`
+  return `${window.location.origin}/i/?t=${token}`
 }
 
 function formatSentDate(value?: string) {

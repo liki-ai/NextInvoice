@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Download } from 'lucide-react'
 import { api } from '../lib/api'
 import { isLang, pdfLabelsIn, translateIn, type Lang } from '../i18n'
@@ -10,13 +10,15 @@ type Shared = { invoice: Invoice & { client: Client }; profile: CompanyProfile |
 
 /** What a client sees from an invoice link: the invoice itself, in the sender's language, with a way to save it. */
 export default function PublicInvoicePage() {
-  const { token } = useParams()
+  const params = useParams()
+  const [search] = useSearchParams()
+  const token = params.token || search.get('t') || ''
   const [shared, setShared] = useState<Shared | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    api<Shared>(`/api/public/invoices/${encodeURIComponent(token || '')}`, { token: null })
+    api<Shared>(`/api/public/invoices/${encodeURIComponent(token)}`, { token: null })
       .then((res) => {
         if (!cancelled) setShared(res)
       })
