@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileSpreadsheet, FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
@@ -34,7 +34,7 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
 }
 
 export function InvoiceListPage() {
-  const { invoices, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice } = useAppData()
+  const { invoices, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue'>('all')
@@ -42,6 +42,12 @@ export function InvoiceListPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkDate, setBulkDate] = useState<'invoice' | 'today'>('invoice')
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState('')
+  const selectAllRef = useRef<HTMLInputElement>(null)
   const [payId, setPayId] = useState<string | null>(null)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -123,6 +129,50 @@ export function InvoiceListPage() {
       return status === 'unpaid' || status === 'partial'
     })
   }, [yearInvoices, query, statusFilter])
+
+  // Rows that can be ticked: issued invoices with something still owed, among those on screen.
+  const payable = useMemo(
+    () =>
+      filtered.filter((item) => {
+        const status = invoiceStatus(item)
+        return (status === 'unpaid' || status === 'partial') && remainingOf(item) > 0
+      }),
+    [filtered],
+  )
+  const chosen = useMemo(() => payable.filter((item) => selected.has(item.id)), [payable, selected])
+  const chosenTotal = chosen.reduce((sum, item) => sum + remainingOf(item), 0)
+  const allChosen = payable.length > 0 && chosen.length === payable.length
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = chosen.length > 0 && !allChosen
+  }, [chosen.length, allChosen])
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function onMarkChosenPaid() {
+    if (bulkBusy || chosen.length === 0) return
+    setBulkBusy(true)
+    setBulkError('')
+    try {
+      await markInvoicesPaid(
+        chosen.map((item) => item.id),
+        bulkDate === 'today' ? fullPaymentPayload({}).date : undefined,
+      )
+      setSelected(new Set())
+      setBulkOpen(false)
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : t('common.error'))
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   const unpaidClients = useMemo(() => clientUnpaidSummaries(yearInvoices), [yearInvoices])
   const statementTotal = unpaidClients.reduce((sum, item) => sum + item.unpaidTotal, 0)
@@ -398,10 +448,46 @@ export function InvoiceListPage() {
             </button>
           </div>
 
+          {chosen.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-3 border-t border-brand-ink/8 bg-[#EEF5F7] px-4 py-3" role="status">
+              <p className="text-sm font-semibold">
+                {t('invoiceList.selectedCount', { count: chosen.length })}
+                <span className="ml-2 font-normal text-brand-ink/60">{formatMoney(chosenTotal, currency)}</span>
+              </p>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <Button type="button" variant="ghost" onClick={() => setSelected(new Set())}>
+                  {t('invoiceList.clearSelection')}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setBulkError('')
+                    setBulkOpen(true)
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {t('invoiceList.markPaid')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-brand-ink/8 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
                 <tr>
+                  <th className="w-10 py-3 pl-5">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      aria-label={t('invoiceList.selectAll')}
+                      title={t('invoiceList.selectAll')}
+                      disabled={payable.length === 0}
+                      checked={allChosen}
+                      onChange={() => setSelected(allChosen ? new Set() : new Set(payable.map((item) => item.id)))}
+                      className="h-4 w-4 cursor-pointer accent-[#2C6E7F] disabled:cursor-default disabled:opacity-40"
+                    />
+                  </th>
                   <th className="px-5 py-3 font-semibold">{t('newInvoice.invoiceNumber')}</th>
                   <th className="px-5 py-3 font-semibold">{t('invoiceList.client')}</th>
                   <th className="px-5 py-3 font-semibold">{t('newInvoice.date')}</th>
@@ -442,7 +528,18 @@ export function InvoiceListPage() {
                     }
                   }
                   return (
-                  <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''} ${pulseId === item.id ? 'bg-[#EEF5F7] ring-2 ring-inset ring-brand/40' : ''}`}>
+                  <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''} ${pulseId === item.id ? 'bg-[#EEF5F7] ring-2 ring-inset ring-brand/40' : ''} ${selected.has(item.id) && (status === 'unpaid' || status === 'partial') ? 'bg-[#F4F9FA]' : ''}`}>
+                    <td className="w-10 py-4 pl-5">
+                      {(status === 'unpaid' || status === 'partial') && remainingOf(item) > 0 ? (
+                        <input
+                          type="checkbox"
+                          aria-label={t('invoiceList.selectOne', { number: item.number })}
+                          checked={selected.has(item.id)}
+                          onChange={() => toggleSelected(item.id)}
+                          className="h-4 w-4 cursor-pointer accent-[#2C6E7F]"
+                        />
+                      ) : null}
+                    </td>
                     <td className="px-5 py-4">
                       <Link to={status === 'draft' ? `/app/invoices/${item.id}/edit` : `/app/invoices/${item.id}`} className="font-semibold text-brand hover:underline">
                         {item.number}
@@ -598,6 +695,45 @@ export function InvoiceListPage() {
       ) : null}
 
       {importOpen ? <ImportInvoicesModal onClose={() => setImportOpen(false)} /> : null}
+
+      {bulkOpen && chosen.length > 0 ? (
+        <Modal
+          title={t('invoiceList.markPaid')}
+          onClose={() => (bulkBusy ? undefined : setBulkOpen(false))}
+          footer={
+            <>
+              <Button type="button" variant="secondary" disabled={bulkBusy} onClick={() => setBulkOpen(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" disabled={bulkBusy} onClick={() => void onMarkChosenPaid()}>
+                {bulkBusy ? t('common.loading') : t('invoiceList.markPaidConfirm', { count: chosen.length })}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-5 bg-white p-6">
+            <p className="text-sm leading-6 text-brand-ink/75">{t('invoiceList.markPaidBody', { count: chosen.length, total: formatMoney(chosenTotal, currency) })}</p>
+            <fieldset>
+              <legend className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('invoiceList.paymentDate')}</legend>
+              <div className="mt-2.5 space-y-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
+                  <input type="radio" name="bulk-date" checked={bulkDate === 'invoice'} onChange={() => setBulkDate('invoice')} className="mt-1 h-4 w-4 accent-[#2C6E7F]" />
+                  <span>
+                    <span className="block text-sm font-semibold">{t('invoiceList.paymentDateInvoice')}</span>
+                    <span className="block text-xs text-brand-ink/50">{t('invoiceList.paymentDateInvoiceHint')}</span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
+                  <input type="radio" name="bulk-date" checked={bulkDate === 'today'} onChange={() => setBulkDate('today')} className="mt-1 h-4 w-4 accent-[#2C6E7F]" />
+                  <span className="text-sm font-semibold">{t('invoiceList.paymentDateToday')}</span>
+                </label>
+              </div>
+            </fieldset>
+            <p className="text-xs text-brand-ink/50">{t('invoiceList.markPaidUndo')}</p>
+            {bulkError ? <p className="text-sm text-[#C0503A]">{bulkError}</p> : null}
+          </div>
+        </Modal>
+      ) : null}
     </div>
   )
 }

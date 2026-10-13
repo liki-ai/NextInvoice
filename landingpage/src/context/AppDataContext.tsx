@@ -37,6 +37,8 @@ type DataValue = {
   updateItem: (id: string, item: Partial<CatalogItem>) => Promise<CatalogItem>
   removeItem: (id: string) => Promise<void>
   importInvoices: (payload: unknown) => Promise<{ created: number; clientsCreated: number; skipped: { number: string; reason: string }[] }>
+  /** Records full payment on each invoice. Without a date, each payment is dated like its invoice. */
+  markInvoicesPaid: (ids: string[], date?: string) => Promise<{ paid: number; skipped: number }>
   saveProfile: (profile: Partial<CompanyProfile>) => Promise<CompanyProfile>
   downloadBackup: () => Promise<void>
   restoreBackup: (backup: unknown) => Promise<void>
@@ -203,6 +205,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setItems((prev) => prev.filter((row) => row.id !== id))
   }, [])
 
+  const markInvoicesPaid = useCallback(
+    async (ids: string[], date?: string) => {
+      const res = await api<{ paid: number; skipped: number }>('/api/invoices/mark-paid', { method: 'POST', body: { ids, date } })
+      await refresh()
+      return res
+    },
+    [refresh],
+  )
+
   const importInvoices = useCallback(
     async (payload: unknown) => {
       const res = await api<{ created: number; clientsCreated: number; skipped: { number: string; reason: string }[] }>('/api/invoices/import', { method: 'POST', body: payload })
@@ -265,6 +276,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateItem,
       removeItem,
       importInvoices,
+      markInvoicesPaid,
       saveProfile,
       downloadBackup,
       restoreBackup,
@@ -297,6 +309,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateItem,
       removeItem,
       importInvoices,
+      markInvoicesPaid,
       saveProfile,
       downloadBackup,
       restoreBackup,

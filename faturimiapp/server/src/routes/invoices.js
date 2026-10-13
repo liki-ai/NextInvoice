@@ -10,6 +10,7 @@ const {
   cancelInvoice,
   correctInvoice,
   importInvoices,
+  markInvoicesPaid,
   addPayment,
   voidPayment,
 } = require('../store');
@@ -34,6 +35,7 @@ function sendError(res, err) {
     VOID_REASON: [400, 'A reason is required to correct a payment.'],
     PAYMENTS_EXCEED: [400, 'Correction would make recorded payments exceed the new total.'],
     IMPORT_EMPTY: [400, 'The file has no invoices to import.'],
+    BULK_EMPTY: [400, 'Select at least one invoice.'],
     IMPORT_TOO_LARGE: [413, 'Import up to 2000 invoices at a time.'],
   };
   const mapped = map[err.message];
@@ -67,6 +69,14 @@ router.post('/', (req, res) => {
 router.post('/import', (req, res) => {
   try {
     res.status(201).json(importInvoices(req.user.id, req.body || {}));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.post('/mark-paid', (req, res) => {
+  try {
+    res.json(markInvoicesPaid(req.user.id, req.body || {}));
   } catch (err) {
     sendError(res, err);
   }

@@ -779,6 +779,37 @@ function importInvoices(userId, payload) {
   return { created: created.length, clientsCreated, skipped };
 }
 
+/**
+ * Records full payment on many invoices in one write. Each invoice gets one payment for whatever
+ * is still owed, dated `date` if given and otherwise the invoice's own date (the honest default
+ * for a backlog whose real payment days nobody recorded). Drafts, cancelled and already-paid
+ * invoices are left alone.
+ */
+function markInvoicesPaid(userId, { ids, date } = {}) {
+  const wanted = new Set((Array.isArray(ids) ? ids : []).map(String));
+  if (wanted.size === 0) throw new Error('BULK_EMPTY');
+  migrateUserData(userId);
+  const db = readDb();
+  const now = nowIso();
+  const paidOn = String(date || '').trim();
+  let paid = 0;
+  let skipped = 0;
+  db.invoices[userId] = (db.invoices[userId] || []).map((invoice) => {
+    if (!wanted.has(String(invoice.id))) return invoice;
+    const lifecycle = invoice.lifecycle || 'issued';
+    const due = documentTotals(invoice).amountDue;
+    if (lifecycle !== 'issued' || paymentStatus(invoice) === 'paid' || due <= 0) {
+      skipped += 1;
+      return invoice;
+    }
+    paid += 1;
+    const payment = { id: crypto.randomUUID(), opId: crypto.randomUUID(), amount: due, date: paidOn || String(invoice.date || '').trim(), method: '', note: '', createdAt: now };
+    return { ...invoice, payments: [...(invoice.payments || []), payment], updatedAt: now };
+  });
+  if (paid > 0) writeDb(db);
+  return { paid, skipped };
+}
+
 function listObligations(userId) {
   migrateUserData(userId);
   const db = readDb();
@@ -1326,6 +1357,7 @@ module.exports = {
   cancelInvoice,
   correctInvoice,
   importInvoices,
+  markInvoicesPaid,
   exportBackup,
   restoreBackup,
   applySync,
