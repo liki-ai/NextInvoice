@@ -473,7 +473,7 @@ export function InvoiceListPage() {
           ) : null}
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="border-b border-brand-ink/8 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
                 <tr>
                   <th className="w-10 py-3 pl-5">
@@ -488,12 +488,12 @@ export function InvoiceListPage() {
                       className="h-4 w-4 cursor-pointer accent-[#2C6E7F] disabled:cursor-default disabled:opacity-40"
                     />
                   </th>
-                  <th className="px-5 py-3 font-semibold">{t('newInvoice.invoiceNumber')}</th>
-                  <th className="px-5 py-3 font-semibold">{t('invoiceList.client')}</th>
-                  <th className="px-5 py-3 font-semibold">{t('newInvoice.date')}</th>
-                  <th className="px-5 py-3 font-semibold">{t('newInvoice.itemsSectionTitle')}</th>
-                  <th className="px-5 py-3 text-right font-semibold">{t('invoiceList.amount')}</th>
-                  <th className="px-5 py-3 text-right font-semibold">{t('common.edit')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('newInvoice.invoiceNumber')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('invoiceList.client')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('newInvoice.date')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('invoiceList.status')}</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">{t('invoiceList.amount')}</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">{t('common.edit')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -529,7 +529,7 @@ export function InvoiceListPage() {
                   }
                   return (
                   <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''} ${pulseId === item.id ? 'bg-[#EEF5F7] ring-2 ring-inset ring-brand/40' : ''} ${selected.has(item.id) && (status === 'unpaid' || status === 'partial') ? 'bg-[#F4F9FA]' : ''}`}>
-                    <td className="w-10 py-4 pl-5">
+                    <td className="w-10 py-2.5 pl-5">
                       {(status === 'unpaid' || status === 'partial') && remainingOf(item) > 0 ? (
                         <input
                           type="checkbox"
@@ -540,22 +540,28 @@ export function InvoiceListPage() {
                         />
                       ) : null}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="whitespace-nowrap px-4 py-2.5">
                       <Link to={status === 'draft' ? `/app/invoices/${item.id}/edit` : `/app/invoices/${item.id}`} className="font-semibold text-brand hover:underline">
                         {item.number}
                       </Link>
                     </td>
-                    <td className="px-5 py-4">{item.client?.fullName}</td>
-                    <td className="px-5 py-4 text-brand-ink/60">
-                      <div className="font-semibold">{item.date}</div>
-                      <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <td className="w-full min-w-[140px] max-w-0 truncate px-4 py-2.5" title={item.client?.fullName}>
+                      {item.client?.fullName}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-brand-ink/70">
+                      <div className="font-medium">{item.date}</div>
+                      <div className="text-xs text-brand-ink/40">
+                        {t('pdf.dueDateLabel')}: {item.dueDate || t('pdf.onReceipt')}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           title={sent ? t('docs.sent') : t('docs.notSent')}
                           disabled={sending}
                           onClick={() => void onShareInvoice(item)}
-                          className={`inline-flex min-h-[26px] min-w-[88px] items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          className={`inline-flex h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[11px] font-semibold ${
                             sent ? 'bg-brand text-white' : 'border border-brand-ink/12 bg-[#F3F4F4] text-brand-ink/55'
                           }`}
                         >
@@ -575,7 +581,7 @@ export function InvoiceListPage() {
                             if (visible === 'cancelled') return
                             markPaidOrUnpaid()
                           }}
-                          className={`inline-flex min-h-[26px] min-w-[72px] items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          className={`inline-flex h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[11px] font-semibold ${
                             visible === 'paid'
                               ? 'bg-[#E7F4EA] text-[#2E7D32]'
                               : visible === 'partial'
@@ -601,17 +607,16 @@ export function InvoiceListPage() {
                           )}
                         </button>
                         {late > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-[#F8E8E4] px-2.5 py-1 text-[11px] font-semibold text-[#C0503A]">
+                          <span className="inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[#F8E8E4] px-2.5 text-[11px] font-semibold text-[#C0503A]">
                             {t('docs.overdueDays', { days: late })}
                           </span>
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-brand-ink/60">{t('invoiceList.itemsCount', { count: item.items?.length || 0 })}</td>
-                    <td className="px-5 py-4 text-right font-semibold">
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums">
                       {formatMoney(Number(item.total) || 0, item.currency || currency)}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="whitespace-nowrap px-4 py-2.5">
                       <div className="flex justify-end gap-1">
                         {canPay ? (
                           <button

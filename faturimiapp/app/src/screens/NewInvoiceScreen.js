@@ -135,6 +135,9 @@ export default function NewInvoiceScreen({ navigation, route }) {
   const applyClient = (item) => {
     setClientId(item.id);
     setClient(invoiceClientFields(item));
+    // The client's own VAT setting (0 for an export customer) wins over the company default.
+    const own = item?.taxRate;
+    setTaxRate(String(own === undefined || own === null ? companyProfile?.defaultTaxRate ?? 0 : own));
   };
 
   const suggestedClients = useMemo(() => {

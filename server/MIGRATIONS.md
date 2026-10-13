@@ -13,6 +13,14 @@ Applied on first read after this code is deployed (`db.migrations[userId].v = 1`
 - Clients are seeded from unique name + phone + email + address + business id. Same name alone does not merge people.
 - Obligations keep proof files and gain an empty `payments` list.
 
+## v2 — VAT setting per client
+
+Applied on first read after this code is deployed (`db.migrations[userId].v = 2`).
+
+- Clients gain `taxRate`: `null` follows the company default, `0` means no VAT (an export customer), any other number is that client's own rate. It only sets what a new invoice starts with.
+- A client with no setting whose invoices imported from a spreadsheet were all at 0% is set to `0`. Imported invoices are the only ones whose 0% is known to be deliberate, so accounts that never imported are not touched.
+- Invoices are not changed.
+
 ## Backup and restore
 
 `GET /api/sync/backup` returns `{ version, exportedAt, userId, checksum, data }`.

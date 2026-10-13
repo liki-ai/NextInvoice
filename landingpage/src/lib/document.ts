@@ -23,6 +23,8 @@ export type ClientRecord = {
   businessId?: string
   vatNumber?: string
   fiscalNumber?: string
+  /** VAT rate new invoices for this client start with. null = the company default. */
+  taxRate?: number | null
   notes?: string
   measurements?: Record<string, string>
   photos?: { proofUri?: string; proofData?: string; proofName?: string; proofMime?: string; data?: string }[]

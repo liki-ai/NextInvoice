@@ -43,6 +43,7 @@ export function composeClient(fields: Record<string, unknown>) {
     businessId: String(fields.businessId || '').trim(),
     vatNumber: String(fields.vatNumber || '').trim(),
     fiscalNumber: String(fields.fiscalNumber || '').trim(),
+    taxRate: fields.taxRate === undefined || fields.taxRate === null || fields.taxRate === '' ? null : Number(fields.taxRate),
     notes: String(fields.notes || '').trim(),
     measurements: (fields.measurements as Record<string, string>) || {},
     photos: Array.isArray(fields.photos) ? fields.photos : [],

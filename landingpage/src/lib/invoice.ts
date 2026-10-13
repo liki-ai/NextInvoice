@@ -4,6 +4,15 @@ export { buildInvoiceHtml } from './invoiceTemplates'
 
 export type Client = { id?: string; fullName: string; address: string; phone: string; email?: string; businessId?: string; vatNumber?: string; fiscalNumber?: string }
 
+/**
+ * The VAT rate a new invoice starts with: the client's own setting if it has one
+ * (0 for an export customer), otherwise the company default. Always editable on the invoice.
+ */
+export function startingTaxRate(client: { taxRate?: number | null } | null | undefined, companyDefault: unknown) {
+  const own = client?.taxRate
+  return own === undefined || own === null ? { rate: normalizeTaxRate(companyDefault), fromClient: false } : { rate: normalizeTaxRate(own), fromClient: true }
+}
+
 export type InvoiceItem = {
   id: string
   description: string

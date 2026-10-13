@@ -78,7 +78,14 @@ export function ClientListPage() {
                       <span className="flex min-w-0 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">{initials(name)}</span>
                         <span className="min-w-0">
-                          <span className="block truncate font-semibold text-brand-ink">{name}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate font-semibold text-brand-ink">{name}</span>
+                            {item.taxRate === 0 ? (
+                              <span className="shrink-0 rounded-md bg-brand-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/55">{t('clients.taxNone')}</span>
+                            ) : item.taxRate ? (
+                              <span className="shrink-0 rounded-md bg-brand-bg px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-brand-ink/55">{item.taxRate}%</span>
+                            ) : null}
+                          </span>
                           {item.address ? <span className="block truncate text-xs text-brand-ink/45">{item.address}</span> : null}
                         </span>
                       </span>

@@ -16,6 +16,7 @@ const {
   normalizeTaxRate,
   clientSnapshot,
   parseLooseDate,
+  vatFreeClientIds,
 } = require('./domain')
 const { sanitizeProfile } = require('./routes/profile')
 
@@ -202,6 +203,31 @@ describe('dates', () => {
     assert.equal(ymd('31/12/2025'), '2025-12-31')
     assert.equal(ymd('9/30/2026'), '2026-9-30')
     assert.equal(ymd('JAN 5, 2026'), '2026-1-5')
+  })
+})
+
+describe('client VAT setting', () => {
+  it('keeps a client rate, and tells "no VAT" from "not set"', () => {
+    assert.equal(clientSnapshot({ fullName: 'A', taxRate: 0 }).taxRate, 0)
+    assert.equal(clientSnapshot({ fullName: 'A', taxRate: '8' }).taxRate, 8)
+    assert.equal(clientSnapshot({ fullName: 'A' }).taxRate, null)
+    assert.equal(clientSnapshot({ fullName: 'A', taxRate: '' }).taxRate, null)
+    assert.equal(clientSnapshot({ fullName: 'A', taxRate: null }).taxRate, null)
+  })
+
+  it('marks as VAT-free only clients whose imported invoices were all at 0%', () => {
+    const imported = [{ type: 'import' }]
+    const invoices = [
+      { clientId: 'export', taxRate: 0, revisions: imported },
+      { clientId: 'export', taxRate: 0, revisions: imported },
+      { clientId: 'local', taxRate: 18, revisions: imported },
+      { clientId: 'mixed', taxRate: 0, revisions: imported },
+      { clientId: 'mixed', taxRate: 18, revisions: imported },
+      { clientId: 'typed-by-hand', taxRate: 0, revisions: [] },
+      { clientId: 'already-set', taxRate: 0, revisions: imported },
+    ]
+    const clients = [{ id: 'export' }, { id: 'local' }, { id: 'mixed' }, { id: 'typed-by-hand' }, { id: 'already-set', taxRate: 18 }, { id: 'no-invoices' }]
+    assert.deepEqual(vatFreeClientIds(invoices, clients), ['export'])
   })
 })
 

@@ -185,10 +185,31 @@ function clientSnapshot(client) {
     businessId: String(client.businessId || client.nui || '').trim(),
     vatNumber: String(client.vatNumber || '').trim(),
     fiscalNumber: String(client.fiscalNumber || '').trim(),
+    // VAT rate new invoices for this client start with; null follows the company default.
+    taxRate: client.taxRate === undefined || client.taxRate === null || client.taxRate === '' ? null : normalizeTaxRate(client.taxRate),
     notes: String(client.notes || '').trim(),
     measurements: client.measurements && typeof client.measurements === 'object' ? client.measurements : {},
     photos: Array.isArray(client.photos) ? client.photos : [],
   }
+}
+
+/**
+ * Clients who should start without VAT: no setting of their own yet, and every invoice brought in
+ * for them from a spreadsheet was VAT-free (an export customer). Imported invoices are the only
+ * ones whose 0% is known to be deliberate; older invoices simply predate VAT.
+ */
+function vatFreeClientIds(invoices, clients) {
+  const rates = new Map()
+  for (const invoice of invoices || []) {
+    const imported = (invoice?.revisions || []).some((item) => item?.type === 'import')
+    if (!imported || !invoice.clientId || invoice.lifecycle === 'cancelled') continue
+    if (!rates.has(invoice.clientId)) rates.set(invoice.clientId, [])
+    rates.get(invoice.clientId).push(normalizeTaxRate(invoice.taxRate))
+  }
+  return (clients || [])
+    .filter((client) => client.taxRate === undefined || client.taxRate === null)
+    .filter((client) => (rates.get(client.id) || []).length > 0 && rates.get(client.id).every((rate) => rate === 0))
+    .map((client) => client.id)
 }
 
 function pdfCompany(invoice, liveProfile) {
@@ -307,6 +328,7 @@ module.exports = {
   allocateInvoiceNumber,
   companySnapshot,
   clientSnapshot,
+  vatFreeClientIds,
   pdfCompany,
   pdfClient,
   pdfCurrency,

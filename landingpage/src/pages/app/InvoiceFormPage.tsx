@@ -13,6 +13,7 @@ import {
   generateId,
   generateInvoiceNumber,
   draftFromInvoice,
+  startingTaxRate,
   toNumber,
   type InvoiceItem,
 } from '../../lib/invoice'
@@ -79,6 +80,28 @@ export function InvoiceFormPage() {
   const [taxRate, setTaxRate] = useState(() => String(existing?.taxRate ?? profile?.defaultTaxRate ?? 0))
   // A new invoice starts from the VAT rate in Settings, unless the rate was already set by hand.
   const taxTouched = useRef(Boolean(existing))
+  // Set when the rate on screen came from the chosen client's own setting.
+  const [taxFromClient, setTaxFromClient] = useState(false)
+
+  // Choosing a client sets the VAT that client is invoiced with; it can still be changed below.
+  function applyClientTax(record: { taxRate?: number | null }) {
+    const start = startingTaxRate(record, profile?.defaultTaxRate)
+    taxTouched.current = true
+    setTaxFromClient(start.fromClient)
+    setTaxRate(String(start.rate))
+  }
+
+  function clientForInvoice(record: (typeof clients)[number]) {
+    return {
+      fullName: clientDisplayName(record) || record.fullName || '',
+      address: record.address || '',
+      phone: record.phone || '',
+      email: record.email || '',
+      businessId: record.businessId || '',
+      vatNumber: record.vatNumber || '',
+      fiscalNumber: record.fiscalNumber || '',
+    }
+  }
   useEffect(() => {
     if (taxTouched.current || profile?.defaultTaxRate === undefined) return
     setTaxRate(String(profile.defaultTaxRate))
@@ -145,7 +168,10 @@ export function InvoiceFormPage() {
     const match = clients.find((item) => item.id === id)
     if (!match) return
     setClientId(id)
+    applyClientTax(match)
     setClient({
+      vatNumber: match.vatNumber || '',
+      fiscalNumber: match.fiscalNumber || '',
       fullName: clientDisplayName(match) || match.fullName || '',
       address: match.address || '',
       phone: match.phone || '',
@@ -288,7 +314,10 @@ export function InvoiceFormPage() {
     const match = findMatchingClient(clients, extractedClient)
     if (match) {
       setClientId(match.id)
+      applyClientTax(match)
       setClient({
+        vatNumber: match.vatNumber || '',
+        fiscalNumber: match.fiscalNumber || '',
         fullName: clientDisplayName(match) || extractedClient.fullName,
         address: extractedClient.address || match.address || '',
         phone: extractedClient.phone || match.phone || '',
@@ -395,13 +424,8 @@ export function InvoiceFormPage() {
 
   function applyClient(item: (typeof clients)[number]) {
     setClientId(item.id)
-    setClient({
-      fullName: clientDisplayName(item) || item.fullName || '',
-      address: item.address || '',
-      phone: item.phone || '',
-      email: item.email || '',
-      businessId: item.businessId || '',
-    })
+    setClient(clientForInvoice(item))
+    applyClientTax(item)
     setPickerOpen(false)
   }
 
@@ -744,6 +768,7 @@ export function InvoiceFormPage() {
                 inputMode="decimal"
                 onChange={(e) => {
                   taxTouched.current = true
+                  setTaxFromClient(false)
                   setTaxRate(e.target.value)
                 }}
               />
@@ -755,14 +780,16 @@ export function InvoiceFormPage() {
                     aria-pressed={appliedTaxRate === rate}
                     onClick={() => {
                       taxTouched.current = true
+                      setTaxFromClient(false)
                       setTaxRate(String(rate))
                     }}
                     className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${appliedTaxRate === rate ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/65 hover:border-brand/30'}`}
                   >
-                    {rate}%
+                    {rate === 0 ? t('newInvoice.taxNone') : `${rate}%`}
                   </button>
                 ))}
               </div>
+              {taxFromClient ? <p className="mt-2 text-xs text-brand-ink/45">{t('newInvoice.taxFromClient')}</p> : null}
             </div>
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Card>

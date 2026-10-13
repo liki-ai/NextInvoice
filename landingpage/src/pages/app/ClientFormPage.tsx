@@ -5,6 +5,7 @@ import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field } from '../../components/ui'
 import { MEASUREMENT_FIELDS, clientDisplayName, composeClient, isFashionIndustry } from '../../lib/client'
+import { normalizeTaxRate } from '../../lib/invoice'
 import { fileToProof, isImageProof, proofSource } from '../../lib/proof'
 import type { ClientRecord } from '../../lib/document'
 
@@ -23,6 +24,13 @@ export function ClientFormPage() {
   const [businessId, setBusinessId] = useState(existing?.businessId || '')
   const [vatNumber, setVatNumber] = useState(existing?.vatNumber || '')
   const [fiscalNumber, setFiscalNumber] = useState(existing?.fiscalNumber || '')
+  const companyRate = normalizeTaxRate(profile?.defaultTaxRate)
+  // 'company' follows the default in Settings, 'none' is an export customer, 'custom' a rate of its own.
+  const [taxMode, setTaxMode] = useState<'company' | 'none' | 'custom'>(() =>
+    existing?.taxRate === undefined || existing?.taxRate === null ? 'company' : existing.taxRate === 0 ? 'none' : 'custom',
+  )
+  const [customRate, setCustomRate] = useState(() => (existing?.taxRate ? String(existing.taxRate) : ''))
+  const taxRate = taxMode === 'company' ? null : taxMode === 'none' ? 0 : normalizeTaxRate(customRate)
   const [measurements, setMeasurements] = useState<Record<string, string>>(existing?.measurements || {})
   const [photos, setPhotos] = useState(existing?.photos || [])
   const [viewPhoto, setViewPhoto] = useState<(typeof photos)[number] | null>(null)
@@ -39,11 +47,12 @@ export function ClientFormPage() {
         businessId,
         vatNumber,
         fiscalNumber,
+        taxRate,
         notes: existing?.notes || '',
         measurements: fashion ? measurements : existing?.measurements || {},
         photos: fashion ? photos : existing?.photos || [],
       }),
-    [fullName, phone, email, address, businessId, vatNumber, fiscalNumber, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
+    [fullName, phone, email, address, businessId, vatNumber, fiscalNumber, taxRate, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
   )
 
   async function persist(thenInvoice: boolean) {
@@ -95,6 +104,44 @@ export function ClientFormPage() {
           </div>
           <Field label={`${t('clients.fiscalNumber')} (${t('common.optional')})`} value={fiscalNumber} onChange={(e) => setFiscalNumber(e.target.value)} />
           <Field label={`${t('clients.vatNumber')} (${t('common.optional')})`} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
+        </div>
+
+        <div className="mt-6 border-t border-brand-ink/8 pt-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('clients.taxTitle')}</p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2" role="radiogroup" aria-label={t('clients.taxTitle')}>
+            {(
+              [
+                ['company', `${t('clients.taxCompany')} (${companyRate}%)`],
+                ['none', t('clients.taxNone')],
+                ['custom', t('clients.taxCustom')],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={taxMode === mode}
+                onClick={() => setTaxMode(mode)}
+                className={`rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${taxMode === mode ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/75 hover:border-brand/30'}`}
+              >
+                {label}
+              </button>
+            ))}
+            {taxMode === 'custom' ? (
+              <label className="flex items-center gap-2 text-sm text-brand-ink/60">
+                <input
+                  value={customRate}
+                  onChange={(e) => setCustomRate(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="8"
+                  aria-label={t('newInvoice.taxRate')}
+                  className="w-20 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm text-brand-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+                />
+                %
+              </label>
+            ) : null}
+          </div>
+          <p className="mt-2 text-xs text-brand-ink/45">{t('clients.taxHint')}</p>
         </div>
 
         {fashion ? (

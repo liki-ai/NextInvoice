@@ -3,6 +3,7 @@ const { initPersist, loadDb, serialize, saveSerialized, hasPostgres } = require(
 const {
   allocateInvoiceNumber,
   clientSnapshot,
+  vatFreeClientIds,
   companySnapshot,
   hydrateInvoice,
   hydrateObligation,
@@ -89,11 +90,28 @@ function clientIdentityKey(client) {
   ].join('|');
 }
 
+// Per-user data version; see MIGRATIONS.md.
+const DATA_VERSION = 2;
+
+function markVatFreeClients(db, userId) {
+  const ids = new Set(vatFreeClientIds(db.invoices[userId], db.clients[userId]));
+  if (ids.size === 0) return 0;
+  db.clients[userId] = (db.clients[userId] || []).map((client) => (ids.has(client.id) ? { ...client, taxRate: 0, updatedAt: nowIso() } : client));
+  return ids.size;
+}
+
 function migrateUserData(userId) {
   const db = readDb();
   ensureUserCollections(db, userId);
-  const current = db.migrations[userId] || { v: 0 };
-  if (current.v >= 1) return;
+  const version = Number((db.migrations[userId] || {}).v) || 0;
+  if (version >= DATA_VERSION) return;
+  if (version < 1) migrateToV1(db, userId);
+  if (version < 2) markVatFreeClients(db, userId);
+  db.migrations[userId] = { v: DATA_VERSION, at: nowIso() };
+  writeDb(db);
+}
+
+function migrateToV1(db, userId) {
   const profile = db.profiles[userId];
   const invoiceMap = new Map();
   for (const inv of db.invoices[userId] || []) {
@@ -135,8 +153,6 @@ function migrateUserData(userId) {
       updatedAt: item.updatedAt || item.createdAt || nowIso(),
     });
   }
-  db.migrations[userId] = { v: 1, at: nowIso() };
-  writeDb(db);
 }
 
 function readDb() {
@@ -272,7 +288,7 @@ async function createUser({ email, passwordHash, language, industry }) {
     db.clients[user.id] = [];
     if (!db.items) db.items = {};
     db.items[user.id] = [];
-    db.migrations[user.id] = { v: 1, at: new Date().toISOString() };
+    db.migrations[user.id] = { v: DATA_VERSION, at: new Date().toISOString() };
     await writeDb(db);
     return user;
   });
@@ -774,6 +790,8 @@ function importInvoices(userId, payload) {
       .map((item, index) => ({ item, index, key: invoiceSortKey(item) }))
       .sort((a, b) => b.key - a.key || String(b.item.number || '').localeCompare(String(a.item.number || '')) || a.index - b.index)
       .map((entry) => entry.item);
+    // Export customers in the file (every invoice at 0%) keep that as their starting rate.
+    markVatFreeClients(db, userId);
     writeDb(db);
   }
   return { created: created.length, clientsCreated, skipped };
