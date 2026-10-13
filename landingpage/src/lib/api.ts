@@ -4,7 +4,7 @@ export function apiBase() {
   const env = import.meta.env.VITE_API_BASE_URL as string | undefined
   if (env) return env.replace(/\/+$/, '')
   if (import.meta.env.DEV) return ''
-  return 'https://nextinvoice.onrender.com'
+  return 'https://api.mynextinvoice.com'
 }
 
 export function getToken() {

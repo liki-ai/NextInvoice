@@ -16,6 +16,7 @@ export async function apiRequest(apiBaseUrl, token, path, { method = 'GET', body
   if (!response.ok) {
     const err = new Error((data && data.error) || `Request failed (${response.status})`);
     err.code = data?.code;
+    err.status = response.status;
     err.remaining = data?.remaining;
     throw err;
   }

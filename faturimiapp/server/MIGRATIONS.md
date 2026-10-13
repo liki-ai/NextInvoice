@@ -22,3 +22,18 @@ Applied on first read after this code is deployed (`db.migrations[userId].v = 1`
 - Body must include `confirm: "RESTORE"`.
 - If `checksum` is sent, it must match `sha256(JSON.stringify(data))`.
 - Do not run restore against production data without an explicit operator request.
+
+## Where the data lives
+
+Accounts, profiles, invoices, clients, items and obligations are stored in Postgres (`DATABASE_URL`), in the table `app_documents`:
+
+| key | holds |
+|-----|-------|
+| `users`, `passwordResets` | one document each |
+| `profiles/<userId>`, `invoices/<userId>`, `clients/<userId>`, `items/<userId>`, `obligations/<userId>`, `syncOps/<userId>`, `migrations/<userId>` | one document per user |
+
+- A save writes only the documents that changed, in one transaction. A failed save is retried until it goes through; meanwhile `GET /health` reports `"durable": false` and the error.
+- On a deploy the old process receives SIGTERM and finishes its writes before exiting.
+- First start on an empty `app_documents`: data is taken over from the older single-row table `app_state` if it exists, otherwise from `data/db.json`. The old table is left untouched.
+- Without `DATABASE_URL` the server keeps data in `data/db.json`. That is for a developer machine only: on Render the disk is rebuilt on every deploy, so the server refuses to start there without a database (`ALLOW_EPHEMERAL_STORE=1` overrides this; do not set it in production).
+- `npm run test:pg` runs the storage tests against a real Postgres (`TEST_DATABASE_URL`).

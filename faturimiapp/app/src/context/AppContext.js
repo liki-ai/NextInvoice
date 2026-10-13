@@ -1,12 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { KEYS, getJson, setJson } from '../storage/storage';
-import { DEFAULT_COMPANY_PROFILE, DEFAULT_SETTINGS, DEFAULT_PLAN } from '../storage/defaults';
+import { DEFAULT_COMPANY_PROFILE, DEFAULT_SETTINGS, DEFAULT_PLAN, currentApiBaseUrl } from '../storage/defaults';
 import { generateId } from '../utils/id';
 import { I18nProvider } from '../i18n/I18nContext';
 import { planUsage } from '../storage/plan';
 import { apiRequest } from '../api/client';
 import { computeTotals } from '../pdf/invoiceTemplates';
+import { translations } from '../i18n/translations';
+import { shouldUploadProfile, signInPlan, profileIsCustom } from '../utils/accountSwitch';
 
 const AppContext = createContext(null);
 
@@ -67,7 +69,7 @@ export function AppProvider({ children }) {
         getJson(KEYS.MIGRATED_USER_ID, null),
       ]);
       setCompanyProfile({ ...DEFAULT_COMPANY_PROFILE, ...profile });
-      setSettings({ ...DEFAULT_SETTINGS, ...storedSettings });
+      setSettings({ ...DEFAULT_SETTINGS, ...storedSettings, apiBaseUrl: currentApiBaseUrl(storedSettings?.apiBaseUrl) });
       setInvoices(storedInvoices);
       setObligations(Array.isArray(storedObligations) ? storedObligations : []);
       setClients(Array.isArray(storedClients) ? storedClients : []);
@@ -149,6 +151,12 @@ export function AppProvider({ children }) {
       await persistSync({ status: 'synced', lastSyncedAt: new Date().toISOString(), error: null });
     } catch (err) {
       await persistSync({ status: 'error', lastSyncedAt: syncState.lastSyncedAt, error: err.message });
+      if (err.status === 401) {
+        setToken(null);
+        setUser(null);
+        await setJson(KEYS.AUTH_TOKEN, null);
+        await setJson(KEYS.AUTH_USER, null);
+      }
     } finally {
       flushing.current = false;
     }
@@ -165,77 +173,112 @@ export function AppProvider({ children }) {
     return () => sub.remove();
   }, [token, flushQueue]);
 
-  const migrateLocalIfNeeded = useCallback(async (nextUser, nextToken) => {
-    if (migratedUserId && migratedUserId !== nextUser.id) {
-      await persistSync({ status: 'pending', lastSyncedAt: null, error: 'wrong-account' });
-      const snap = await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync');
-      await applySnapshot(snap);
-      return;
-    }
-    if (migratedUserId === nextUser.id) return;
+  // Sends everything on this phone to the signed-in account. Whatever the server does not take
+  // stays in the sync queue, so it is retried rather than lost.
+  const uploadLocalData = useCallback(async (nextToken, includeProfile) => {
     const changes = [];
-    if (companyProfile) changes.push({ collection: 'profile', op: 'upsert', id: 'profile', body: companyProfile });
+    if (includeProfile) changes.push({ collection: 'profile', op: 'upsert', id: 'profile', body: companyProfile });
     for (const client of clients) changes.push({ collection: 'clients', op: 'upsert', id: client.id, body: client });
     for (const item of catalogItems) changes.push({ collection: 'items', op: 'upsert', id: item.id, body: item });
     for (const inv of invoices) changes.push({ collection: 'invoices', op: 'upsert', id: inv.id, body: inv });
     for (const item of obligations) changes.push({ collection: 'obligations', op: 'upsert', id: item.id, body: item });
+    const waiting = [];
     for (const change of changes) {
-      await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync', {
-        method: 'POST',
-        body: { opId: generateId(), changes: [change] },
-      });
+      const item = { opId: generateId(), ...change };
+      try {
+        await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync', { method: 'POST', body: { opId: item.opId, changes: [item] } });
+      } catch (err) {
+        if (err.status === 401) throw err;
+        waiting.push(item);
+      }
+    }
+    return waiting;
+  }, [companyProfile, clients, catalogItems, invoices, obligations, settings.apiBaseUrl]);
+
+  const askAboutLocalData = useCallback(() => {
+    const copy = (translations[settings.language] || translations.sq).auth;
+    return new Promise((resolve) => {
+      Alert.alert(
+        copy.localDataTitle,
+        copy.localDataBody,
+        [
+          { text: copy.localDataDiscard, style: 'destructive', onPress: () => resolve('replace') },
+          { text: copy.localDataUpload, onPress: () => resolve('upload') },
+        ],
+        { cancelable: false },
+      );
+    });
+  }, [settings.language]);
+
+  // Hands the phone's copy of the data over to the account that just signed in. Returns how many
+  // changes are still waiting to reach the server.
+  const adoptAccount = useCallback(async (nextUser, nextToken) => {
+    const serverState = await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync');
+    const hasLocalData = invoices.length + clients.length + catalogItems.length + obligations.length > 0 || profileIsCustom(companyProfile);
+    let plan = signInPlan({
+      migratedUserId,
+      nextUserId: nextUser.id,
+      hasLocalData,
+      hasUnsyncedChanges: syncQueue.length > 0 || syncState.status === 'error',
+    });
+    if (plan === 'keep') return syncQueue.length;
+    if (plan === 'ask') plan = await askAboutLocalData();
+
+    let waiting = [];
+    if (plan === 'upload') {
+      waiting = await uploadLocalData(nextToken, shouldUploadProfile(companyProfile, serverState?.profile));
+    }
+    // Changes queued for the previous account are either uploaded above or deliberately dropped.
+    setSyncQueue(waiting);
+    await setJson(KEYS.SYNC_QUEUE, waiting);
+    if (waiting.length === 0) {
+      await applySnapshot(plan === 'upload' ? await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync') : serverState);
     }
     await setJson(KEYS.MIGRATED_USER_ID, nextUser.id);
     setMigratedUserId(nextUser.id);
-    const snap = await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync');
-    await applySnapshot(snap);
-  }, [migratedUserId, companyProfile, clients, catalogItems, invoices, obligations, settings.apiBaseUrl, applySnapshot, persistSync]);
+    return waiting.length;
+  }, [migratedUserId, companyProfile, clients, catalogItems, invoices, obligations, syncQueue, syncState.status, settings.apiBaseUrl, applySnapshot, askAboutLocalData, uploadLocalData]);
+
+  const startSession = useCallback(async (res) => {
+    // The data is settled before the session becomes visible, so the background sync cannot
+    // send the previous account's queue to this one in the meantime.
+    const waiting = await adoptAccount(res.user, res.token);
+    if (res.user?.plan === 'premium') {
+      const next = normalizePlan({
+        plan: 'premium',
+        platform: res.user.billingSource || 'server',
+        expiresAt: res.user.planExpiresAt || null,
+        updatedAt: new Date().toISOString(),
+      });
+      setPlan(next);
+      await setJson(KEYS.PLAN, next);
+    }
+    await persistSync(
+      waiting > 0
+        ? { status: 'pending', lastSyncedAt: syncState.lastSyncedAt, error: null }
+        : { status: 'synced', lastSyncedAt: new Date().toISOString(), error: null },
+    );
+    await setJson(KEYS.AUTH_TOKEN, res.token);
+    await setJson(KEYS.AUTH_USER, res.user);
+    setToken(res.token);
+    setUser(res.user);
+  }, [adoptAccount, persistSync, syncState.lastSyncedAt]);
 
   const login = useCallback(async (email, password) => {
     const res = await apiRequest(settings.apiBaseUrl, null, '/api/auth/login', {
       method: 'POST',
       body: { email, password },
     });
-    setToken(res.token);
-    setUser(res.user);
-    await setJson(KEYS.AUTH_TOKEN, res.token);
-    await setJson(KEYS.AUTH_USER, res.user);
-    await migrateLocalIfNeeded(res.user, res.token);
-    if (res.user?.plan === 'premium') {
-      const next = normalizePlan({
-        plan: 'premium',
-        platform: res.user.billingSource || 'server',
-        expiresAt: res.user.planExpiresAt || null,
-        updatedAt: new Date().toISOString(),
-      });
-      setPlan(next);
-      await setJson(KEYS.PLAN, next);
-    }
-    await persistSync({ status: 'synced', lastSyncedAt: new Date().toISOString(), error: null });
-  }, [settings.apiBaseUrl, migrateLocalIfNeeded, persistSync]);
+    await startSession(res);
+  }, [settings.apiBaseUrl, startSession]);
 
   const signup = useCallback(async (email, password, extras = {}) => {
     const res = await apiRequest(settings.apiBaseUrl, null, '/api/auth/signup', {
       method: 'POST',
       body: { email, password, language: settings.language, industry: extras.industry },
     });
-    setToken(res.token);
-    setUser(res.user);
-    await setJson(KEYS.AUTH_TOKEN, res.token);
-    await setJson(KEYS.AUTH_USER, res.user);
-    await migrateLocalIfNeeded(res.user, res.token);
-    if (res.user?.plan === 'premium') {
-      const next = normalizePlan({
-        plan: 'premium',
-        platform: res.user.billingSource || 'server',
-        expiresAt: res.user.planExpiresAt || null,
-        updatedAt: new Date().toISOString(),
-      });
-      setPlan(next);
-      await setJson(KEYS.PLAN, next);
-    }
-    await persistSync({ status: 'synced', lastSyncedAt: new Date().toISOString(), error: null });
-  }, [settings.apiBaseUrl, settings.language, migrateLocalIfNeeded, persistSync]);
+    await startSession(res);
+  }, [settings.apiBaseUrl, settings.language, startSession]);
 
   const logout = useCallback(async () => {
     setToken(null);

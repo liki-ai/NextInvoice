@@ -1,5 +1,13 @@
 require('dotenv').config();
 
+const { proxyTarget, startProxy } = require('./proxy');
+
+// On the retired host this process only forwards to the real API and needs nothing else.
+if (proxyTarget()) {
+  startProxy(proxyTarget(), process.env.PORT || 4000);
+  return;
+}
+
 const express = require('express');
 const cors = require('cors');
 
@@ -14,8 +22,7 @@ const syncRouter = require('./routes/sync');
 const profileRouter = require('./routes/profile');
 const billingRouter = require('./routes/billing');
 const { handleStripeWebhook } = require('./routes/billing');
-const { initStore } = require('./store');
-const { hasPostgres } = require('./persist');
+const { initStore, flushStore, storeHealth } = require('./store');
 const { billingHealth } = require('./billing/stripe');
 
 const app = express();
@@ -39,7 +46,7 @@ app.get('/', (_req, res) => {
 app.get('/health', (_req, res) =>
   res.json({
     ok: true,
-    persist: hasPostgres() ? 'postgres' : 'file',
+    ...storeHealth(),
     billing: billingHealth(),
   }),
 );
@@ -64,9 +71,26 @@ const PORT = process.env.PORT || 4000;
 
 initStore()
   .then(() => {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`[nextinvoice-server] listening on http://0.0.0.0:${PORT}`);
     });
+    // A deploy stops the old process with SIGTERM. Finish the writes in flight before going.
+    let stopping = false;
+    const stop = (signal) => {
+      if (stopping) return;
+      stopping = true;
+      console.log(`[nextinvoice-server] ${signal} received, saving and shutting down`);
+      server.close();
+      const giveUp = setTimeout(() => process.exit(1), 10000);
+      flushStore()
+        .then((state) => {
+          clearTimeout(giveUp);
+          process.exit(state.ok ? 0 : 1);
+        })
+        .catch(() => process.exit(1));
+    };
+    process.on('SIGTERM', () => stop('SIGTERM'));
+    process.on('SIGINT', () => stop('SIGINT'));
   })
   .catch((err) => {
     console.error('[nextinvoice-server] failed to start', err);

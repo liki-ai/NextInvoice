@@ -16,8 +16,16 @@ export const DEFAULT_COMPANY_PROFILE = {
 
 export const DEFAULT_SETTINGS = {
   language: 'sq',
-  apiBaseUrl: 'https://nextinvoice.onrender.com',
+  apiBaseUrl: 'https://api.mynextinvoice.com',
 };
+
+// Addresses the API used to live at. A phone that saved one of these follows the move.
+export const RETIRED_API_URLS = ['https://nextinvoice.onrender.com'];
+
+export function currentApiBaseUrl(saved) {
+  const url = String(saved || '').trim().replace(/\/+$/, '');
+  return !url || RETIRED_API_URLS.includes(url) ? DEFAULT_SETTINGS.apiBaseUrl : url;
+}
 
 export const DEFAULT_PLAN = {
   plan: 'free',

@@ -1,0 +1,39 @@
+# NextInvoice API + its database, as run on the production server (/opt/nextinvoice).
+# Secrets come from /opt/nextinvoice/.env on the server; that file is never in git.
+name: nextinvoice
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: nextinvoice-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nextinvoice
+      POSTGRES_USER: nextinvoice
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    # No published port: only the api container can reach the database.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nextinvoice -d nextinvoice']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build: ./server
+    container_name: nextinvoice-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: '4000'
+      PROXY_TO: 'off'
+      # Same private Docker network, so no TLS between the two containers.
+      DATABASE_URL: postgres://nextinvoice:${POSTGRES_PASSWORD}@db:5432/nextinvoice?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    # nginx on the host terminates HTTPS and forwards here.
+    ports:
+      - '127.0.0.1:4100:4000'
+    stop_grace_period: 20s

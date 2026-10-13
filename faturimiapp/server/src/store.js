@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { initPersist, loadDb, saveDb } = require('./persist');
+const { initPersist, loadDb, serialize, saveSerialized, hasPostgres } = require('./persist');
 const {
   allocateInvoiceNumber,
   clientSnapshot,
@@ -146,17 +146,67 @@ function readDb() {
   return cache;
 }
 
-function writeDb(db) {
-  cache = db;
-  const snapshot = JSON.parse(JSON.stringify(db));
-  persistChain = persistChain.then(() => saveDb(snapshot)).catch((err) => {
-    console.error('[store] failed to persist', err);
+// The newest state waiting to be written. Saves run one at a time; when several pile up
+// (a draft autosaving while someone types) only the latest one is worth sending.
+let pendingSave = null;
+let retryTimer = null;
+let retryDelay = 0;
+const persistState = { ok: true, lastSavedAt: null, error: null, failedSince: null };
+
+function runSave() {
+  persistChain = persistChain.then(async () => {
+    const snapshot = pendingSave;
+    if (!snapshot) return;
+    pendingSave = null;
+    try {
+      await saveSerialized(snapshot);
+      persistState.ok = true;
+      persistState.error = null;
+      persistState.failedSince = null;
+      persistState.lastSavedAt = nowIso();
+      retryDelay = 0;
+    } catch (err) {
+      // The change is still in memory and already answered to the client; losing it on the next
+      // restart would be silent. Keep it queued and try again until the database takes it.
+      console.error('[store] failed to persist, will retry', err.message);
+      persistState.ok = false;
+      persistState.error = String(err.message || err);
+      persistState.failedSince = persistState.failedSince || nowIso();
+      if (!pendingSave) pendingSave = snapshot;
+      retryDelay = Math.min(retryDelay ? retryDelay * 2 : 1000, 30000);
+      if (!retryTimer) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          runSave();
+        }, retryDelay);
+        if (retryTimer.unref) retryTimer.unref();
+      }
+    }
   });
   return persistChain;
 }
 
-function flushStore() {
-  return persistChain;
+function writeDb(db) {
+  cache = db;
+  pendingSave = serialize(db);
+  return runSave();
+}
+
+/** Resolves once everything written so far has reached storage (or one more attempt has failed). */
+async function flushStore() {
+  if (pendingSave) runSave();
+  await persistChain;
+  return { ...persistState };
+}
+
+function storeHealth() {
+  return {
+    persist: hasPostgres() ? 'postgres' : 'file',
+    // "durable" is what matters to an operator: false means a restart can lose data.
+    durable: hasPostgres() && persistState.ok,
+    lastSavedAt: persistState.lastSavedAt,
+    ...(persistState.ok ? {} : { saveError: persistState.error, failingSince: persistState.failedSince }),
+  };
 }
 
 function hashToken(token) {
@@ -1237,6 +1287,7 @@ module.exports = {
   isPremiumUser,
   initStore,
   flushStore,
+  storeHealth,
   createUser,
   findUserByEmail,
   findUserById,
