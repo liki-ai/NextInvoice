@@ -4,6 +4,8 @@ import { Camera, Eye, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Us
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
+import { DateField } from '../../components/DateField'
+import { parseLooseDate } from '../../lib/document'
 import {
   buildInvoiceHtml,
   computeTotals,
@@ -28,6 +30,19 @@ import { TemplateSwitch } from '../../components/TemplateSwitch'
 import { clientDisplayName, clientMatchesQuery, composeClient, findMatchingClient, frequentClients } from '../../lib/client'
 import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catalog'
 import { fileToSupportedImageDataUrl } from '../../lib/proof'
+
+/** A price as shown in its box: at most two decimals. The full value stays in the form until it is retyped. */
+function shortAmount(value: string | number) {
+  const raw = String(value ?? '').trim()
+  if (raw === '' || /^-?\d*([.,]\d{0,2})?$/.test(raw)) return raw
+  const amount = toNumber(raw)
+  return Number.isFinite(amount) ? amount.toFixed(2) : raw
+}
+
+/** The lines reduced to what makes the amounts, for telling whether an issued invoice's amounts were touched. */
+function lineSignature(items: { description?: string; quantity?: string | number; unitPrice?: string | number }[] | undefined) {
+  return JSON.stringify((items || []).map((it) => [String(it.description || '').trim(), toNumber(it.quantity), Math.round(toNumber(it.unitPrice) * 1e6) / 1e6]))
+}
 
 function emptyItem(): InvoiceItem {
   return { id: generateId(), description: '', quantity: '1', unitPrice: '' }
@@ -185,7 +200,20 @@ export function InvoiceFormPage() {
   const issued = Boolean(existing && existing.lifecycle !== 'draft')
   const canSaveOnly = !issued
   const [correctReason, setCorrectReason] = useState('')
-  const saveLabel = issued ? t('docs.correct') : t('newInvoice.saveAndShare')
+  // Price boxes the user has typed in show exactly what was typed; the others show two decimals.
+  const [typedPrices, setTypedPrices] = useState<Set<string>>(() => new Set())
+  // On an issued invoice a reason is asked only when the amounts change, not for a new date.
+  const amountsChanged = useMemo(() => {
+    if (!issued || !existing) return false
+    const before = computeTotals(existing.items || [], existing.discount, existing.taxRate)
+    return (
+      lineSignature(netItems.filter((it) => it.description.trim())) !== lineSignature(existing.items) ||
+      subtotal !== before.subtotal ||
+      total !== before.total ||
+      appliedTaxRate !== before.taxRate
+    )
+  }, [issued, existing, netItems, subtotal, total, appliedTaxRate])
+  const saveLabel = issued ? (amountsChanged ? t('docs.correct') : t('newInvoice.saveChanges')) : t('newInvoice.saveAndShare')
   const [savingDraft, setSavingDraft] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -398,6 +426,10 @@ export function InvoiceFormPage() {
       setError(t('newInvoice.validationItems'))
       return null
     }
+    if (!parseLooseDate(date) || (dueDate.trim() && !parseLooseDate(dueDate))) {
+      setError(t('newInvoice.validationDate'))
+      return null
+    }
     const totals = computeTotals(validItems, discount, taxRate)
     return {
       number: invoiceNumber,
@@ -458,7 +490,7 @@ export function InvoiceFormPage() {
   async function onSave(asDraft = false) {
     const invoice = validate()
     if (!invoice) return
-    if (issued && !correctReason.trim()) {
+    if (issued && amountsChanged && !correctReason.trim()) {
       setError(t('docs.correctReason'))
       return
     }
@@ -478,7 +510,15 @@ export function InvoiceFormPage() {
       }
       let savedId = persistedIdRef.current || invoiceId
       if (issued && invoiceId) {
-        await correctInvoice(invoiceId, { items: payload.items, discount: payload.discount, taxRate: payload.taxRate, notes: payload.notes, reason: correctReason.trim() })
+        await correctInvoice(invoiceId, {
+          items: payload.items,
+          discount: payload.discount,
+          taxRate: payload.taxRate,
+          notes: payload.notes,
+          date: payload.date,
+          dueDate: payload.dueDate,
+          reason: correctReason.trim() || (amountsChanged ? '' : t('docs.dateChangeReason')),
+        })
         savedId = invoiceId
       } else if (savedId) {
         await updateInvoice(savedId, payload)
@@ -739,7 +779,15 @@ export function InvoiceFormPage() {
                         <input className={inputClass} value={String(item.quantity)} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} />
                       </td>
                       <td className="px-3 py-2">
-                        <input className={inputClass} value={String(item.unitPrice)} onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value)} />
+                        <input
+                          className={inputClass}
+                          inputMode="decimal"
+                          value={typedPrices.has(item.id) ? String(item.unitPrice) : shortAmount(item.unitPrice)}
+                          onChange={(e) => {
+                            setTypedPrices((prev) => (prev.has(item.id) ? prev : new Set(prev).add(item.id)))
+                            updateItem(item.id, 'unitPrice', e.target.value)
+                          }}
+                        />
                       </td>
                       <td className="px-3 py-2 text-right font-medium">
                         {formatMoney(toNumber(item.quantity) * toNumber(item.unitPrice), currency)}
@@ -764,8 +812,8 @@ export function InvoiceFormPage() {
           <Card>
             <h2 className="mb-4 font-semibold">{t('newInvoice.invoiceDetailsSectionTitle')}</h2>
             <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
-            <Field label={t('newInvoice.date')} value={date} onChange={(e) => setDate(e.target.value)} />
-            <Field label={t('newInvoice.dueDate')} value={dueDate} placeholder={t('newInvoice.phDueDate')} onChange={(e) => setDueDate(e.target.value)} />
+            <DateField label={t('newInvoice.date')} value={date} pickLabel={t('newInvoice.pickDate')} onChange={setDate} />
+            <DateField label={t('newInvoice.dueDate')} value={dueDate} placeholder={t('newInvoice.phDueDate')} pickLabel={t('newInvoice.pickDate')} onChange={setDueDate} />
             <Field label={t('newInvoice.discount')} value={discount} inputMode="decimal" onChange={(e) => setDiscount(e.target.value)} />
             <div className="mb-5">
               <Field
@@ -841,7 +889,7 @@ export function InvoiceFormPage() {
                 <span>{formatMoney(total, currency)}</span>
               </div>
             </div>
-            {issued ? <Field label={t('docs.correctReason')} value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} /> : null}
+            {issued && amountsChanged ? <Field label={t('docs.correctReason')} value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} /> : null}
             {error ? <p className="mt-4 text-sm text-[#C0503A]">{error}</p> : null}
             <div className="mt-5 flex flex-col gap-2">
               <div className="flex gap-2">

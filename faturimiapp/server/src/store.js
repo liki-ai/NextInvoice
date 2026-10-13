@@ -603,12 +603,17 @@ function cancelInvoice(userId, invoiceId, reason) {
   return hydrateInvoice(list[idx], db.profiles[userId]);
 }
 
-function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, reason }) {
+/** The lines of an invoice reduced to what makes its amounts, for telling whether they changed. */
+function lineSignature(items) {
+  return JSON.stringify((Array.isArray(items) ? items : []).map((it) => [String(it.description || '').trim(), toNumber(it.quantity), Math.round(toNumber(it.unitPrice) * 1e6) / 1e6]));
+}
+
+/**
+ * Changes an issued invoice and keeps what it said before. Changing the amounts needs a reason;
+ * changing only the invoice date, the due date or the notes does not.
+ */
+function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, date, dueDate, reason }) {
   const why = String(reason || '').trim();
-  if (!why) {
-    const err = new Error('CORRECT_REASON');
-    throw err;
-  }
   migrateUserData(userId);
   const db = readDb();
   const list = db.invoices[userId] || [];
@@ -623,6 +628,19 @@ function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, re
   const nextDiscount = discount === undefined ? current.discount : discount;
   const totals = totalFields(nextItems, nextDiscount, taxRate === undefined ? current.taxRate : taxRate);
   const total = totals.total;
+  const amountsChanged =
+    lineSignature(nextItems) !== lineSignature(current.items) || JSON.stringify(totals) !== JSON.stringify(totalFields(current.items, current.discount, current.taxRate));
+  if (amountsChanged && !why) {
+    const err = new Error('CORRECT_REASON');
+    throw err;
+  }
+  const nextDate = date === undefined ? current.date : String(date).trim().slice(0, 40);
+  const nextDueDate = dueDate === undefined ? current.dueDate || '' : String(dueDate).trim().slice(0, 40);
+  if (nextDate !== current.date && !parseLooseDate(nextDate)) throw new Error('DATE_INVALID');
+  const nextNotes = notes === undefined ? current.notes : notes;
+  const datesChanged = nextDate !== current.date || nextDueDate !== (current.dueDate || '');
+  // Nothing to record: the form was saved as it was opened.
+  if (!amountsChanged && !datesChanged && (nextNotes || '') === (current.notes || '')) return hydrateInvoice(current, db.profiles[userId]);
   const hydrated = hydrateInvoice(current, db.profiles[userId]);
   if (hydrated.amountPaid > total) {
     const err = new Error('PAYMENTS_EXCEED');
@@ -632,10 +650,12 @@ function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, re
   }
   list[idx] = {
     ...current,
-    items: nextItems,
-    discount: nextDiscount,
-    notes: notes === undefined ? current.notes : notes,
-    ...totals,
+    items: amountsChanged ? nextItems : current.items,
+    discount: amountsChanged ? nextDiscount : current.discount,
+    notes: nextNotes,
+    date: nextDate,
+    dueDate: nextDueDate,
+    ...(amountsChanged ? totals : {}),
     updatedAt: nowIso(),
     revisions: [
       ...(current.revisions || []),
@@ -643,7 +663,7 @@ function correctInvoice(userId, invoiceId, { items, discount, taxRate, notes, re
         type: 'correct',
         reason: why,
         at: nowIso(),
-        previous: { items: current.items, discount: current.discount, taxRate: current.taxRate, subtotal: current.subtotal, total: current.total },
+        previous: { items: current.items, discount: current.discount, taxRate: current.taxRate, subtotal: current.subtotal, total: current.total, date: current.date, dueDate: current.dueDate || '' },
       },
     ],
   };

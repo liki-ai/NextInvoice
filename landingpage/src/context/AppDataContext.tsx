@@ -23,7 +23,8 @@ type DataValue = {
   removeInvoice: (id: string) => Promise<void>
   issueInvoice: (id: string) => Promise<Invoice>
   cancelInvoice: (id: string, reason: string) => Promise<Invoice>
-  correctInvoice: (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; taxRate?: number; notes?: string; reason: string }) => Promise<Invoice>
+  /** Changes an issued invoice. The reason is needed only when the amounts change. */
+  correctInvoice: (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; taxRate?: number; notes?: string; date?: string; dueDate?: string; reason: string }) => Promise<Invoice>
   addInvoicePayment: (id: string, payment: PaymentInput) => Promise<Invoice>
   voidInvoicePayment: (id: string, paymentId: string, reason: string) => Promise<Invoice>
   createObligation: (obligation: Omit<Obligation, 'id' | 'createdAt'>) => Promise<Obligation>
@@ -139,7 +140,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return res.invoice
   }, [])
 
-  const correctInvoice = useCallback(async (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; taxRate?: number; notes?: string; reason: string }) => {
+  const correctInvoice = useCallback(async (id: string, body: { items?: Invoice['items']; discount?: Invoice['discount']; taxRate?: number; notes?: string; date?: string; dueDate?: string; reason: string }) => {
     const res = await api<{ invoice: Invoice }>(`/api/invoices/${id}/correct`, { method: 'POST', body })
     setInvoices((prev) => prev.map((item) => (item.id === id ? res.invoice : item)))
     return res.invoice

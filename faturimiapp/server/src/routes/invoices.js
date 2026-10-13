@@ -29,6 +29,7 @@ function sendError(res, err) {
     ISSUED_DELETE: [409, 'Issued invoices cannot be deleted. Cancel them instead.'],
     CANCEL_REASON: [400, 'A cancel reason is required.'],
     CORRECT_REASON: [400, 'A correction reason is required.'],
+    DATE_INVALID: [400, 'Enter a valid invoice date.'],
     NOT_ISSUED: [409, 'Only issued invoices can be corrected.'],
     DRAFT_CANCEL: [409, 'Delete the draft instead of cancelling it.'],
     DRAFT_PAYMENT: [409, 'Issue the invoice before recording a payment.'],

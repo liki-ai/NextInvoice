@@ -199,6 +199,7 @@ const translations = {
 			cancelReason: "Arsyeja e anulimit",
 			correct: "Korrigjo shumat",
 			correctReason: "Arsyeja e korrigjimit",
+			dateChangeReason: "Ndryshim i datës",
 			voidPayment: "Korrigjo pagesën",
 			voidReason: "Arsyeja e korrigjimit",
 			clients: "Klientët",
@@ -313,6 +314,7 @@ const translations = {
 			subtotal: "Nëntotali",
 			total: "Totali",
 			saveAndShare: "Ruaj dhe shpërndaj",
+			pickDate: "Zgjidh datën nga kalendari",
 			saveChanges: "Ruaj ndryshimet",
 			selectClient: "Zgjidh",
 			searchClients: "Kërko klientin",
@@ -329,7 +331,8 @@ const translations = {
 			savedSuccess: "Fatura u ruajt me sukses.",
 			updatedSuccess: "Fatura u përditësua.",
 			validationClient: "Plotëso emrin e klientit para se të vazhdosh.",
-			validationItems: "Shto të paktën një artikull me çmim."
+			validationItems: "Shto të paktën një artikull me çmim.",
+			validationDate: "Shkruaj një datë të vlefshme, p.sh. OCT 13, 2026, ose zgjidhe nga kalendari."
 		},
 		invoiceDetail: {
 			title: "Detajet e faturës",
@@ -943,6 +946,7 @@ const translations = {
 			cancelReason: "Cancellation reason",
 			correct: "Correct amounts",
 			correctReason: "Correction reason",
+			dateChangeReason: "Date changed",
 			voidPayment: "Correct payment",
 			voidReason: "Correction reason",
 			clients: "Clients",
@@ -1057,6 +1061,7 @@ const translations = {
 			subtotal: "Subtotal",
 			total: "Total",
 			saveAndShare: "Save and share",
+			pickDate: "Pick the date from the calendar",
 			saveChanges: "Save changes",
 			selectClient: "Select",
 			searchClients: "Search clients",
@@ -1073,7 +1078,8 @@ const translations = {
 			savedSuccess: "Invoice saved.",
 			updatedSuccess: "Invoice updated.",
 			validationClient: "Enter the client name before continuing.",
-			validationItems: "Add at least one item with a price."
+			validationItems: "Add at least one item with a price.",
+			validationDate: "Enter a valid date, e.g. OCT 13, 2026, or pick it from the calendar."
 		},
 		invoiceDetail: {
 			title: "Invoice details",
@@ -1687,6 +1693,7 @@ const translations = {
 			cancelReason: "Motivo dell’annullamento",
 			correct: "Correggi importi",
 			correctReason: "Motivo della correzione",
+			dateChangeReason: "Data modificata",
 			voidPayment: "Correggi pagamento",
 			voidReason: "Motivo della correzione",
 			clients: "Clienti",
@@ -1801,6 +1808,7 @@ const translations = {
 			subtotal: "Imponibile",
 			total: "Totale",
 			saveAndShare: "Salva e condividi",
+			pickDate: "Scegli la data dal calendario",
 			saveChanges: "Salva modifiche",
 			selectClient: "Scegli",
 			searchClients: "Cerca cliente",
@@ -1817,7 +1825,8 @@ const translations = {
 			savedSuccess: "Fattura salvata.",
 			updatedSuccess: "Fattura aggiornata.",
 			validationClient: "Inserisci il nome del cliente prima di continuare.",
-			validationItems: "Aggiungi almeno una voce con un prezzo."
+			validationItems: "Aggiungi almeno una voce con un prezzo.",
+			validationDate: "Inserisci una data valida, es. OCT 13, 2026, oppure sceglila dal calendario."
 		},
 		invoiceDetail: {
 			title: "Dettagli fattura",
