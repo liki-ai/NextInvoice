@@ -116,11 +116,14 @@ router.post('/forgot', async (req, res) => {
     } catch (err) {
       if (err.message === 'MAIL_NOT_CONFIGURED') {
         const payload = { ok: true };
-        if (process.env.MAIL_DEV === '1' || !process.env.RENDER) {
+        // The link is the key to the account: it is handed back in the answer only on a developer's
+        // machine that asked for it, never by a production server.
+        const developerMachine = process.env.MAIL_DEV === '1' && process.env.NODE_ENV !== 'production' && !process.env.RENDER;
+        if (developerMachine) {
           payload.resetUrl = err.resetUrl;
           payload.dev = true;
         }
-        if (process.env.RENDER && process.env.MAIL_DEV !== '1') {
+        if (!developerMachine) {
           return res.status(503).json({
             error: 'Password reset email is not configured yet. Try logging in, or set RESEND_API_KEY on the server.',
             code: 'MAIL_NOT_CONFIGURED',
