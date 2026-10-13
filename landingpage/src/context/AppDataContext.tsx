@@ -5,7 +5,7 @@ import type { CompanyProfile, Invoice } from '../lib/invoice'
 import type { Obligation } from '../lib/obligation'
 import type { ClientRecord, Payment } from '../lib/document'
 import type { CatalogItem } from '../lib/catalog'
-import type { InvoiceEmailInput, MailSettingsInput, MailState, ReminderInput } from '../lib/mail'
+import type { InvoiceEmailInput, MailBox, MailSettingsInput, MailState, ReminderInput } from '../lib/mail'
 import { useI18n, isLang } from '../i18n'
 
 type PaymentInput = { amount: number; date: string; method?: string; note?: string; opId?: string }
@@ -46,10 +46,10 @@ type DataValue = {
   saveProfile: (profile: Partial<CompanyProfile>) => Promise<CompanyProfile>
   /** The company's mailbox connection for sending invoices; null until it is known. */
   mail: MailState | null
-  saveMail: (settings: MailSettingsInput) => Promise<MailState>
-  removeMail: () => Promise<MailState>
+  saveMail: (box: MailBox, settings: MailSettingsInput) => Promise<MailState>
+  removeMail: (box: MailBox) => Promise<MailState>
   /** Sends a test message to the account's own address. */
-  testMail: (message: { from?: string; subject: string; body: string }) => Promise<{ to: string }>
+  testMail: (message: { box: MailBox; subject: string; body: string }) => Promise<{ to: string }>
   /** Emails the invoice from the company mailbox and marks it sent. */
   sendInvoiceEmail: (id: string, message: InvoiceEmailInput) => Promise<{ invoice: Invoice; attached: boolean }>
   /** Brings recorded payments in line with a bank statement: per invoice, the payments it replaces and the transfers it shows. */
@@ -256,22 +256,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return res.profile
   }, [setLang])
 
-  const saveMail = useCallback(async (settings: MailSettingsInput) => {
-    const res = await api<MailState>('/api/mail', { method: 'PUT', body: settings })
+  const saveMail = useCallback(async (box: MailBox, settings: MailSettingsInput) => {
+    const res = await api<MailState>(box === 'personal' ? '/api/mail/personal' : '/api/mail', { method: 'PUT', body: settings })
     setMail(res)
     return res
   }, [])
 
-  const removeMail = useCallback(async () => {
-    const res = await api<MailState>('/api/mail', { method: 'DELETE' })
+  const removeMail = useCallback(async (box: MailBox) => {
+    const res = await api<MailState>(box === 'personal' ? '/api/mail/personal' : '/api/mail', { method: 'DELETE' })
     setMail(res)
     return res
   }, [])
 
-  const testMail = useCallback(async (message: { from?: string; subject: string; body: string }) => {
-    const res = await api<{ to: string } & Partial<MailState>>('/api/mail/test', { method: 'POST', body: message })
+  const testMail = useCallback(async (message: { box: MailBox; subject: string; body: string }) => {
+    const res = await api<{ to: string } & MailState>('/api/mail/test', { method: 'POST', body: message })
     // A delivered test also proves a connection that was saved before saving checked it.
-    if (res.mail) setMail({ mail: res.mail, pdf: Boolean(res.pdf) })
+    if (res.mail && res.personal) setMail({ mail: res.mail, personal: res.personal, from: res.from || [], pdf: Boolean(res.pdf) })
     return res
   }, [])
 

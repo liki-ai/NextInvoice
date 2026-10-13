@@ -13,52 +13,73 @@ test('a saved password comes back only through decryptSecret', () => {
 });
 
 test('settings are cleaned, and a blank password keeps the saved one', () => {
-  const first = sanitizeMailSettings({ host: ' SMTP.Gmail.com ', port: 587, user: ' info@tretek.io ', password: 'abcd efgh ijkl mnop', senders: [{ name: 'Financa "x"\r\nBcc: a@b.c', email: 'Finance@Tretek.io' }, { email: 'owner@tretek.io' }, { email: 'nope' }] }, null, account.email);
+  const first = sanitizeMailSettings({ host: ' SMTP.Gmail.com ', port: 587, user: ' info@tretek.io ', password: 'abcd efgh ijkl mnop', senders: [{ name: 'Financa "x"\r\nBcc: a@b.c', email: 'Finance@Tretek.io' }, { email: 'INFO@tretek.io' }, { email: 'nope' }] }, null);
   assert.equal(first.host, 'smtp.gmail.com');
   assert.equal(first.user, 'info@tretek.io');
   assert.equal(decryptSecret(first.pass), 'abcdefghijklmnop');
   assert.deepEqual(first.senders, [{ name: 'Financa x Bcc: a@b.c', email: 'finance@tretek.io' }]);
   assert.ok(mailReady(first));
 
-  const kept = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', senders: [] }, first, account.email);
+  const kept = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', senders: [] }, first);
   assert.equal(decryptSecret(kept.pass), 'abcdefghijklmnop');
 
   const checked = { ...first, verifiedAt: '2026-10-13T10:00:00.000Z' };
-  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', senders: [{ email: 'a@tretek.io' }] }, checked, account.email).verifiedAt, checked.verifiedAt);
-  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', password: 'another' }, checked, account.email).verifiedAt, null);
-  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 465, user: 'info@tretek.io' }, checked, account.email).verifiedAt, null);
+  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', senders: [{ email: 'a@tretek.io' }] }, checked).verifiedAt, checked.verifiedAt);
+  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', password: 'another' }, checked).verifiedAt, null);
+  assert.equal(sanitizeMailSettings({ host: 'smtp.gmail.com', port: 465, user: 'info@tretek.io' }, checked).verifiedAt, null);
 
-  const moved = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'other@tretek.io' }, first, account.email);
+  const moved = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'other@tretek.io' }, first);
   assert.equal(moved.pass, null);
   assert.ok(!mailReady(moved));
 });
 
 test('only real mail ports and well-formed hosts are accepted', () => {
-  assert.throws(() => sanitizeMailSettings({ host: 'smtp.gmail.com', port: 5432, user: 'a@b.c', password: 'x' }, null, account.email), /MAIL_HOST/);
-  assert.throws(() => sanitizeMailSettings({ host: 'bad host/..', port: 587, user: 'a@b.c', password: 'x' }, null, account.email), /MAIL_HOST/);
+  assert.throws(() => sanitizeMailSettings({ host: 'smtp.gmail.com', port: 5432, user: 'a@b.c', password: 'x' }, null), /MAIL_HOST/);
+  assert.throws(() => sanitizeMailSettings({ host: 'bad host/..', port: 587, user: 'a@b.c', password: 'x' }, null), /MAIL_HOST/);
 });
 
 test('the browser never receives the password', () => {
-  const saved = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', password: 'secret-value', senders: [{ name: 'Financa', email: 'finance@tretek.io' }] }, null, account.email);
-  const shown = publicMailSettings(saved, account, 'Tretek SH.P.K.');
+  const saved = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', password: 'secret-value', senders: [{ name: 'Financa', email: 'finance@tretek.io' }] }, null);
+  const shown = publicMailSettings(saved);
   assert.equal(shown.hasPassword, true);
   assert.equal(shown.ready, true);
   assert.equal(shown.verified, false);
-  assert.equal(publicMailSettings({ ...saved, verifiedAt: '2026-10-13T10:00:00.000Z' }, account, 'Tretek SH.P.K.').verified, true);
+  assert.equal(publicMailSettings({ ...saved, verifiedAt: '2026-10-13T10:00:00.000Z' }).verified, true);
   assert.ok(!JSON.stringify(shown).includes('secret-value'));
   assert.ok(!('pass' in shown));
-  assert.deepEqual(shown.from, [
-    { name: 'Tretek SH.P.K.', email: 'owner@tretek.io' },
-    { name: 'Financa', email: 'finance@tretek.io' },
-  ]);
 });
 
-test('the sender defaults to the account address and must be on the list', () => {
-  const saved = { senders: [{ name: '', email: 'finance@tretek.io' }] };
-  assert.equal(pickSender(saved, account, 'Tretek', '').email, 'owner@tretek.io');
-  assert.deepEqual(pickSender(saved, account, 'Tretek', 'FINANCE@tretek.io'), { name: 'Tretek', email: 'finance@tretek.io' });
-  assert.throws(() => pickSender(saved, account, 'Tretek', 'ceo@other.com'), /MAIL_SENDER/);
-  assert.equal(senderOptions(null, account, 'Tretek').length, 1);
+test('a personal mailbox sends as itself only', () => {
+  const own = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'ana@tretek.io', password: 'x', senders: [{ email: 'owner@tretek.io' }] }, null, { personal: true });
+  assert.deepEqual(own.senders, []);
+});
+
+test('senders come from the company mailbox and from the own mailbox, never from that of a colleague', () => {
+  const company = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'info@tretek.io', password: 'a', senders: [{ name: 'Financa', email: 'finance@tretek.io' }] }, null);
+  const anas = sanitizeMailSettings({ host: 'smtp.gmail.com', port: 587, user: 'ana@tretek.io', password: 'b' }, null, { personal: true });
+  const ana = { id: 'u1', accountId: 'u2', email: 'ana@tretek.io' };
+
+  assert.deepEqual(senderOptions({ company, personal: anas }, ana, 'Tretek'), [
+    { name: 'Tretek', email: 'info@tretek.io', box: 'company' },
+    { name: 'Financa', email: 'finance@tretek.io', box: 'company' },
+    { name: 'Tretek', email: 'ana@tretek.io', box: 'personal' },
+  ]);
+  // Without a mailbox of her own she has the company's addresses, not her account address.
+  assert.deepEqual(senderOptions({ company, personal: null }, ana, 'Tretek').map((item) => item.email), ['info@tretek.io', 'finance@tretek.io']);
+
+  const first = pickSender({ company, personal: anas }, ana, 'Tretek', '');
+  assert.equal(first.sender.email, 'info@tretek.io');
+  assert.equal(first.settings, company);
+  const hers = pickSender({ company, personal: anas }, ana, 'Tretek', 'ANA@tretek.io');
+  assert.deepEqual(hers.sender, { name: 'Tretek', email: 'ana@tretek.io' });
+  assert.equal(hers.settings, anas);
+  assert.throws(() => pickSender({ company, personal: anas }, ana, 'Tretek', 'owner@tretek.io'), /MAIL_SENDER/);
+  assert.throws(() => pickSender({ company: null, personal: null }, ana, 'Tretek', ''), /MAIL_NOT_CONFIGURED/);
+});
+
+test('a mailbox signed in to without an address sends as the account', () => {
+  const relay = sanitizeMailSettings({ host: 'smtp.example.com', port: 587, user: 'apikey', password: 'k' }, null);
+  assert.deepEqual(senderOptions({ company: relay }, account, 'Tretek'), [{ name: 'Tretek', email: 'owner@tretek.io', box: 'company' }]);
 });
 
 test('recipients are parsed, de-duplicated and limited', () => {

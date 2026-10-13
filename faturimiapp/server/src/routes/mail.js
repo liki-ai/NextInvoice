@@ -1,8 +1,8 @@
 const express = require('express');
 const { authRequired, managerRequired } = require('../auth');
 const { appUrl } = require('../mail');
-const { getProfile, getInvoice, shareInvoice, getMailSettings, saveMailSettings, recordInvoiceEmail, recordInvoiceReminder } = require('../store');
-const { countSend, deliver, mailReady, messageHtml, parseRecipients, pickSender, publicMailSettings, sanitizeMailSettings, verifyConnection } = require('../mailer');
+const { getProfile, getInvoice, shareInvoice, getMailSettings, saveMailSettings, personalMailKey, recordInvoiceEmail, recordInvoiceReminder } = require('../store');
+const { countSend, deliver, mailReady, messageHtml, parseRecipients, pickSender, publicMailSettings, sanitizeMailSettings, senderOptions, verifyConnection } = require('../mailer');
 const { pdfAvailable, htmlToPdf } = require('../pdf');
 
 const router = express.Router();
@@ -52,9 +52,22 @@ function canAttachPdf() {
   return pdfAvailable() && Boolean(invoiceRender());
 }
 
+/** The two mailboxes a signed-in person can send through: the company's and their own. */
+function mailboxes(user) {
+  return { company: getMailSettings(user.id), personal: getMailSettings(personalMailKey(user.accountId)) };
+}
+
 function describe(user) {
   const profile = getProfile(user.id);
-  return { mail: publicMailSettings(getMailSettings(user.id), user, profile.companyName), pdf: canAttachPdf() };
+  const boxes = mailboxes(user);
+  const from = senderOptions(boxes, user, profile.companyName);
+  return {
+    // `from` is repeated inside `mail` for pages opened before there were two mailboxes.
+    mail: { ...publicMailSettings(boxes.company), from },
+    personal: publicMailSettings(boxes.personal),
+    from,
+    pdf: canAttachPdf(),
+  };
 }
 
 function messageParts(body) {
@@ -73,10 +86,8 @@ async function sendInvoiceEmail(user, invoiceId, body) {
   if (!invoice) return null;
   if (invoice.lifecycle === 'draft') throw new Error('DRAFT_SHARE');
   if (invoice.lifecycle === 'cancelled') throw new Error('CANCELLED_LOCKED');
-  const settings = getMailSettings(user.id);
-  if (!mailReady(settings)) throw code('MAIL_NOT_CONFIGURED');
   const profile = getProfile(user.id);
-  const sender = pickSender(settings, user, profile.companyName, body.from);
+  const { sender, settings } = pickSender(mailboxes(user), user, profile.companyName, body.from);
   const to = parseRecipients(body.to, { required: true });
   const cc = parseRecipients(body.cc);
   const { subject, text } = messageParts(body);
@@ -130,10 +141,8 @@ async function sendPaymentReminder(user, body) {
     return { invoices: recordInvoiceReminder(user.id, ids, { emailed: false }), attached: 0 };
   }
 
-  const settings = getMailSettings(user.id);
-  if (!mailReady(settings)) throw code('MAIL_NOT_CONFIGURED');
   const profile = getProfile(user.id);
-  const sender = pickSender(settings, user, profile.companyName, body.from);
+  const { sender, settings } = pickSender(mailboxes(user), user, profile.companyName, body.from);
   const to = parseRecipients(body.to, { required: true });
   const cc = parseRecipients(body.cc);
   const { subject, text } = messageParts(body);
@@ -167,39 +176,52 @@ router.get('/', (req, res) => {
  * Saves the connection only after the mail server has accepted the mailbox and its password, so a
  * saved connection is one that works. Changing just the list of senders needs no new sign-in.
  */
-router.put('/', managerRequired, async (req, res, next) => {
+async function connect(req, res, next, key, personal) {
   try {
-    const settings = sanitizeMailSettings(req.body, getMailSettings(req.user.id), req.user.email);
+    const settings = sanitizeMailSettings(req.body, getMailSettings(key), { personal });
     if (!settings.host || !settings.user || !settings.pass) throw code('MAIL_INCOMPLETE');
     if (!settings.verifiedAt) {
       await verifyConnection(settings);
       settings.verifiedAt = new Date().toISOString();
     }
-    saveMailSettings(req.user.id, settings);
+    saveMailSettings(key, settings);
     res.json(describe(req.user));
   } catch (err) {
     if (!sendMailError(res, err)) next(err);
   }
-});
+}
+
+// The company's mailbox is set up by its administrators and shared by everyone in the company.
+router.put('/', managerRequired, (req, res, next) => connect(req, res, next, req.user.id, false));
 
 router.delete('/', managerRequired, (req, res) => {
   saveMailSettings(req.user.id, null);
   res.json(describe(req.user));
 });
 
-/** A message to the account's own address, to prove the saved connection works. */
+// A person's own mailbox: they connect it themselves, with their own password, and only they send from it.
+router.put('/personal', (req, res, next) => connect(req, res, next, personalMailKey(req.user.accountId), true));
+
+router.delete('/personal', (req, res) => {
+  saveMailSettings(personalMailKey(req.user.accountId), null);
+  res.json(describe(req.user));
+});
+
+/** A message to the account's own address, to prove one of the saved connections works. */
 router.post('/test', async (req, res, next) => {
   try {
-    const settings = getMailSettings(req.user.id);
-    if (!mailReady(settings)) throw code('MAIL_NOT_CONFIGURED');
+    const personal = Boolean(req.body && req.body.box === 'personal');
+    const key = personal ? personalMailKey(req.user.accountId) : req.user.id;
+    const one = getMailSettings(key);
+    if (!mailReady(one)) throw code('MAIL_NOT_CONFIGURED');
     const profile = getProfile(req.user.id);
-    const sender = pickSender(settings, req.user, profile.companyName, req.body && req.body.from);
+    const { sender, settings } = pickSender(personal ? { personal: one } : { company: one }, req.user, profile.companyName, req.body && req.body.from);
     const to = parseRecipients(req.user.email, { required: true });
     const { subject, text } = messageParts(req.body || {});
     countSend(req.user.id);
     await deliver(settings, { sender, to, subject, text, html: messageHtml(text, { accent: profile.accentColor }) });
     // A connection saved before saving checked it: a delivered test proves it just as well.
-    if (!settings.verifiedAt) saveMailSettings(req.user.id, { ...settings, verifiedAt: new Date().toISOString() });
+    if (!settings.verifiedAt) saveMailSettings(key, { ...settings, verifiedAt: new Date().toISOString() });
     res.json({ ok: true, to: to[0], from: sender.email, ...describe(req.user) });
   } catch (err) {
     if (!sendMailError(res, err)) next(err);
@@ -210,3 +232,4 @@ module.exports = router;
 module.exports.sendInvoiceEmail = sendInvoiceEmail;
 module.exports.sendPaymentReminder = sendPaymentReminder;
 module.exports.sendMailError = sendMailError;
+module.exports.mailboxes = mailboxes;

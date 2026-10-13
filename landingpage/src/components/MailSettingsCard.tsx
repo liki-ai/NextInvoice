@@ -4,7 +4,8 @@ import { Check, ExternalLink, Mail, Plus, Send, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/AppDataContext'
 import { useI18n } from '../i18n'
-import { MAIL_PROVIDERS, isEmail, isGoogleHost, mailErrorText, providerOf, type MailProviderId, type MailSender } from '../lib/mail'
+import { MAIL_PROVIDERS, isEmail, isGoogleHost, mailErrorText, providerOf, type MailBox, type MailProviderId, type MailSender } from '../lib/mail'
+import { canManageCompany } from '../lib/team'
 import { cn } from '../lib/cn'
 import { Button, Card, Field, Select } from './ui'
 
@@ -17,17 +18,20 @@ function sameForm(a: Form, b: Form) {
 }
 
 /**
- * Settings → the company's own mailbox for sending invoices: which mail server, which mailbox, its
- * app password, and the addresses that may appear as sender. Saved on its own, apart from the profile.
+ * Settings → a mailbox for sending invoices and reminders: which mail server, which mailbox and its
+ * app password. There are two of them. The company's is connected by an administrator, every user
+ * of the company may send from it, and it can carry extra sender addresses. A person's own is
+ * connected by that person and only they send from it. Each is saved on its own, apart from the profile.
  */
-export function MailSettingsCard() {
+export function MailSettingsCard({ box }: { box: MailBox }) {
   const { user } = useAuth()
   const { mail, saveMail, removeMail, testMail } = useAppData()
   const { t } = useI18n()
   const location = useLocation()
   const cardRef = useRef<HTMLDivElement>(null)
 
-  const saved = mail?.mail
+  const personal = box === 'personal'
+  const saved = personal ? mail?.personal : mail?.mail
   const baseline = useMemo<Form>(
     () => ({
       host: saved?.host || 'smtp.gmail.com',
@@ -51,8 +55,10 @@ export function MailSettingsCard() {
 
   // The send dialog links here when no mailbox is connected yet.
   useEffect(() => {
-    if (location.hash === '#email') cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [location.hash, mail])
+    // Someone who cannot set up the company's mailbox is brought to their own.
+    const mine = location.hash === '#my-email' || (location.hash === '#email' && !canManageCompany(user))
+    if (personal ? mine : location.hash === '#email') cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [location.hash, mail, personal, user])
 
   if (!mail || !saved) return null
 
@@ -95,38 +101,38 @@ export function MailSettingsCard() {
 
   const onSave = () =>
     run('save', async () => {
-      await saveMail({
+      await saveMail(box, {
         host: form.host.trim(),
         port: Number(form.port) || 587,
         user: form.user.trim(),
         password: form.password || undefined,
-        senders: form.senders.map((item) => ({ name: item.name.trim(), email: item.email.trim() })).filter((item) => item.email),
+        senders: personal ? [] : form.senders.map((item) => ({ name: item.name.trim(), email: item.email.trim() })).filter((item) => item.email),
       })
       return t('mail.saved')
     })
 
   const onTest = () =>
     run('test', async () => {
-      const res = await testMail({ subject: t('mail.testSubject'), body: t('mail.testBody') })
+      const res = await testMail({ box, subject: t('mail.testSubject'), body: t('mail.testBody') })
       return t('mail.testOk', { to: res.to })
     })
 
   const onRemove = () =>
     run('remove', async () => {
-      await removeMail()
+      await removeMail(box)
       return t('mail.disconnected')
     })
 
   return (
-    <div ref={cardRef} id="email" className="scroll-mt-8">
+    <div ref={cardRef} id={personal ? 'my-email' : 'email'} className="scroll-mt-8">
       <Card>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <Mail className="h-4 w-4 text-brand" />
-              {t('mail.title')}
+              {t(personal ? 'mail.personalTitle' : 'mail.title')}
             </h2>
-            <p className="mt-1 text-sm leading-6 text-brand-ink/55">{t('mail.hint')}</p>
+            <p className="mt-1 text-sm leading-6 text-brand-ink/55">{t(personal ? 'mail.personalHint' : 'mail.hint')}</p>
           </div>
           <span
             className={cn(
@@ -155,7 +161,7 @@ export function MailSettingsCard() {
             </div>
           </div>
           <div className="grid gap-x-4 sm:grid-cols-2">
-            <Field label={t('mail.user')} type="email" value={form.user} placeholder={user?.email || ''} autoComplete="off" spellCheck={false} onChange={(e) => set('user', e.target.value)} />
+            <Field label={t('mail.user')} type="email" value={form.user} placeholder={personal ? user?.email || '' : t('mail.companyPlaceholder')} autoComplete="off" spellCheck={false} onChange={(e) => set('user', e.target.value)} />
             <Field
               label={t('mail.password')}
               type="password"
@@ -175,15 +181,17 @@ export function MailSettingsCard() {
             ) : null}
           </p>
 
-          <div className="mt-6 border-t border-brand-ink/8 pt-5">
+          <div className={cn('mt-6 border-t border-brand-ink/8 pt-5', personal && 'hidden')}>
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('mail.senders')}</p>
-            <p className="mt-1.5 text-sm leading-6 text-brand-ink/55">{t('mail.sendersHint', { email: user?.email || '' })}</p>
+            <p className="mt-1.5 text-sm leading-6 text-brand-ink/55">{t('mail.sendersHint')}</p>
 
             <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-2 rounded-xl bg-brand-bg px-3.5 py-2.5 text-sm">
-                <Check className="h-4 w-4 shrink-0 text-brand" />
-                <span className="min-w-0 truncate font-medium">{user?.email}</span>
-              </div>
+              {isEmail(form.user) ? (
+                <div className="flex items-center gap-2 rounded-xl bg-brand-bg px-3.5 py-2.5 text-sm">
+                  <Check className="h-4 w-4 shrink-0 text-brand" />
+                  <span className="min-w-0 truncate font-medium">{form.user.trim()}</span>
+                </div>
+              ) : null}
               {form.senders.map((item, index) => (
                 <div key={index} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] items-start gap-2">
                   <input

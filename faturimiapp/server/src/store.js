@@ -364,6 +364,8 @@ function removeMember(ownerId, memberId) {
   if (!user) return false;
   db.users = db.users.filter((item) => item.id !== memberId);
   db.passwordResets = (db.passwordResets || []).filter((item) => item.userId !== memberId);
+  // The mailbox they connected for themselves leaves with them.
+  if (db.mail) delete db.mail[personalMailKey(memberId)];
   writeDb(db);
   return true;
 }
@@ -1075,6 +1077,11 @@ function shareInvoice(userId, invoiceId) {
  * A company's connection to its own mailbox, for sending invoices. Kept apart from the profile so it
  * never travels with it: not to the apps, not into a backup file, not onto a shared invoice.
  */
+/** Where a person's own mailbox is kept, apart from the company's (which sits under the company's key). */
+function personalMailKey(accountId) {
+  return `personal:${accountId}`;
+}
+
 function getMailSettings(userId) {
   const db = readDb();
   return (db.mail && db.mail[userId]) || null;
@@ -1777,6 +1784,7 @@ module.exports = {
   markInvoicesPaid,
   shareInvoice,
   sharedInvoice,
+  personalMailKey,
   getMailSettings,
   saveMailSettings,
   recordInvoiceEmail,

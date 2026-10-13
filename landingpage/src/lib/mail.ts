@@ -1,22 +1,28 @@
 export type MailSender = { name: string; email: string }
 
-/** The company's mailbox connection as the server lets the browser see it; the password never comes back. */
+/** Which mailbox: the company's, shared by all its users, or the signed-in person's own. */
+export type MailBox = 'company' | 'personal'
+
+/** A mailbox connection as the server lets the browser see it; the password never comes back. */
 export type MailSettings = {
   host: string
   port: number
   user: string
   hasPassword: boolean
-  /** Extra addresses the company allows as sender. */
+  /** Extra addresses this mailbox may send as. */
   senders: MailSender[]
   ready: boolean
   /** The mail server has accepted this mailbox and password. */
   verified: boolean
-  /** Everything that may stand under "From", the account's own address first. */
-  from: MailSender[]
 }
 
 export type MailState = {
+  /** The company's mailbox. */
   mail: MailSettings
+  /** The signed-in person's own mailbox. */
+  personal: MailSettings
+  /** Everything this person may put under "From": the company's addresses first, then their own. */
+  from: (MailSender & { box: MailBox })[]
   /** Whether the server can attach the invoice as a PDF. */
   pdf: boolean
 }

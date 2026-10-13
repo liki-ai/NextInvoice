@@ -53,8 +53,8 @@ export function SendInvoiceModal({ invoice, onClose }: { invoice: Invoice; onClo
   const [error, setError] = useState('')
   const [copied, setCopied] = useState<'link' | 'message' | null>(null)
   const [opened, setOpened] = useState(false)
-  const direct = Boolean(mail?.mail.ready)
-  const senders = mail?.mail.from || []
+  const senders = mail?.from || []
+  const direct = senders.length > 0
   const [from, setFrom] = useState('')
   const [cc, setCc] = useState('')
   const [attachPdf, setAttachPdf] = useState(true)

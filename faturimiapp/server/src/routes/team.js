@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { authRequired, managerRequired } = require('../auth');
 const { appUrl } = require('../mail');
-const { getProfile, getMailSettings, listTeam, addMember, setMemberRole, removeMember, createInvite, revokeInvite } = require('../store');
+const { getProfile, getMailSettings, personalMailKey, listTeam, addMember, setMemberRole, removeMember, createInvite, revokeInvite } = require('../store');
 const { cleanEmail, countSend, deliver, mailReady, messageHtml, pickSender } = require('../mailer');
 
 // The users of a company: who they are, adding one directly, inviting one by email.
@@ -39,7 +39,7 @@ function describe(user) {
     members: team.members.map((item) => ({ ...item, you: item.id === user.accountId })),
     invites: team.invites,
     canManage: user.role === 'owner' || user.role === 'admin',
-    mailReady: mailReady(getMailSettings(user.id)),
+    mailReady: mailReady(getMailSettings(user.id)) || mailReady(getMailSettings(personalMailKey(user.accountId))),
   };
 }
 
@@ -104,16 +104,18 @@ router.post('/invites', managerRequired, async (req, res, next) => {
     const link = inviteLink(token);
     const result = { ...describe(req.user), invite, link, emailed: false };
 
-    const settings = getMailSettings(req.user.id);
+    // The invitation goes out from the company's mailbox, or from the inviter's own when there is none.
+    const boxes = { company: getMailSettings(req.user.id), personal: getMailSettings(personalMailKey(req.user.accountId)) };
     const subject = String((req.body && req.body.subject) || '').trim();
     const message = String((req.body && req.body.message) || '').trim();
-    if (mailReady(settings) && subject && message && message.length <= 4000) {
+    if ((mailReady(boxes.company) || mailReady(boxes.personal)) && subject && message && message.length <= 4000) {
       try {
         const profile = getProfile(req.user.id);
         const text = message.includes('{link}') ? message.split('{link}').join(link) : `${message}\n\n${link}`;
         countSend(req.user.id);
+        const { sender, settings } = pickSender(boxes, req.user, profile.companyName);
         await deliver(settings, {
-          sender: pickSender(settings, req.user, profile.companyName),
+          sender,
           to: [email],
           subject,
           text,

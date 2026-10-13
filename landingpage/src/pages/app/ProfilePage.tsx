@@ -533,10 +533,15 @@ export function ProfilePage() {
             </div>
           </SettingsSection>
 
-          {manager ? <MailSettingsCard /> : null}
+          {manager ? <MailSettingsCard box="company" /> : null}
         </fieldset>
 
-        <aside className="space-y-6 lg:sticky lg:top-8">
+        {/* Outside the administrators' part: everyone connects and manages their own mailbox. */}
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+          <MailSettingsCard box="personal" />
+        </div>
+
+        <aside className="space-y-6 lg:sticky lg:top-8 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <Card>
             <h2 className="text-base font-semibold">{t('profile.account')}</h2>
             <p className="mt-1 truncate text-sm text-brand-ink/55">{user?.email}</p>

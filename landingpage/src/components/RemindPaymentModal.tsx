@@ -57,8 +57,8 @@ export function RemindPaymentModal({ invoice, onClose }: { invoice: Invoice; onC
   const [copied, setCopied] = useState(false)
   const [receipt, setReceipt] = useState<{ to: string[]; subject: string; numbers: string[]; attached: number; at: string } | null>(null)
 
-  const direct = Boolean(mail?.mail.ready)
-  const senders = mail?.mail.from || []
+  const senders = mail?.from || []
+  const direct = senders.length > 0
   const sender = senders.some((item) => item.email === from) ? from : senders[0]?.email || ''
   const chosen = useMemo(() => owed.filter((item) => chosenIds.has(item.id)), [owed, chosenIds])
   const fallbackCurrency = profile?.currency || 'EUR'

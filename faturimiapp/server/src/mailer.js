@@ -62,8 +62,8 @@ function cleanName(value) {
     .slice(0, 80);
 }
 
-function cleanSenders(list, accountEmail) {
-  const seen = new Set([cleanEmail(accountEmail)]);
+function cleanSenders(list, ownAddress) {
+  const seen = new Set([cleanEmail(ownAddress)]);
   const senders = [];
   for (const item of Array.isArray(list) ? list : []) {
     const email = cleanEmail(item && item.email);
@@ -75,8 +75,11 @@ function cleanSenders(list, accountEmail) {
   return senders;
 }
 
-/** What the settings form sent, checked and merged over what is saved. A blank password keeps the saved one. */
-function sanitizeMailSettings(body, current, accountEmail) {
+/**
+ * What the settings form sent, checked and merged over what is saved. A blank password keeps the
+ * saved one. A person's own mailbox (`personal`) sends as itself only, so it takes no extra addresses.
+ */
+function sanitizeMailSettings(body, current, { personal } = {}) {
   const src = body && typeof body === 'object' ? body : {};
   const host = String(src.host || '')
     .trim()
@@ -93,7 +96,7 @@ function sanitizeMailSettings(body, current, accountEmail) {
     port,
     user,
     pass: current && current.pass ? current.pass : null,
-    senders: cleanSenders(src.senders, accountEmail),
+    senders: personal ? [] : cleanSenders(src.senders, user),
     // When the mail server last accepted this mailbox and password; cleared whenever either changes.
     verifiedAt: (current && current.verifiedAt) || null,
   };
@@ -113,18 +116,40 @@ function mailReady(settings) {
   return Boolean(settings && settings.host && settings.user && settings.pass && decryptSecret(settings.pass));
 }
 
-/** The addresses invoices may be sent from: the account's own first, then the ones the company added. */
-function senderOptions(settings, account, companyName) {
-  const own = cleanEmail(account && account.email);
-  const options = own ? [{ name: cleanName(companyName), email: own }] : [];
-  for (const sender of (settings && settings.senders) || []) {
-    if (sender.email !== own) options.push({ name: sender.name || cleanName(companyName), email: sender.email });
+/**
+ * The addresses one connected mailbox may send as: its own first, then the ones added to it.
+ * A mailbox signed in to with something other than an address, and given none, sends as `fallback`.
+ */
+function mailboxSenders(settings, companyName, fallback) {
+  if (!mailReady(settings)) return [];
+  const name = cleanName(companyName);
+  const own = cleanEmail(settings.user);
+  const options = own ? [{ name, email: own }] : [];
+  for (const sender of settings.senders || []) {
+    if (sender.email !== own) options.push({ name: sender.name || name, email: sender.email });
   }
+  if (options.length === 0 && cleanEmail(fallback)) options.push({ name, email: cleanEmail(fallback) });
+  return options;
+}
+
+/**
+ * Everything a person may put under "From": the company mailbox's addresses, which every user of
+ * the company shares, then the person's own mailbox. Each choice says which mailbox delivers it;
+ * nobody is offered a colleague's address.
+ */
+function senderOptions(boxes, account, companyName) {
+  const email = account && account.email;
+  const options = [];
+  const add = (box, list) => {
+    for (const sender of list) if (!options.some((item) => item.email === sender.email)) options.push({ ...sender, box });
+  };
+  add('company', mailboxSenders(boxes && boxes.company, companyName, email));
+  add('personal', mailboxSenders(boxes && boxes.personal, companyName, email));
   return options;
 }
 
 /** The settings as the browser may see them: everything but the password. */
-function publicMailSettings(settings, account, companyName) {
+function publicMailSettings(settings) {
   const saved = settings || {};
   return {
     host: saved.host || '',
@@ -134,7 +159,6 @@ function publicMailSettings(settings, account, companyName) {
     senders: saved.senders || [],
     ready: mailReady(saved),
     verified: mailReady(saved) && Boolean(saved.verifiedAt),
-    from: senderOptions(saved, account, companyName),
   };
 }
 
@@ -230,12 +254,18 @@ function parseRecipients(value, { required } = {}) {
   return list;
 }
 
-function pickSender(settings, account, companyName, wanted) {
-  const options = senderOptions(settings, account, companyName);
-  const email = cleanEmail(wanted) || (options[0] && options[0].email);
-  const sender = options.find((item) => item.email === email);
-  if (!sender) throw fail('MAIL_SENDER');
-  return sender;
+/**
+ * The sender a message goes out as, and the mailbox that delivers it. Without a wish it is the
+ * first choice, the company's address. Throws when no mailbox is connected or the address is not
+ * one this person may use.
+ */
+function pickSender(boxes, account, companyName, wanted) {
+  const options = senderOptions(boxes, account, companyName);
+  if (options.length === 0) throw fail('MAIL_NOT_CONFIGURED');
+  const email = cleanEmail(wanted) || options[0].email;
+  const found = options.find((item) => item.email === email);
+  if (!found) throw fail('MAIL_SENDER');
+  return { sender: { name: found.name, email: found.email }, settings: boxes[found.box], box: found.box };
 }
 
 function esc(value) {
