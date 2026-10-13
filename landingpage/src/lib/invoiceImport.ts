@@ -353,9 +353,9 @@ export function planInvoiceImport(workbook: Workbook): ImportPlan {
 
 export type ImportOptions = { markPaid: boolean; includeOtherClients: boolean }
 
-/** The request body for POST /api/invoices/import. */
-export function importPayload(plan: ImportPlan, existingNumbers: Set<string>, options: ImportOptions) {
-  const invoices = plan.invoices.filter((item) => !existingNumbers.has(item.number))
+/** The request body for POST /api/invoices/import. `skipNumbers` are left out: already saved, or removed by the user. */
+export function importPayload(plan: ImportPlan, skipNumbers: Set<string>, options: ImportOptions) {
+  const invoices = plan.invoices.filter((item) => !skipNumbers.has(item.number))
   const needed = new Set(invoices.map((item) => item.clientKey))
   const clients = [...plan.clients.filter((client) => needed.has(client.key)), ...(options.includeOtherClients ? plan.otherClients : [])]
   return {

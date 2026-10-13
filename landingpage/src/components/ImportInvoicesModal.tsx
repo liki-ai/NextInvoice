@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Check, FileSpreadsheet } from 'lucide-react'
+import { AlertTriangle, Check, FileSpreadsheet, Search } from 'lucide-react'
 import { useAppData } from '../context/AppDataContext'
 import { useI18n } from '../i18n'
 import { parseLooseDate } from '../lib/document'
@@ -8,8 +8,6 @@ import { importPayload, planInvoiceImport, type ImportPlan, type ImportProblem, 
 import { readWorkbook } from '../lib/xlsx'
 import { cn } from '../lib/cn'
 import { Button, Modal } from './ui'
-
-const PREVIEW_ROWS = 8
 
 const REASON_KEYS: Record<ImportProblem['reason'], string> = {
   date: 'importer.reasonDate',
@@ -47,6 +45,9 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
   const [markPaid, setMarkPaid] = useState(false)
   const [includeOtherClients, setIncludeOtherClients] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
+  // Invoice numbers the user took out of this import (cancelled, wrong, ...).
+  const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
+  const [query, setQuery] = useState('')
   const currency = profile?.currency || 'EUR'
 
   const existingNumbers = useMemo(
@@ -54,20 +55,42 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
     [invoices],
   )
   const fresh = useMemo(() => (plan ? plan.invoices.filter((item) => !existingNumbers.has(item.number)) : []), [plan, existingNumbers])
+  const chosen = useMemo(() => fresh.filter((item) => !excluded.has(item.number)), [fresh, excluded])
   const flagged = fresh.filter((item) => item.warnings.length > 0)
+  const flaggedChosen = flagged.filter((item) => !excluded.has(item.number))
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return fresh
+    return fresh.filter((item) => item.number.toLowerCase().includes(needle) || item.clientName.toLowerCase().includes(needle))
+  }, [fresh, query])
+  const visibleChosen = visible.filter((item) => !excluded.has(item.number)).length
+  const allVisibleChosen = visible.length > 0 && visibleChosen === visible.length
   const period = useMemo(() => {
-    const times = fresh.map((item) => parseLooseDate(item.date)?.getTime() || 0).filter(Boolean)
+    const times = chosen.map((item) => parseLooseDate(item.date)?.getTime() || 0).filter(Boolean)
     if (times.length === 0) return ''
-    const first = fresh.find((item) => parseLooseDate(item.date)?.getTime() === Math.min(...times))
-    const last = fresh.find((item) => parseLooseDate(item.date)?.getTime() === Math.max(...times))
+    const first = chosen.find((item) => parseLooseDate(item.date)?.getTime() === Math.min(...times))
+    const last = chosen.find((item) => parseLooseDate(item.date)?.getTime() === Math.max(...times))
     return first && last ? `${first.date} – ${last.date}` : ''
-  }, [fresh])
+  }, [chosen])
+
+  function setIncluded(numbers: string[], include: boolean) {
+    setExcluded((current) => {
+      const next = new Set(current)
+      for (const number of numbers) {
+        if (include) next.delete(number)
+        else next.add(number)
+      }
+      return next
+    })
+  }
 
   async function onFile(file: File | undefined) {
     if (!file) return
     setReading(true)
     setError('')
     setPlan(null)
+    setExcluded(new Set())
+    setQuery('')
     setFileName(file.name)
     try {
       setPlan(planInvoiceImport(await readWorkbook(file)))
@@ -79,11 +102,11 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
   }
 
   async function onImport() {
-    if (!plan || fresh.length === 0) return
+    if (!plan || chosen.length === 0) return
     setImporting(true)
     setError('')
     try {
-      setResult(await importInvoices(importPayload(plan, existingNumbers, { markPaid, includeOtherClients })))
+      setResult(await importInvoices(importPayload(plan, new Set([...existingNumbers, ...excluded]), { markPaid, includeOtherClients })))
     } catch (err) {
       const code = (err as { code?: string }).code
       setError(code === 'PLAN_LIMIT' ? t('importer.limit') : err instanceof Error ? err.message : t('common.error'))
@@ -130,8 +153,8 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
               {t('common.cancel')}
             </Button>
             {plan ? (
-              <Button type="button" disabled={importing || fresh.length === 0} onClick={() => void onImport()}>
-                {importing ? t('importer.importing') : t('importer.confirm', { count: fresh.length })}
+              <Button type="button" disabled={importing || chosen.length === 0} onClick={() => void onImport()}>
+                {importing ? t('importer.importing') : t('importer.confirm', { count: chosen.length })}
               </Button>
             ) : null}
           </>
@@ -168,10 +191,10 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
             {plan ? (
               <>
                 <div className="grid gap-3 sm:grid-cols-4">
-                  <Stat label={t('importer.toImport')} value={fresh.length} />
+                  <Stat label={t('importer.toImport')} value={chosen.length} />
                   <Stat label={t('importer.existing')} value={plan.invoices.length - fresh.length} muted={plan.invoices.length === fresh.length} />
-                  <Stat label={t('importer.newClients')} value={new Set(fresh.map((item) => item.clientKey)).size} />
-                  <Stat label={t('importer.total')} value={formatMoney(fresh.reduce((sum, item) => sum + item.total, 0), currency)} />
+                  <Stat label={t('importer.newClients')} value={new Set(chosen.map((item) => item.clientKey)).size} />
+                  <Stat label={t('importer.total')} value={formatMoney(chosen.reduce((sum, item) => sum + item.total, 0), currency)} />
                 </div>
                 <p className="text-xs text-brand-ink/50">
                   {t('importer.sheets')}: {[plan.sheets.invoices, plan.sheets.lines, plan.sheets.clients].filter(Boolean).join(' · ')}
@@ -181,6 +204,14 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
                 {fresh.length === 0 ? <p className="rounded-xl bg-white px-4 py-3 text-sm text-brand-ink/65">{t('importer.nothing')}</p> : null}
                 {fresh.length > 0 && plan.invoices.length > fresh.length ? (
                   <p className="text-sm text-brand-ink/60">{t('importer.existingNote', { count: plan.invoices.length - fresh.length })}</p>
+                ) : null}
+                {fresh.length > chosen.length ? (
+                  <p className="text-sm text-brand-ink/60">
+                    {t('importer.removed', { count: fresh.length - chosen.length })}{' '}
+                    <button type="button" className="font-semibold text-brand hover:underline" onClick={() => setExcluded(new Set())}>
+                      {t('importer.restoreAll')}
+                    </button>
+                  </p>
                 ) : null}
 
                 {plan.problems.length > 0 ? (
@@ -199,24 +230,83 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
 
                 {flagged.length > 0 ? (
                   <div className="rounded-xl border border-[#E8B84A] bg-[#FFF6E5] px-4 py-3 text-sm">
-                    <p className="font-semibold text-[#8A5A00]">{t('importer.warnings', { count: flagged.length })}</p>
-                    <ul className="mt-1 space-y-0.5 text-brand-ink/70">
-                      {flagged.slice(0, 6).map((item) => (
-                        <li key={item.number}>
-                          <span className="font-semibold">{item.number}</span> — {item.warnings.map((warning) => t(WARNING_KEYS[warning])).join('; ')}
-                        </li>
-                      ))}
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                      <p className="font-semibold text-[#8A5A00]">{t('importer.warnings', { count: flagged.length })}</p>
+                      <button
+                        type="button"
+                        className="font-semibold text-[#8A5A00] underline-offset-2 hover:underline"
+                        onClick={() =>
+                          setIncluded(
+                            flagged.map((item) => item.number),
+                            flaggedChosen.length === 0,
+                          )
+                        }
+                      >
+                        {flaggedChosen.length === 0 ? t('importer.restoreFlagged') : t('importer.removeFlagged')}
+                      </button>
+                    </div>
+                    <ul className="mt-1 max-h-44 space-y-0.5 overflow-y-auto text-brand-ink/70">
+                      {flagged.map((item) => {
+                        const out = excluded.has(item.number)
+                        return (
+                          <li key={item.number} className="flex items-start justify-between gap-3">
+                            <span className={cn(out && 'text-brand-ink/40 line-through')}>
+                              <span className="font-semibold">{item.number}</span> — {item.warnings.map((warning) => t(WARNING_KEYS[warning])).join('; ')}
+                            </span>
+                            <button
+                              type="button"
+                              className="shrink-0 font-semibold text-[#8A5A00] underline-offset-2 hover:underline"
+                              onClick={() => setIncluded([item.number], out)}
+                            >
+                              {out ? t('importer.restore') : t('importer.remove')}
+                            </button>
+                          </li>
+                        )
+                      })}
                     </ul>
-                    {flagged.length > 6 ? <p className="mt-1 text-brand-ink/50">{t('importer.more', { count: flagged.length - 6 })}</p> : null}
                   </div>
                 ) : null}
 
                 {fresh.length > 0 ? (
                   <>
-                    <div className="overflow-x-auto rounded-2xl border border-brand-ink/8 bg-white">
-                      <table className="w-full min-w-[560px] text-sm">
-                        <thead className="bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs leading-5 text-brand-ink/50">{t('importer.pickHint')}</p>
+                      <label className="relative block w-full sm:w-64">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-ink/35" />
+                        <input
+                          type="search"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder={t('importer.search')}
+                          aria-label={t('importer.search')}
+                          className="w-full rounded-xl border border-brand-ink/12 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/15"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="max-h-[340px] overflow-auto rounded-2xl border border-brand-ink/8 bg-white">
+                      <table className="w-full min-w-[600px] text-sm">
+                        <thead className="sticky top-0 z-10 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
                           <tr>
+                            <th className="w-10 py-2.5 pl-4">
+                              <input
+                                ref={(el) => {
+                                  if (el) el.indeterminate = visibleChosen > 0 && !allVisibleChosen
+                                }}
+                                type="checkbox"
+                                aria-label={t('importer.selectAll')}
+                                title={t('importer.selectAll')}
+                                disabled={visible.length === 0}
+                                checked={allVisibleChosen}
+                                onChange={() =>
+                                  setIncluded(
+                                    visible.map((item) => item.number),
+                                    !allVisibleChosen,
+                                  )
+                                }
+                                className="h-4 w-4 cursor-pointer accent-[#2C6E7F]"
+                              />
+                            </th>
                             <th className="px-4 py-2.5 text-left font-semibold">{t('importer.colNumber')}</th>
                             <th className="px-4 py-2.5 text-left font-semibold">{t('importer.colClient')}</th>
                             <th className="px-4 py-2.5 text-left font-semibold">{t('importer.colDate')}</th>
@@ -226,21 +316,45 @@ export function ImportInvoicesModal({ onClose }: { onClose: () => void }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {fresh.slice(0, PREVIEW_ROWS).map((item) => (
-                            <tr key={item.number} className="border-t border-brand-ink/5">
-                              <td className="whitespace-nowrap px-4 py-2.5 font-semibold">{item.number}</td>
-                              <td className="max-w-[240px] truncate px-4 py-2.5 text-brand-ink/70">{item.clientName}</td>
-                              <td className="whitespace-nowrap px-4 py-2.5 text-brand-ink/60">{item.date}</td>
-                              <td className="px-4 py-2.5 text-right tabular-nums text-brand-ink/60">{item.items.length}</td>
-                              <td className="px-4 py-2.5 text-right tabular-nums text-brand-ink/60">{item.taxRate}%</td>
-                              <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums">{formatMoney(item.total, currency)}</td>
-                            </tr>
-                          ))}
+                          {visible.map((item) => {
+                            const out = excluded.has(item.number)
+                            return (
+                              <tr
+                                key={item.number}
+                                className={cn('cursor-pointer border-t border-brand-ink/5 hover:bg-[#F4F9FA]', out && 'text-brand-ink/40 line-through')}
+                                onClick={() => setIncluded([item.number], out)}
+                              >
+                                <td className="w-10 py-2.5 pl-4">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t('importer.selectOne', { number: item.number })}
+                                    checked={!out}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => setIncluded([item.number], out)}
+                                    className="h-4 w-4 cursor-pointer accent-[#2C6E7F]"
+                                  />
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2.5 font-semibold">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    {item.number}
+                                    {item.warnings.length > 0 ? (
+                                      <span title={item.warnings.map((warning) => t(WARNING_KEYS[warning])).join('; ')}>
+                                        <AlertTriangle className="h-3.5 w-3.5 text-[#C98A00]" />
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </td>
+                                <td className={cn('max-w-[240px] truncate px-4 py-2.5', !out && 'text-brand-ink/70')}>{item.clientName}</td>
+                                <td className={cn('whitespace-nowrap px-4 py-2.5', !out && 'text-brand-ink/60')}>{item.date}</td>
+                                <td className={cn('px-4 py-2.5 text-right tabular-nums', !out && 'text-brand-ink/60')}>{item.items.length}</td>
+                                <td className={cn('px-4 py-2.5 text-right tabular-nums', !out && 'text-brand-ink/60')}>{item.taxRate}%</td>
+                                <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums">{formatMoney(item.total, currency)}</td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
-                      {fresh.length > PREVIEW_ROWS ? (
-                        <p className="border-t border-brand-ink/5 px-4 py-2.5 text-xs text-brand-ink/45">{t('importer.more', { count: fresh.length - PREVIEW_ROWS })}</p>
-                      ) : null}
+                      {visible.length === 0 ? <p className="px-4 py-6 text-center text-sm text-brand-ink/50">{t('importer.noMatch')}</p> : null}
                     </div>
 
                     <div className="space-y-3 rounded-2xl border border-brand-ink/8 bg-white p-5">
