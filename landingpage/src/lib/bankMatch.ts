@@ -208,6 +208,17 @@ function numberShapes(invoices: Invoice[]): RegExp[] {
   return [...shapes].slice(0, 8).map((shape) => new RegExp(`(?<![a-z0-9])${shape}(?![0-9])`, 'gi'))
 }
 
+/** How many single-character insertions, deletions or replacements turn one text into the other. */
+function editDistance(a: string, b: string) {
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i]
+    for (let j = 1; j <= b.length; j += 1) current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    previous = current
+  }
+  return previous[b.length]
+}
+
 /** The bank's own charge on an international transfer, when the statement states it (":71F:EUR33.00"). */
 function statedFee(text: string) {
   const found = /71F:\s*[A-Z]{3}\s*([\d.,]+)/i.exec(text)
@@ -259,22 +270,42 @@ export function matchStatement(statement: BankStatement, invoices: Invoice[], op
 
   const clientKey = (entry: (typeof entries)[number]) => entry.invoice.clientId || entry.invoice.client?.id || plain(entry.invoice.client?.fullName)
   const ownNumbers = new Set(entries.map((entry) => plain(entry.invoice.number)))
+  // Numbers that start with the year and month (202509-014): a bare month of ours that has no invoices.
+  const monthOf = (number: string) => /^(20\d{2}(?:0[1-9]|1[0-2]))\D/.exec(String(number || ''))?.[1]
+  const months = new Set(entries.map((entry) => monthOf(entry.invoice.number)).filter(Boolean))
+  const byMonth = entries.length > 0 && entries.filter((entry) => monthOf(entry.invoice.number)).length >= entries.length * 0.8
   const loose: BankMatch['loose'] = []
   const leftovers: { line: BankLine; set: Set<string>; rest: number; payers: Set<string>; foreign: boolean }[] = []
+  const settled: { set: Set<string>; clients: Set<string> }[] = []
 
-  // 1. Payments that name invoice numbers.
-  statement.lines.forEach((line, index) => {
+  // 1. Payments that name invoice numbers. Those whose numbers belong to a payer they name go first,
+  //    so a payer's own transfer settles its invoice before another payer's slip can reach it.
+  const namedIn = statement.lines.map((line) => entries.filter((entry) => entry.pattern && entry.pattern.test(line.text)))
+  const ownFirst = statement.lines
+    .map((line, index) => ({ line, index, stray: namedIn[index].some((entry) => !namesClient(entry, lineWords[index])) && entries.some((entry) => namesClient(entry, lineWords[index])) }))
+    .sort((a, b) => Number(a.stray) - Number(b.stray) || a.line.date.localeCompare(b.line.date))
+  ownFirst.forEach(({ line, index }) => {
     let rest = cents(line.amount) + statedFee(line.text)
     const set = lineWords[index]
-    let named = entries.filter((entry) => entry.pattern && entry.pattern.test(line.text))
+    let named = namedIn[index]
     // A number that belongs to another client is a slip of the payer's pen when the sums do not fit.
     const sumOpen = (list: typeof entries) => list.reduce((sum, entry) => sum + entry.open, 0)
     if (named.length > 1 && Math.abs(sumOpen(named) - rest) > 5) {
       const own = named.filter((entry) => namesClient(entry, set))
       if (own.length > 0 && own.length < named.length) named = own
     }
-    // A number of the same kind as ours that is not ours: the payment is for an invoice kept elsewhere.
-    const foreign = shapes.some((shape) => (line.text.match(shape) || []).some((found) => !ownNumbers.has(plain(found))))
+    // So is a number on another client's invoice, in a transfer that names its payer, when that
+    // invoice is already paid or is bigger than the transfer ("Carmax ;202504-010", EZ Auto's invoice).
+    // A client renamed since ("ASSECO SEE" paying as "ASEE") still settles its own invoices.
+    if (entries.some((entry) => namesClient(entry, set))) {
+      named = named.filter((entry) => namesClient(entry, set) || (entry.open > 0 && entry.open <= rest + Math.max(entry.open * 0.03, 5)))
+    }
+    // A number of the same kind as ours that is not ours, or a month we have no invoices for
+    // ("202411;202410"): the payment is for invoices kept elsewhere.
+    const foreign =
+      shapes.some((shape) => (line.text.match(shape) || []).some((found) => !ownNumbers.has(plain(found)))) ||
+      (byMonth && [...line.text.matchAll(/(?<![0-9])(20\d{2}(?:0[1-9]|1[0-2]))(?![0-9])/g)].some((found) => !months.has(found[1])))
+    const before = new Map(named.map((entry) => [entry, entry.open]))
     named
       .sort((a, b) => a.date.localeCompare(b.date))
       .forEach((entry, position) => {
@@ -288,41 +319,113 @@ export function matchStatement(statement: BankStatement, invoices: Invoice[], op
         entry.open -= paid
         rest -= Math.min(paid, rest)
       })
+    const paidTo = new Set(named.filter((entry) => entry.open < (before.get(entry) ?? 0)).map(clientKey))
+    if (paidTo.size > 0) settled.push({ set, clients: paidTo })
     if (rest > 5) leftovers.push({ line, set, rest, payers: new Set(named.map(clientKey)), foreign })
   })
 
+  leftovers.sort((a, b) => a.line.date.localeCompare(b.line.date))
+
+  // Codes a payer puts on every transfer (a budget line, an account number) name that payer in the
+  // transfers that carry neither an invoice number nor a name: learned from at least two transfers
+  // that paid only that client's invoices, and never seen on another client's.
+  const codeClients = new Map<string, Set<string>>()
+  const codeLines = new Map<string, number>()
+  const invoiceHeads = new Set(entries.map((entry) => plain(entry.invoice.number).split(/\D+/)[0]))
+  for (const { set, clients } of settled) {
+    for (const word of set) {
+      if (word.length < 6 || !/\d/.test(word) || common(word) || invoiceHeads.has(word) || /^20\d{2}(0[1-9]|1[0-2])?$/.test(word)) continue
+      const seen = codeClients.get(word) || new Set<string>()
+      for (const client of clients) seen.add(client)
+      codeClients.set(word, seen)
+      if (clients.size === 1) codeLines.set(word, (codeLines.get(word) || 0) + 1)
+    }
+  }
+  const codes = new Map<string, string>()
+  for (const [word, clients] of codeClients) if (clients.size === 1 && (codeLines.get(word) || 0) >= 2) codes.set(word, [...clients][0])
+  const identifies = (entry: (typeof entries)[number], set: Set<string>) => namesClient(entry, set) || [...set].some((word) => codes.get(word) === clientKey(entry))
+
+  // 1b. A number one keystroke away from an open invoice of exactly the amount left: a slip of the
+  //     payer's pen ("202510-099" for 202510-009, "2026604-005" for 202604-005).
+  for (const left of [...leftovers]) {
+    const written = [...left.line.text.matchAll(/(?<![a-z0-9])(\d{4,8})[\s\-/._]{0,3}(\d{1,3})(?![0-9])/gi)].map((found) => ({ head: found[1], seq: String(Number(found[2])) }))
+    if (written.length === 0) continue
+    const near = entries.filter((entry) => {
+      if (entry.open <= 0 || !entry.date || entry.date > left.line.date || Math.abs(entry.open - left.rest) > 5) return false
+      const parts = String(entry.invoice.number || '').match(/^(\d{4,8})\D{1,3}(\d{1,4})$/)
+      if (!parts) return false
+      const seq = String(Number(parts[2]))
+      return written.some((item) => editDistance(item.head, parts[1]) + editDistance(item.seq, seq) === 1)
+    })
+    if (near.length !== 1) continue
+    near[0].payments.push({ date: left.line.date, amount: near[0].open / 100, basis: 'amount' })
+    near[0].open = 0
+    leftovers.splice(leftovers.indexOf(left), 1)
+  }
+
   // 2. What is left goes to open invoices of one client — the one whose invoices the payment named,
   //    or whose name it carries — when they add up exactly. The oldest invoices that fit are taken.
-  const unexplained: typeof leftovers = []
-  for (const left of leftovers) {
-    const pool = left.foreign && left.payers.size === 0 ? [] : entries.filter((entry) => entry.open > 0 && entry.date && entry.date <= left.line.date && (left.payers.has(clientKey(entry)) || namesClient(entry, left.set)))
+  const payersOf = (left: (typeof leftovers)[number]) => {
+    const pool = left.foreign && left.payers.size === 0 ? [] : entries.filter((entry) => entry.open > 0 && entry.date && entry.date <= left.line.date && (left.payers.has(clientKey(entry)) || identifies(entry, left.set)))
     const byClient = new Map<string, typeof entries>()
     for (const entry of pool) byClient.set(clientKey(entry), [...(byClient.get(clientKey(entry)) || []), entry])
+    for (const group of byClient.values()) group.sort((a, b) => a.date.localeCompare(b.date))
+    return byClient
+  }
+  /** Pays the oldest set of one payer's open invoices that adds up to the transfer exactly; false if none does. */
+  const exactFit = (left: (typeof leftovers)[number]) => {
     let best: typeof entries | null = null
     const newest = (list: typeof entries) => list[list.length - 1].date
-    for (const group of byClient.values()) {
-      const candidates = group.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 14)
+    for (const group of payersOf(left).values()) {
+      const candidates = group.slice(0, 14)
       for (let mask = 1; mask < 1 << candidates.length; mask += 1) {
         const chosen = candidates.filter((_, bit) => mask & (1 << bit))
         if (Math.abs(chosen.reduce((sum, entry) => sum + entry.open, 0) - left.rest) > 5) continue
         if (!best || newest(chosen) < newest(best) || (newest(chosen) === newest(best) && chosen.length < best.length)) best = chosen
       }
     }
-    if (!best) {
-      unexplained.push(left)
-      continue
-    }
+    if (!best) return false
     for (const entry of best) {
       entry.payments.push({ date: left.line.date, amount: entry.open / 100, basis: 'amount' })
       entry.open = 0
     }
+    return true
+  }
+
+  /**
+   * A transfer from one known payer that fits no set of its invoices exactly is a payment on account:
+   * it goes to that payer's oldest open invoices first, and what is left belongs to no invoice here.
+   * False when the payer is not known, or not alone.
+   */
+  const onAccountFit = (left: (typeof leftovers)[number]) => {
+    const byClient = payersOf(left)
+    if (byClient.size !== 1) return false
+    let rest = left.rest
+    for (const entry of [...byClient.values()][0]) {
+      if (rest <= 5) break
+      const short = entry.open - rest
+      const paid = short <= Math.min(5000, Math.max(entry.open * 0.03, 5)) ? entry.open : rest
+      entry.payments.push({ date: left.line.date, amount: paid / 100, basis: 'amount' })
+      entry.open -= paid
+      rest -= Math.min(paid, rest)
+    }
+    if (rest > 5) loose.push({ ...left.line, rest: Math.min(rest, cents(left.line.amount)) / 100 })
+    return true
+  }
+
+  // Day by day, so a later transfer cannot take an invoice an earlier one covered; within a day,
+  // exact fits before payments on account.
+  const unexplained: typeof leftovers = []
+  for (const day of [...new Set(leftovers.map((left) => left.line.date))].sort()) {
+    const notExact = leftovers.filter((left) => left.line.date === day).filter((left) => !exactFit(left))
+    for (const left of notExact) if (!onAccountFit(left)) unexplained.push(left)
   }
 
   // 3. A payment naming nobody we know: the one open invoice of exactly that amount, if there is only one client it could be.
   for (const left of unexplained) {
     const fits = left.foreign || left.payers.size > 0 ? [] : entries.filter((entry) => entry.open > 0 && entry.date && entry.date <= left.line.date && Math.abs(entry.open - left.rest) <= 5 && entry.open === entry.start)
     const clients = new Set(fits.map(clientKey))
-    const mentionsOther = entries.some((entry) => namesClient(entry, left.set))
+    const mentionsOther = entries.some((entry) => identifies(entry, left.set))
     if (fits.length > 0 && clients.size === 1 && !mentionsOther) {
       const entry = fits.sort((a, b) => a.date.localeCompare(b.date))[0]
       entry.payments.push({ date: left.line.date, amount: entry.open / 100, basis: 'amount' })
