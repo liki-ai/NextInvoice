@@ -433,7 +433,7 @@ async function readWorkbook(file) {
 	const entries = readEntries(bytes);
 	const read = async (name) => {
 		const entry = entries.find((item) => item.name === name);
-		return entry ? readEntry(bytes, entry) : "";
+		return entry ? (await readEntry(bytes, entry)).replace(/<(\/?)[A-Za-z_][\w.-]*:(?=[A-Za-z_])/g, "<$1") : "";
 	};
 	const workbookXml = await read("xl/workbook.xml");
 	if (!workbookXml) throw new Error("NOT_XLSX");
