@@ -154,14 +154,19 @@ export function OverviewPage() {
     return `/app/statement?${params.toString()}`
   }
 
-  const cards = [
+  // What happened within the chosen period …
+  const periodCards = [
     { key: 'invoiced', label: t('overview.invoiced'), value: report.invoiced, metric: 'invoiced' },
     { key: 'received', label: t('overview.received'), value: report.paymentsReceived, metric: 'received' },
     { key: 'obligations', label: t('overview.obligationsRecorded'), value: report.obligationsRecorded, metric: 'obligations' },
     { key: 'paidOut', label: t('overview.paidOut'), value: report.paymentsMade, metric: 'paidOut' },
-    { key: 'receivables', label: t('overview.receivables'), value: report.receivables, metric: 'receivables' },
-    { key: 'payables', label: t('overview.payables'), value: report.payables, metric: 'payables' },
   ]
+  // … and what stands open on its last day, from every month before it: totals, not this period's share.
+  const balanceCards = [
+    { key: 'receivables', label: t('overview.receivables'), hint: t('overview.receivablesHint'), value: report.receivables, metric: 'receivables' },
+    { key: 'payables', label: t('overview.payables'), hint: t('overview.payablesHint'), value: report.payables, metric: 'payables' },
+  ]
+  const endDay = report.period.endIso.split('-').reverse().join('.')
 
   const drillTitle: Record<string, string> = {
     invoiced: t('overview.drillInvoiced'),
@@ -286,22 +291,40 @@ export function OverviewPage() {
       ) : null}
 
       <p className="mt-6 text-xs text-brand-ink/45">{t('overview.tapHint')}</p>
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {cards.map((card) => (
-          <button key={card.key} type="button" onClick={() => openMetric(card.metric)} className="text-left">
-            <Card className="h-full p-4 transition hover:border-brand/30 sm:p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{card.label}</p>
-              <p className="mt-2 font-display text-xl font-medium sm:text-2xl">{formatMoney(card.value, currency)}</p>
-            </Card>
-          </button>
-        ))}
-        <button type="button" onClick={() => openMetric('net')} className="col-span-2 text-left lg:col-span-3">
-          <Card className="p-4 transition hover:border-brand/30 sm:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('overview.netPayments')}</p>
-            <p className="mt-2 font-display text-2xl font-medium">{formatMoney(report.netPayments, currency)}</p>
-            <p className="mt-2 text-xs text-brand-ink/50">{t('overview.netHint')}</p>
-          </Card>
-        </button>
+      <div className="mt-3 grid items-start gap-x-6 gap-y-5 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <section aria-labelledby="overview-period">
+          <h2 id="overview-period" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">
+            {t('overview.periodGroup', { period: label })}
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {periodCards.map((card) => (
+              <button key={card.key} type="button" onClick={() => openMetric(card.metric)} aria-pressed={metric === card.metric} className="text-left">
+                <Card className={`h-full p-3.5 transition hover:border-brand/30 sm:p-4 ${metric === card.metric ? 'border-brand/40' : ''}`}>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{card.label}</p>
+                  <p className="mt-1.5 font-display text-lg font-medium tabular-nums sm:text-xl">{formatMoney(card.value, currency)}</p>
+                </Card>
+              </button>
+            ))}
+          </div>
+        </section>
+        <section aria-labelledby="overview-balance">
+          <h2 id="overview-balance" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand">
+            {t('overview.balanceGroup', { date: endDay })}
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {balanceCards.map((card) => (
+              <button key={card.key} type="button" onClick={() => openMetric(card.metric)} aria-pressed={metric === card.metric} className="text-left">
+                <div
+                  className={`h-full rounded-2xl border bg-brand/5 p-3.5 transition hover:border-brand/40 sm:p-4 ${metric === card.metric ? 'border-brand/40' : 'border-brand/15'}`}
+                >
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-brand/80">{card.label}</p>
+                  <p className="mt-1.5 font-display text-lg font-medium tabular-nums sm:text-xl">{formatMoney(card.value, currency)}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-brand-ink/50">{card.hint}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
 
       {metric ? (
