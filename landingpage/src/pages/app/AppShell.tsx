@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LayoutDashboard, LogOut, Menu, Plus, Repeat, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
+import { FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider, useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -23,7 +23,6 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
           pathname.startsWith('/app/invoices') ||
           (pathname.startsWith('/app/statement') && !search.includes('from=overview')),
       },
-      { to: '/app/recurring', icon: Repeat, key: 'nav.recurring', active: (pathname) => pathname.startsWith('/app/recurring') },
       { to: '/app/obligations', icon: Wallet, key: 'nav.obligations', active: (pathname) => pathname.startsWith('/app/obligations') },
       {
         // Its tabs: financial health (first, for managers), the overview, and projects.

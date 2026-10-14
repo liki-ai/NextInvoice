@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Check, Eye, ImagePlus, LogOut, Trash2 } from 'lucide-react'
+import { Check, Eye, ImagePlus, LogOut, Settings, Trash2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -186,7 +186,10 @@ function ImageSlot({
   )
 }
 
-export function ProfilePage() {
+/** Which part of the settings to show: the company's own page, or one tab of the invoice settings. */
+export type ProfilePart = 'company' | 'templates' | 'defaults'
+
+export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
   const { user, logout } = useAuth()
   const { profile, saveProfile, downloadBackup, restoreBackup } = useAppData()
   const { t, dict, lang } = useI18n()
@@ -334,6 +337,223 @@ export function ProfilePage() {
   const currencies: string[] = CURRENCIES.includes(form.currency as (typeof CURRENCIES)[number]) ? [...CURRENCIES] : [form.currency, ...CURRENCIES]
   const imageLabels = { uploadLabel: t('profile.upload'), changeLabel: t('profile.change'), removeLabel: t('profile.remove') }
 
+  const templateSection = (
+    <SettingsSection title={t('profile.sectionInvoice')} hint={t('profile.invoiceHint')}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('profile.templateLabel')}</p>
+      <div className="mt-2.5 grid gap-4 sm:grid-cols-3" role="radiogroup" aria-label={t('profile.templateLabel')}>
+        {INVOICE_TEMPLATES.map((id) => {
+          const selected = template === id
+          return (
+            <div key={id} className={cn('overflow-hidden rounded-2xl border bg-white transition', selected ? 'border-brand ring-2 ring-brand/20' : 'border-brand-ink/10 hover:border-brand/30')}>
+              <button type="button" role="radio" aria-checked={selected} onClick={() => setField('invoiceTemplate', id)} className="block w-full text-left">
+                <div className="relative border-b border-brand-ink/8 bg-brand-bg p-3">
+                  <PagePreview html={previews?.[id] || ''} className="rounded-md shadow-[0_1px_4px_rgba(29,43,46,0.14)]" />
+                  {selected ? (
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                      <Check className="h-3 w-3" />
+                      {t('profile.templateSelected')}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="px-4 pt-3">
+                  <p className="text-sm font-semibold">{t(`profile.template${TEMPLATE_KEYS[id]}`)}</p>
+                  <p className="mt-1 text-xs leading-5 text-brand-ink/55">{t(`profile.template${TEMPLATE_KEYS[id]}Desc`)}</p>
+                </div>
+              </button>
+              <button type="button" onClick={() => setPreviewTemplate(id)} className="m-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/8">
+                <Eye className="h-3.5 w-3.5" />
+                {t('profile.templatePreview')}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('profile.accent')}</p>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2.5" role="radiogroup" aria-label={t('profile.accent')}>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!form.accentColor}
+          onClick={() => setField('accentColor', '')}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition',
+            !form.accentColor ? 'border-brand bg-brand/8 text-brand' : 'border-brand-ink/12 bg-white text-brand-ink/70 hover:border-brand/30',
+          )}
+        >
+          <span className="h-4 w-4 rounded-full" style={{ background: TEMPLATE_ACCENT[template] }} />
+          {t('profile.accentDefault')}
+        </button>
+        {ACCENT_SWATCHES.map((color) => {
+          const selected = form.accentColor?.toLowerCase() === color.toLowerCase()
+          return (
+            <button
+              key={color}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={color}
+              title={color}
+              onClick={() => setField('accentColor', color)}
+              className={cn('flex h-9 w-9 items-center justify-center rounded-full ring-offset-2 transition hover:scale-105', selected && 'ring-2 ring-brand-ink/60')}
+              style={{ background: color }}
+            >
+              {selected ? <Check className="h-4 w-4 text-white" /> : null}
+            </button>
+          )
+        })}
+      </div>
+    </SettingsSection>
+  )
+  const defaultsSection = (
+    <SettingsSection title={t('recurring.settings.defaultsTitle')} hint={t('recurring.settings.defaultsHint')}>
+      <div className="grid gap-x-4 sm:grid-cols-2">
+        <Select label={t('profile.currency')} value={form.currency} onChange={(e) => setField('currency', e.target.value)}>
+          {currencies.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+        </Select>
+        <div>
+          <Field
+            label={t('profile.defaultTaxRate')}
+            value={taxInput}
+            inputMode="decimal"
+            placeholder="0"
+            onChange={(e) => {
+              setTaxInput(e.target.value)
+              setField('defaultTaxRate', normalizeTaxRate(e.target.value))
+            }}
+          />
+          <p className="mt-2 text-xs text-brand-ink/45">{t('profile.defaultTaxRateHint')}</p>
+        </div>
+      </div>
+      {usesExportNote(form) ? (
+        <div className="mt-2">
+          <TextArea
+            label={t('profile.exportNote')}
+            rows={2}
+            value={form.exportNote ?? DEFAULT_EXPORT_NOTE}
+            placeholder={t('profile.phExportNote')}
+            onChange={(e) => setField('exportNote', e.target.value)}
+          />
+          <p className="-mt-2 text-xs text-brand-ink/45">{t('profile.exportNoteHint')}</p>
+        </div>
+      ) : null}
+    </SettingsSection>
+  )
+  const signatureSection = (
+    <SettingsSection title={t('profile.sectionSignature')} hint={t('profile.signatureHint')}>
+      <div className="grid gap-6 sm:grid-cols-2">
+        <ImageSlot
+          label={t('profile.signature')}
+          value={form.signatureData}
+          wide
+          busy={imageBusy === 'signatureData'}
+          {...imageLabels}
+          onPick={(file) => void onPickImage('signatureData', file)}
+          onRemove={() => setField('signatureData', '')}
+        />
+        <ImageSlot
+          label={t('profile.stamp')}
+          value={form.stampData}
+          busy={imageBusy === 'stampData'}
+          {...imageLabels}
+          onPick={(file) => void onPickImage('stampData', file)}
+          onRemove={() => setField('stampData', '')}
+        />
+      </div>
+    </SettingsSection>
+  )
+
+  const saveBar =
+    dirty || saving || notice || error ? (
+    <div className="sticky bottom-4 z-20 mt-6 flex justify-center" role="status" aria-live="polite">
+      <div
+        className={cn(
+          'flex w-full max-w-2xl flex-wrap items-center gap-3 rounded-2xl border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(29,43,46,0.16)]',
+          error ? 'border-[#C0503A]/40' : 'border-brand-ink/10',
+        )}
+      >
+        <p className={cn('min-w-0 flex-1 text-sm font-semibold', error ? 'text-[#C0503A]' : notice ? 'text-brand' : 'text-brand-ink')}>
+          {error ? (
+            error
+          ) : notice ? (
+            <span className="inline-flex items-center gap-2">
+              <Check className="h-4 w-4" />
+              {notice}
+            </span>
+          ) : (
+            t('profile.unsaved')
+          )}
+        </p>
+        {dirty || saving ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={saving}
+              onClick={() => {
+                setForm(baseline)
+                setError('')
+                setEmailError('')
+              }}
+            >
+              {t('profile.discard')}
+            </Button>
+            <Button type="button" disabled={saving} onClick={() => void onSave()}>
+              {saving ? t('common.loading') : t('common.save')}
+            </Button>
+          </>
+        ) : null}
+      </div>
+    </div>
+  ) : null
+  const templateModal =
+    previewTemplate && previews ? (
+    <Modal
+      title={t(`profile.template${TEMPLATE_KEYS[previewTemplate]}`)}
+      onClose={() => setPreviewTemplate(null)}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={() => setPreviewTemplate(null)}>
+            {t('common.close')}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setField('invoiceTemplate', previewTemplate)
+              setPreviewTemplate(null)
+            }}
+          >
+            {t('profile.templateLabel')}: {t(`profile.template${TEMPLATE_KEYS[previewTemplate]}`)}
+          </Button>
+        </>
+      }
+    >
+      <iframe title="template-preview" sandbox="" className="h-[70vh] w-full bg-white" srcDoc={previews[previewTemplate]} />
+    </Modal>
+  ) : null
+
+  if (part !== 'company') {
+    return (
+      <div className="min-w-0">
+        {manager ? null : <p className="mb-6 rounded-xl bg-[#FFF6E5] px-4 py-3 text-sm font-medium text-[#8A5A00]">{t('profile.memberNotice')}</p>}
+        <fieldset disabled={!manager} className="m-0 min-w-0 space-y-6 border-0 p-0">
+          {part === 'templates' ? templateSection : (
+            <>
+              {defaultsSection}
+              {signatureSection}
+            </>
+          )}
+        </fieldset>
+        {saveBar}
+        {templateModal}
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-[1180px]">
       <h1 className="font-display text-4xl font-medium tracking-tight">{t('profile.title')}</h1>
@@ -406,132 +626,21 @@ export function ProfilePage() {
           <SettingsSection title={t('profile.sectionPayment')} hint={t('profile.paymentHint')}>
             <div className="grid gap-x-4 sm:grid-cols-2">
               <Field label={t('profile.bankName')} value={form.bankName || ''} placeholder={t('profile.phBankName')} onChange={(e) => setField('bankName', e.target.value)} />
-              <Select label={t('profile.currency')} value={form.currency} onChange={(e) => setField('currency', e.target.value)}>
-                {currencies.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </Select>
               <Field label={t('profile.iban')} value={form.iban || ''} placeholder={t('profile.phIban')} className="font-mono tracking-wide" spellCheck={false} onChange={(e) => setField('iban', e.target.value.toUpperCase())} />
-              <div>
-                <Field
-                  label={t('profile.defaultTaxRate')}
-                  value={taxInput}
-                  inputMode="decimal"
-                  placeholder="0"
-                  onChange={(e) => {
-                    setTaxInput(e.target.value)
-                    setField('defaultTaxRate', normalizeTaxRate(e.target.value))
-                  }}
-                />
-                <p className="mt-2 text-xs text-brand-ink/45">{t('profile.defaultTaxRateHint')}</p>
-              </div>
               <Field label={`${t('profile.swift')} (${t('common.optional')})`} value={form.swift || ''} placeholder={t('profile.phSwift')} className="font-mono tracking-wide" spellCheck={false} maxLength={11} onChange={(e) => setField('swift', e.target.value.toUpperCase())} />
             </div>
           </SettingsSection>
 
-          <SettingsSection title={t('profile.sectionInvoice')} hint={t('profile.invoiceHint')}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('profile.templateLabel')}</p>
-            <div className="mt-2.5 grid gap-4 sm:grid-cols-3" role="radiogroup" aria-label={t('profile.templateLabel')}>
-              {INVOICE_TEMPLATES.map((id) => {
-                const selected = template === id
-                return (
-                  <div key={id} className={cn('overflow-hidden rounded-2xl border bg-white transition', selected ? 'border-brand ring-2 ring-brand/20' : 'border-brand-ink/10 hover:border-brand/30')}>
-                    <button type="button" role="radio" aria-checked={selected} onClick={() => setField('invoiceTemplate', id)} className="block w-full text-left">
-                      <div className="relative border-b border-brand-ink/8 bg-brand-bg p-3">
-                        <PagePreview html={previews?.[id] || ''} className="rounded-md shadow-[0_1px_4px_rgba(29,43,46,0.14)]" />
-                        {selected ? (
-                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                            <Check className="h-3 w-3" />
-                            {t('profile.templateSelected')}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="px-4 pt-3">
-                        <p className="text-sm font-semibold">{t(`profile.template${TEMPLATE_KEYS[id]}`)}</p>
-                        <p className="mt-1 text-xs leading-5 text-brand-ink/55">{t(`profile.template${TEMPLATE_KEYS[id]}Desc`)}</p>
-                      </div>
-                    </button>
-                    <button type="button" onClick={() => setPreviewTemplate(id)} className="m-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/8">
-                      <Eye className="h-3.5 w-3.5" />
-                      {t('profile.templatePreview')}
-                    </button>
-                  </div>
-                )
-              })}
+          <Card className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold">{t('recurring.settings.title')}</h2>
+              <p className="mt-1 text-sm leading-6 text-brand-ink/55">{t('recurring.settings.movedHint')}</p>
             </div>
-
-            <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('profile.accent')}</p>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2.5" role="radiogroup" aria-label={t('profile.accent')}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={!form.accentColor}
-                onClick={() => setField('accentColor', '')}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition',
-                  !form.accentColor ? 'border-brand bg-brand/8 text-brand' : 'border-brand-ink/12 bg-white text-brand-ink/70 hover:border-brand/30',
-                )}
-              >
-                <span className="h-4 w-4 rounded-full" style={{ background: TEMPLATE_ACCENT[template] }} />
-                {t('profile.accentDefault')}
-              </button>
-              {ACCENT_SWATCHES.map((color) => {
-                const selected = form.accentColor?.toLowerCase() === color.toLowerCase()
-                return (
-                  <button
-                    key={color}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={color}
-                    title={color}
-                    onClick={() => setField('accentColor', color)}
-                    className={cn('flex h-9 w-9 items-center justify-center rounded-full ring-offset-2 transition hover:scale-105', selected && 'ring-2 ring-brand-ink/60')}
-                    style={{ background: color }}
-                  >
-                    {selected ? <Check className="h-4 w-4 text-white" /> : null}
-                  </button>
-                )
-              })}
-            </div>
-
-            {usesExportNote(form) ? (
-              <div className="mt-6">
-                <TextArea
-                  label={t('profile.exportNote')}
-                  rows={2}
-                  value={form.exportNote ?? DEFAULT_EXPORT_NOTE}
-                  placeholder={t('profile.phExportNote')}
-                  onChange={(e) => setField('exportNote', e.target.value)}
-                />
-                <p className="-mt-2 text-xs text-brand-ink/45">{t('profile.exportNoteHint')}</p>
-              </div>
-            ) : null}
-          </SettingsSection>
-
-          <SettingsSection title={t('profile.sectionSignature')} hint={t('profile.signatureHint')}>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <ImageSlot
-                label={t('profile.signature')}
-                value={form.signatureData}
-                wide
-                busy={imageBusy === 'signatureData'}
-                {...imageLabels}
-                onPick={(file) => void onPickImage('signatureData', file)}
-                onRemove={() => setField('signatureData', '')}
-              />
-              <ImageSlot
-                label={t('profile.stamp')}
-                value={form.stampData}
-                busy={imageBusy === 'stampData'}
-                {...imageLabels}
-                onPick={(file) => void onPickImage('stampData', file)}
-                onRemove={() => setField('stampData', '')}
-              />
-            </div>
-          </SettingsSection>
+            <Link to="/app/invoices/settings" className="inline-flex items-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-3.5 py-2 text-sm font-semibold text-brand hover:border-brand/30 hover:bg-brand/5">
+              <Settings className="h-4 w-4" />
+              {t('recurring.settings.open')}
+            </Link>
+          </Card>
 
           {manager ? <MailSettingsCard box="company" /> : null}
         </fieldset>
@@ -632,73 +741,7 @@ export function ProfilePage() {
         </aside>
       </div>
 
-      {dirty || saving || notice || error ? (
-        <div className="sticky bottom-4 z-20 mt-6 flex justify-center" role="status" aria-live="polite">
-          <div
-            className={cn(
-              'flex w-full max-w-2xl flex-wrap items-center gap-3 rounded-2xl border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(29,43,46,0.16)]',
-              error ? 'border-[#C0503A]/40' : 'border-brand-ink/10',
-            )}
-          >
-            <p className={cn('min-w-0 flex-1 text-sm font-semibold', error ? 'text-[#C0503A]' : notice ? 'text-brand' : 'text-brand-ink')}>
-              {error ? (
-                error
-              ) : notice ? (
-                <span className="inline-flex items-center gap-2">
-                  <Check className="h-4 w-4" />
-                  {notice}
-                </span>
-              ) : (
-                t('profile.unsaved')
-              )}
-            </p>
-            {dirty || saving ? (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={saving}
-                  onClick={() => {
-                    setForm(baseline)
-                    setError('')
-                    setEmailError('')
-                  }}
-                >
-                  {t('profile.discard')}
-                </Button>
-                <Button type="button" disabled={saving} onClick={() => void onSave()}>
-                  {saving ? t('common.loading') : t('common.save')}
-                </Button>
-              </>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {previewTemplate && previews ? (
-        <Modal
-          title={t(`profile.template${TEMPLATE_KEYS[previewTemplate]}`)}
-          onClose={() => setPreviewTemplate(null)}
-          footer={
-            <>
-              <Button type="button" variant="secondary" onClick={() => setPreviewTemplate(null)}>
-                {t('common.close')}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  setField('invoiceTemplate', previewTemplate)
-                  setPreviewTemplate(null)
-                }}
-              >
-                {t('profile.templateLabel')}: {t(`profile.template${TEMPLATE_KEYS[previewTemplate]}`)}
-              </Button>
-            </>
-          }
-        >
-          <iframe title="template-preview" sandbox="" className="h-[70vh] w-full bg-white" srcDoc={previews[previewTemplate]} />
-        </Modal>
-      ) : null}
+      {saveBar}
     </div>
   )
 }

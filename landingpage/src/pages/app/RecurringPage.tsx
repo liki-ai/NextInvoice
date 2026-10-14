@@ -58,7 +58,7 @@ function errorText(err: unknown, t: (key: string) => string) {
 }
 
 /** Recurring invoices: the plans, the notifications the company gets, and card payments by Stripe. */
-export function RecurringPage() {
+export function RecurringPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth()
   const { clients, profile, mail, refresh } = useAppData()
   const { t } = useI18n()
@@ -155,11 +155,15 @@ export function RecurringPage() {
   const badge = 'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold'
 
   return (
-    <div className="mx-auto max-w-[1180px]">
+    <div className={embedded ? 'min-w-0' : 'mx-auto max-w-[1180px]'}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-display text-4xl font-medium tracking-tight">{t('recurring.title')}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-brand-ink/55">{t('recurring.subtitle')}</p>
+          {embedded ? (
+            <h2 className="text-xl font-semibold tracking-tight">{t('recurring.title')}</h2>
+          ) : (
+            <h1 className="font-display text-4xl font-medium tracking-tight">{t('recurring.title')}</h1>
+          )}
+          <p className={cn('max-w-2xl text-sm leading-6 text-brand-ink/55', embedded ? 'mt-1' : 'mt-2')}>{t('recurring.subtitle')}</p>
         </div>
         <Button type="button" onClick={openNew}>
           <Plus className="h-4 w-4" />
@@ -186,7 +190,7 @@ export function RecurringPage() {
         {error && !form ? <p className="mt-5 rounded-xl bg-[#F8E8E4] px-4 py-3 text-sm font-medium text-[#C0503A]">{error}</p> : null}
       </div>
 
-      <div className={cn('mt-8 grid items-start gap-6', manager && 'xl:grid-cols-[minmax(0,1fr)_360px]')}>
+      <div className={cn('grid items-start gap-6', embedded ? 'mt-6' : 'mt-8', manager && (embedded ? '2xl:grid-cols-[minmax(0,1fr)_340px]' : 'xl:grid-cols-[minmax(0,1fr)_360px]'))}>
         <div className="min-w-0 space-y-4">
           {state.plans.length === 0 ? (
             <Card>

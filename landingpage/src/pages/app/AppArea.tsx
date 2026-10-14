@@ -19,7 +19,7 @@ import { ClientFormPage } from './ClientFormPage'
 import { ItemListPage } from './ItemListPage'
 import { ItemFormPage } from './ItemFormPage'
 import { UsersPage } from './UsersPage'
-import { RecurringPage } from './RecurringPage'
+import { InvoiceSettingsPage } from './InvoiceSettingsPage'
 
 /** Everything behind login. Loaded on demand, so visitors to the landing page do not download the app. */
 export default function AppArea() {
@@ -36,6 +36,7 @@ export default function AppArea() {
         <Route index element={<InvoiceListPage />} />
         <Route path="new" element={<InvoiceFormPage />} />
         <Route path="upgrade" element={<UpgradePage />} />
+        <Route path="invoices/settings/:tab?" element={<InvoiceSettingsPage />} />
         <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
         <Route path="invoices/:invoiceId/edit" element={<InvoiceFormPage />} />
         <Route path="statement" element={<StatementPage />} />
@@ -49,7 +50,7 @@ export default function AppArea() {
         <Route path="obligations/:obligationId/edit" element={<ObligationFormPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="users" element={<UsersPage />} />
-        <Route path="recurring" element={<RecurringPage />} />
+        <Route path="recurring" element={<Navigate to="/app/invoices/settings/recurring" replace />} />
         <Route path="clients" element={<ClientListPage />} />
         <Route path="clients/new" element={<ClientFormPage />} />
         <Route path="clients/:clientId" element={<ClientFormPage />} />

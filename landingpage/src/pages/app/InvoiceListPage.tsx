@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Bell, BellRing, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Bell, BellRing, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -293,6 +293,14 @@ export function InvoiceListPage() {
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            to="/app/invoices/settings"
+            title={t('recurring.settings.open')}
+            aria-label={t('recurring.settings.open')}
+            className="inline-flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-brand-ink/12 bg-white text-brand-ink/70 hover:border-brand/30 hover:bg-brand/5 hover:text-brand"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
           <button
             type="button"
             onClick={() => setImportOpen(true)}
