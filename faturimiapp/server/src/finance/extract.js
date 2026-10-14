@@ -242,6 +242,7 @@ async function extractDocument({ name, mime, data, companyName, email }) {
     bank.to = statement.to;
     result.bank = bank;
   }
+  if (sheetMonths) sheetMonths.version = (financeLib() || {}).STATEMENT_MONTHS_VERSION || 1;
   return { result, statement, months: sheetMonths };
 }
 

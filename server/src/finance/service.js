@@ -262,13 +262,15 @@ async function processDocument(ownerId, docId) {
         mutate(ownerId, (finance) => {
           const current = findDoc(finance, docId);
           if (!current) return;
-          current.statement = { ...(current.statement || { from: statement.from, to: statement.to, credits: 0, totalIn: 0, loose: 0, looseTotal: 0, auto: false, applied: [], review: [] }), iban: months.iban || (result.bank && result.bank.iban) || '', months: months.months };
+          current.statement = { ...(current.statement || { from: statement.from, to: statement.to, credits: 0, totalIn: 0, loose: 0, looseTotal: 0, auto: false, applied: [], review: [] }), iban: months.iban || (result.bank && result.bank.iban) || '', months: months.months, monthsVersion: months.version };
         });
       }
     }
   } catch (err) {
     console.error('[finance] could not read', doc.name, err && err.message);
-    update({ status: 'failed', error: String((err && (err.code || err.message)) || 'FAILED').slice(0, 200), readAt: nowIso() });
+    const error = String((err && (err.code || err.message)) || 'FAILED').slice(0, 200);
+    // A document read well before keeps what was read; only a first reading that fails is marked failed.
+    update(doc.status === 'done' ? { error, readAt: nowIso() } : { status: 'failed', error, readAt: nowIso() });
   }
 }
 
@@ -436,10 +438,12 @@ function startFinanceChecks() {
     }
   };
   // Documents left half-read by a restart are read again.
-  // Spreadsheet statements read before money in and out was counted month by month are read again.
+  // Spreadsheet statements read before money in and out was counted month by month (or counted
+  // under older categories) are read again.
+  const version = (financeLib() || {}).STATEMENT_MONTHS_VERSION || 1;
   for (const ownerId of financeOwners()) {
     for (const doc of load(ownerId).documents) {
-      const unsplit = doc.status === 'done' && doc.kind === 'bank_statement' && /\.(xlsx|xls|csv)$/i.test(doc.name) && !(doc.statement && doc.statement.months);
+      const unsplit = doc.status === 'done' && doc.kind === 'bank_statement' && /\.(xlsx|xls|csv)$/i.test(doc.name) && !(doc.statement && doc.statement.months && doc.statement.monthsVersion >= version);
       if (doc.status === 'pending' || unsplit) enqueue(ownerId, doc.id);
     }
   }

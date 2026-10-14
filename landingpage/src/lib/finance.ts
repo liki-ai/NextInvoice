@@ -25,7 +25,7 @@ export const FINANCE_KINDS = [
 export type FinanceKind = (typeof FINANCE_KINDS)[number]
 
 /** What money leaving the bank went to, as the server sorts a statement's outgoing payments. */
-export const SPEND_CATEGORIES = ['payroll', 'taxes', 'rent', 'suppliers', 'card', 'cash', 'fees', 'dividends', 'other'] as const
+export const SPEND_CATEGORIES = ['payroll', 'pension', 'taxes', 'rent', 'suppliers', 'card', 'cash', 'fees', 'dividends', 'other'] as const
 export type SpendCategory = (typeof SPEND_CATEGORIES)[number]
 export type BankMonth = { in: number; out: number; spend: Partial<Record<SpendCategory, number>> }
 
@@ -146,12 +146,15 @@ function sameDocumentKey(doc: FinanceDoc) {
   return `${doc.kind}|${doc.period}|${name}`
 }
 
+/** Kinds that come many to a period: each one counts (overlapping statements are sorted out month by month). */
+const MANY_PER_PERIOD = new Set<FinanceKind>(['bank_statement', 'supplier_invoice', 'own_invoice', 'legal', 'other'])
+
 /** The documents that count: read, not set aside, and only the newest of anything sent twice. */
 export function currentDocuments(docs: FinanceDoc[]) {
   const latest = new Map<string, FinanceDoc>()
   for (const doc of docs) {
     if (doc.status !== 'done' || doc.excluded || !doc.kind) continue
-    const key = sameDocumentKey(doc)
+    const key = MANY_PER_PERIOD.has(doc.kind) ? doc.id : sameDocumentKey(doc)
     const seen = latest.get(key)
     if (!seen || String(doc.receivedAt) > String(seen.receivedAt)) latest.set(key, doc)
   }
@@ -161,6 +164,7 @@ export function currentDocuments(docs: FinanceDoc[]) {
 export type MonthFigures = {
   period: string
   invoiced: number
+  invoicedNet: number
   collected: number
   salesNet: N
   salesVat: N
@@ -203,6 +207,7 @@ function emptyMonth(period: string): MonthFigures {
   return {
     period,
     invoiced: 0,
+    invoicedNet: 0,
     collected: 0,
     salesNet: null,
     salesVat: null,
@@ -278,6 +283,8 @@ export function monthlyFigures(docs: FinanceDoc[], invoices: Invoice[], year: nu
     const report = buildOverview({ invoices, period: { start: new Date(year, index, 1), end: new Date(year, index + 1, 0) }, currency, fallbackCurrency: currency })
     month.invoiced = report.invoiced
     month.collected = report.paymentsReceived
+    // Invoices carry VAT on top of their net price; the result counts the net.
+    month.invoicedNet = round(report.issuedInPeriod.reduce((total, invoice) => total + (Number(invoice.total) || 0) / (1 + (Number((invoice as { taxRate?: unknown }).taxRate) || 0) / 100), 0))
   })
 
   const bank = bankMonths(docs)
@@ -361,7 +368,7 @@ export type FinanceSummary = {
   /** The year's spending as the bank shows it, by what it went to; dividends are kept apart. */
   spending: { total: number; average: number; months: number; dividends: number; byCategory: { category: SpendCategory; amount: number }[]; taxesFromBank: number } | null
   annual: { year: string; revenue: N; netProfit: N; profitBeforeTax: N; margin: N; docId: string } | null
-  estimate: { result: number; months: number } | null
+  estimate: { result: number; revenue: number; costs: number; months: number; from: string; to: string } | null
   burn: N
   missing: { period: string; kinds: FinanceKind[] } | null
   upcoming: FinanceDoc[]
@@ -451,8 +458,9 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
       }
     : null
 
+  // The newest year whose statements state a profit; a balance sheet alone says nothing about it.
   const annualDoc = docs
-    .filter((doc) => doc.kind === 'financial_statements' && /^\d{4}$/.test(doc.period || '') && doc.figures?.statements)
+    .filter((doc) => doc.kind === 'financial_statements' && /^\d{4}$/.test(doc.period || '') && (has(doc.figures?.statements?.netProfit) || has(doc.figures?.statements?.profitBeforeTax)))
     .sort((a, b) => String(b.period).localeCompare(String(a.period)) || String(b.receivedAt).localeCompare(String(a.receivedAt)))[0]
   const statements = annualDoc?.figures?.statements
   const annual = annualDoc && statements
@@ -466,10 +474,29 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
       }
     : null
 
-  // What the year has earned so far, as far as the books show: sales less purchases less pay.
-  const booked = months.filter((month) => has(month.salesNet) && (has(month.purchasesNet) || has(month.payrollCost)))
-  const estimate = booked.length
-    ? { result: round(booked.reduce((total, month) => total + (month.salesNet ?? 0) - (month.purchasesNet ?? 0) - (month.payrollCost ?? 0), 0)), months: booked.length }
+  // What the year has earned so far, before profit tax, month by month from the best source there is:
+  // sales from the sales book (or the invoices here, without VAT); purchases from the purchase book
+  // (or what the bank paid suppliers, by card, for rent and in cash); pay from the payroll list (or
+  // the net pay and pension contributions the bank paid, with the wage tax slip when there is one).
+  const BANK_COSTS: SpendCategory[] = ['suppliers', 'card', 'rent', 'cash', 'fees', 'other']
+  const earned = months.filter(complete).flatMap((month) => {
+    const revenue = has(month.salesNet) ? month.salesNet : month.invoicedNet > 0 ? month.invoicedNet : null
+    const bankCosts = month.bank ? BANK_COSTS.reduce((total, item) => total + (month.bank!.spend[item] ?? 0), 0) : null
+    const purchases = has(month.purchasesNet) ? month.purchasesNet : bankCosts
+    const bankPay = month.bank ? (month.bank.spend.payroll ?? 0) + (month.bank.spend.pension ?? 0) : null
+    const pay = has(month.payrollCost) ? month.payrollCost : has(month.payrollNet) || bankPay ? (month.payrollNet ?? month.bank?.spend.payroll ?? 0) + (has(month.payrollTax) ? month.payrollTax : (month.bank?.spend.pension ?? 0)) : null
+    if (revenue === null || (purchases === null && pay === null)) return []
+    return [{ period: month.period, revenue, costs: (purchases ?? 0) + (pay ?? 0) }]
+  })
+  const estimate = earned.length
+    ? {
+        result: round(earned.reduce((total, month) => total + month.revenue - month.costs, 0)),
+        revenue: round(earned.reduce((total, month) => total + month.revenue, 0)),
+        costs: round(earned.reduce((total, month) => total + month.costs, 0)),
+        months: earned.length,
+        from: earned[0].period,
+        to: earned[earned.length - 1].period,
+      }
     : null
 
   // What a month costs to run: what left the bank in the latest statements when they say, otherwise
