@@ -370,6 +370,12 @@ export function payrollFullCost(month: MonthFigures): { cost: N; net: N; taxes: 
 
 const RUNNING_COSTS: SpendCategory[] = ['suppliers', 'card', 'rent', 'cash', 'fees', 'other']
 
+/** A month's costs other than pay: the purchase book, or else what the bank paid suppliers, by card, for rent and in cash. Null with neither. */
+export function runningCosts(month: MonthFigures): N {
+  if (has(month.purchasesNet)) return month.purchasesNet
+  return month.bank ? round(RUNNING_COSTS.reduce((total, item) => total + (month.bank!.spend[item] ?? 0), 0)) : null
+}
+
 /**
  * What one month earned before profit tax, from the best source it has: sales from the sales book
  * (or the invoices here, without VAT), less purchases from the purchase book (or what the bank paid
@@ -378,8 +384,7 @@ const RUNNING_COSTS: SpendCategory[] = ['suppliers', 'card', 'rent', 'cash', 'fe
  */
 export function monthResult(month: MonthFigures): { revenue: number; costs: number; value: number; books: boolean } | null {
   const revenue = has(month.salesNet) ? month.salesNet : month.invoicedNet > 0 ? month.invoicedNet : null
-  const bankCosts = month.bank ? RUNNING_COSTS.reduce((total, item) => total + (month.bank!.spend[item] ?? 0), 0) : null
-  const purchases = has(month.purchasesNet) ? month.purchasesNet : bankCosts
+  const purchases = runningCosts(month)
   const pay = payrollFullCost(month).cost
   if (revenue === null || (purchases === null && pay === null)) return null
   const costs = round((purchases ?? 0) + (pay ?? 0))
