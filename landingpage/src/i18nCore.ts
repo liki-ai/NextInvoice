@@ -1,6 +1,8 @@
 // Every text of the app in its three languages, with no dependency on React, so the server can
 // print invoices and write emails from the very same words.
 
+import { financeNav, financeTexts } from './i18nFinance'
+
 export const LANGS = [
   { code: 'sq', short: 'SQ', name: 'Shqip' },
   { code: 'en', short: 'EN', name: 'English' },
@@ -15,7 +17,9 @@ export function isLang(value: unknown): value is Lang {
 
 export const translations = {
   sq: {
+    finance: financeTexts.sq,
     nav: {
+      finance: financeNav.sq,
       invoices: 'Faturat',
       obligations: 'Detyrimet',
       overview: 'Pasqyra',
@@ -894,7 +898,9 @@ export const translations = {
     },
   },
   en: {
+    finance: financeTexts.en,
     nav: {
+      finance: financeNav.en,
       invoices: 'Invoices',
       obligations: 'Obligations',
       overview: 'Overview',
@@ -1773,7 +1779,9 @@ export const translations = {
     },
   },
   it: {
+    finance: financeTexts.it,
     nav: {
+      finance: financeNav.it,
       invoices: 'Fatture',
       obligations: 'Obblighi',
       overview: 'Panoramica',

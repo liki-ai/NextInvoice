@@ -24,9 +24,11 @@ const billingRouter = require('./routes/billing');
 const publicRouter = require('./routes/public');
 const mailRouter = require('./routes/mail');
 const teamRouter = require('./routes/team');
+const financeRouter = require('./routes/finance');
 const { handleStripeWebhook } = require('./routes/billing');
 const { initStore, flushStore, storeHealth } = require('./store');
 const { billingHealth } = require('./billing/stripe');
+const { startFinanceChecks } = require('./finance/service');
 
 const app = express();
 
@@ -65,6 +67,7 @@ app.use('/api/billing', billingRouter);
 app.use('/api/public', publicRouter);
 app.use('/api/mail', mailRouter);
 app.use('/api/team', teamRouter);
+app.use('/api/finance', financeRouter);
 app.use('/api', extractClientRouter);
 app.use('/api', extractCompanyRouter);
 
@@ -80,6 +83,8 @@ initStore()
     const server = app.listen(PORT, () => {
       console.log(`[nextinvoice-server] listening on http://0.0.0.0:${PORT}`);
     });
+    // Documents from the accountant arrive by email; each company's mailbox is checked now and then.
+    startFinanceChecks();
     // A deploy stops the old process with SIGTERM. Finish the writes in flight before going.
     let stopping = false;
     const stop = (signal) => {

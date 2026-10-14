@@ -7,7 +7,7 @@ const DB_PATH = path.join(DATA_DIR, 'db.json');
 // In Postgres each of these collections is stored as one document per user, so saving one
 // person's invoice rewrites that person's invoices and nothing else. Everything else in the
 // database object (the user list, password resets) is one document each.
-const PER_USER = ['profiles', 'invoices', 'obligations', 'clients', 'items', 'syncOps', 'migrations', 'mail', 'invites'];
+const PER_USER = ['profiles', 'invoices', 'obligations', 'clients', 'items', 'syncOps', 'migrations', 'mail', 'invites', 'finance'];
 
 function emptyDb() {
   return {
@@ -21,6 +21,7 @@ function emptyDb() {
     migrations: {},
     mail: {},
     invites: {},
+    finance: {},
     passwordResets: [],
   };
 }
@@ -69,6 +70,11 @@ async function initPersist() {
   `);
   console.log('[store] postgres persistence enabled');
   return { mode: 'postgres' };
+}
+
+/** The database connection, for what is kept outside the in-memory documents (files); null without Postgres. */
+function pgPool() {
+  return pool;
 }
 
 async function closePersist() {
@@ -201,6 +207,7 @@ module.exports = {
   serialize,
   saveSerialized,
   hasPostgres,
+  pgPool,
   DATA_DIR,
   DB_PATH,
 };

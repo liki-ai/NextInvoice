@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
+import { FileText, HeartPulse, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider, useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -8,7 +8,7 @@ import { LanguagePicker } from '../../components/LangSwitch'
 import { cn } from '../../lib/cn'
 import { displayCompanyValue } from '../../lib/companySamples'
 
-type NavItem = { to: string; icon: LucideIcon; key: string; active: (pathname: string, search: string) => boolean }
+type NavItem = { to: string; icon: LucideIcon; key: string; active: (pathname: string, search: string) => boolean; managerOnly?: boolean }
 
 const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
@@ -30,6 +30,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
         key: 'nav.overview',
         active: (pathname, search) => pathname.startsWith('/app/overview') || search.includes('from=overview'),
       },
+      { to: '/app/finance', icon: HeartPulse, key: 'nav.finance', active: (pathname) => pathname.startsWith('/app/finance'), managerOnly: true },
     ],
   },
   {
@@ -77,7 +78,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">{t(group.label)}</p>
             ) : null}
             <div className="space-y-1">
-              {group.items.map((item) => {
+              {group.items.filter((item) => !item.managerOnly || user?.role !== 'member').map((item) => {
                 const active = item.active(pathname, search)
                 return (
                   <Link

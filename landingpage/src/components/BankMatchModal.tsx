@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Check, Landmark } from 'lucide-react'
 import { useAppData } from '../context/AppDataContext'
 import { useI18n } from '../i18n'
@@ -20,7 +20,7 @@ function day(iso: string) {
  * leave out. Payments that belong to no invoice are listed too, which is where a double payment
  * or an invoice missing from the books shows up.
  */
-export function BankMatchModal({ onClose }: { onClose: () => void }) {
+export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; /** A statement already in hand (one that came by email), read as soon as the dialog opens. */ initialFile?: Blob }) {
   const { invoices, profile, reconcileInvoices } = useAppData()
   const { t } = useI18n()
   const [statement, setStatement] = useState<BankStatement | null>(null)
@@ -38,7 +38,7 @@ export function BankMatchModal({ onClose }: { onClose: () => void }) {
   const chosen = changes.filter((item) => !left.has(item.invoice.id))
   const money = (amount: number, verdict?: InvoiceVerdict) => formatMoney(amount, verdict?.invoice.currency || fallbackCurrency)
 
-  async function onFile(file: File | undefined) {
+  async function onFile(file: Blob | undefined) {
     if (!file) return
     setReading(true)
     setError('')
@@ -57,6 +57,12 @@ export function BankMatchModal({ onClose }: { onClose: () => void }) {
       setReading(false)
     }
   }
+
+  useEffect(() => {
+    if (initialFile) void onFile(initialFile)
+    // Only the file the dialog opened with; later ones come through the picker.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function apply() {
     if (chosen.length === 0) return

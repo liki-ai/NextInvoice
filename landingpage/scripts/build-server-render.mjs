@@ -8,18 +8,25 @@ import { fileURLToPath } from 'node:url'
 import { rolldown } from 'rolldown'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const targets = ['../server/src/generated/invoiceRender.js', '../faturimiapp/server/src/generated/invoiceRender.js'].map((item) => resolve(root, item))
 
-const bundle = await rolldown({ input: resolve(root, 'src/lib/serverRender.ts'), platform: 'node', logLevel: 'warn' })
-await bundle.write({
-  file: targets[0],
-  format: 'cjs',
-  banner: '// Generated from landingpage/src/lib/serverRender.ts by landingpage/scripts/build-server-render.mjs. Do not edit.',
-})
-await bundle.close()
+// The invoice page and texts, and the spreadsheet and bank-statement readers for the finance inbox.
+const entries = [
+  ['src/lib/serverRender.ts', 'invoiceRender.js'],
+  ['src/lib/serverFinance.ts', 'finance.js'],
+]
 
-for (const target of targets.slice(1)) {
-  mkdirSync(dirname(target), { recursive: true })
-  copyFileSync(targets[0], target)
+for (const [input, output] of entries) {
+  const targets = ['../server/src/generated/', '../faturimiapp/server/src/generated/'].map((dir) => resolve(root, dir, output))
+  const bundle = await rolldown({ input: resolve(root, input), platform: 'node', logLevel: 'warn' })
+  await bundle.write({
+    file: targets[0],
+    format: 'cjs',
+    banner: `// Generated from landingpage/${input} by landingpage/scripts/build-server-render.mjs. Do not edit.`,
+  })
+  await bundle.close()
+  for (const target of targets.slice(1)) {
+    mkdirSync(dirname(target), { recursive: true })
+    copyFileSync(targets[0], target)
+  }
+  console.log(`${output} → ${targets.length} copies`)
 }
-console.log(`server render → ${targets.length} copies`)

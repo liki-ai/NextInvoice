@@ -61,6 +61,7 @@ async function initStore() {
   if (!cache.migrations) cache.migrations = {};
   if (!cache.mail) cache.mail = {};
   if (!cache.invites) cache.invites = {};
+  if (!cache.finance) cache.finance = {};
   if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
   return cache;
 }
@@ -1096,6 +1097,27 @@ function saveMailSettings(userId, settings) {
   return db.mail[userId] || null;
 }
 
+/** The company's finance records: the documents its accountant and bank send, and how they are collected. */
+function getFinance(userId) {
+  const db = readDb();
+  return (db.finance && db.finance[userId]) || null;
+}
+
+/** Ids of the companies that have finance records, for the background mail check. */
+function financeOwners() {
+  const db = readDb();
+  return Object.keys(db.finance || {});
+}
+
+function saveFinance(userId, finance) {
+  const db = readDb();
+  if (!db.finance) db.finance = {};
+  if (finance) db.finance[userId] = { ...finance, updatedAt: nowIso() };
+  else delete db.finance[userId];
+  writeDb(db);
+  return db.finance[userId] || null;
+}
+
 const EMAIL_LOG_MAX = 20;
 
 /** Notes on the invoice that it went out by email, and marks it sent. */
@@ -1787,6 +1809,9 @@ module.exports = {
   personalMailKey,
   getMailSettings,
   saveMailSettings,
+  getFinance,
+  financeOwners,
+  saveFinance,
   recordInvoiceEmail,
   recordInvoiceReminder,
   reconcilePayments,

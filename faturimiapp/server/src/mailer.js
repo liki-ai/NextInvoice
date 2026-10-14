@@ -329,6 +329,7 @@ module.exports = {
   parseRecipients,
   pickSender,
   publicMailSettings,
+  resolveMailHost,
   sanitizeMailSettings,
   senderOptions,
   verifyConnection,
