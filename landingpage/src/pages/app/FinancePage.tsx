@@ -272,7 +272,7 @@ export function FinancePage() {
   const isThisYear = year === new Date().getFullYear()
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="min-w-0">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-medium tracking-tight">{t('finance.title')}</h1>

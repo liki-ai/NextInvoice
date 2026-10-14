@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { FolderKanban, HeartPulse, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n'
@@ -16,12 +16,11 @@ const TABS = [
 export function ReportsLayout() {
   const { user } = useAuth()
   const { t } = useI18n()
-  const { pathname } = useLocation()
   if (user?.role === 'member') return <Outlet />
   return (
     <>
-      {/* As wide as the page under it: the overview spans the screen, the other two are centred. */}
-      <nav aria-label={t('nav.overview')} className={cn('mb-6 overflow-x-auto', !pathname.startsWith('/app/overview') && 'mx-auto max-w-6xl')}>
+      {/* All three pages span the screen, so the tabs stay in the same place when switching. */}
+      <nav aria-label={t('nav.overview')} className="mb-6 overflow-x-auto">
         <div className="inline-flex gap-1 rounded-2xl border border-brand-ink/8 bg-white p-1">
           {TABS.map((tab) => (
             <NavLink
