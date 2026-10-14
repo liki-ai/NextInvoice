@@ -928,6 +928,7 @@ function reconcilePayload(verdicts) {
 /** What money leaving the bank went to, as the server sorts a statement's outgoing payments. */
 const SPEND_CATEGORIES = [
 	"payroll",
+	"pension",
 	"taxes",
 	"rent",
 	"suppliers",
@@ -1100,7 +1101,8 @@ function spendCategory(text) {
 	const words = plainText(text);
 	if (/pagese e komisionit|komisioni mujor|commission|provizion/.test(words)) return "fees";
 	if (/\bdividen(t|d)/.test(words)) return "dividends";
-	if (/administraten tatimore|administrata tatimore|\batk\b|fiscal no|kontribut\w* pensional|mfakp|\btrust\b/.test(words)) return "taxes";
+	if (/kontribut\w* pensional|mfakp|\btrust\b/.test(words)) return "pension";
+	if (/administraten tatimore|administrata tatimore|\batk\b|fiscal no/.test(words)) return "taxes";
 	if (/\bpag(a|at|en)\b|\brrog|salary|salaries|pune praktike/.test(words)) return "payroll";
 	if (/\bqira|\brent\b/.test(words)) return "rent";
 	if (/terheqje|bankomat|\batm\b|cash withdrawal/.test(words)) return "cash";
@@ -1119,6 +1121,8 @@ function excelDay(value) {
 	const dmy = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/.exec(text);
 	return dmy ? `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}` : "";
 }
+/** Raised whenever the sorting of outgoing payments changes, so statements read before are read again. */
+const STATEMENT_MONTHS_VERSION = 2;
 /**
 * Money in and out of the account month by month, and what went out for: pay, taxes and
 * contributions, rent, suppliers, card purchases, cash, bank fees. Null when the sheet has no
@@ -1179,6 +1183,7 @@ async function statementFromFile(bytes, name = "") {
 }
 //#endregion
 exports.SPEND_CATEGORIES = SPEND_CATEGORIES;
+exports.STATEMENT_MONTHS_VERSION = STATEMENT_MONTHS_VERSION;
 exports.matchStatement = matchStatement;
 exports.readAnyWorkbook = readAnyWorkbook;
 exports.readCsv = readCsv;
