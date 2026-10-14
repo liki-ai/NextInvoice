@@ -86,11 +86,25 @@ function progress(ownerId) {
 
 const readingFor = new Map();
 
-/** Queues a document to be read; `first` puts it ahead of the rest (one the user just uploaded). */
-function enqueue(ownerId, docId, first = false) {
+/**
+ * Queues a document to be read. The newest documents go first — this month's tax slips matter
+ * more than last year's — by the day the email brought them. `place` 'first' puts one ahead of
+ * everything (a file the user just uploaded, a reading asked for again); 'last' puts one behind
+ * everything (an old statement read again only because the reading improved).
+ */
+function enqueue(ownerId, docId, place = 'date') {
   if (queue.some((item) => item.ownerId === ownerId && item.docId === docId)) return;
-  if (first) queue.unshift({ ownerId, docId });
-  else queue.push({ ownerId, docId });
+  const doc = findDoc(load(ownerId), docId);
+  // One put first counts as newer than any date, so later arrivals do not overtake it.
+  const at = place === 'first' ? '\uffff' : String((doc && (doc.receivedAt || doc.addedAt)) || '');
+  const entry = { ownerId, docId, at, last: place === 'last' };
+  if (place === 'first') queue.unshift(entry);
+  else if (place === 'last') queue.push(entry);
+  else {
+    const before = queue.findIndex((item) => item.last || item.at < entry.at);
+    if (before === -1) queue.push(entry);
+    else queue.splice(before, 0, entry);
+  }
   pump();
 }
 
@@ -144,7 +158,7 @@ async function addFile(ownerId, { name, mime, data, source, email }) {
     finance.documents.push(doc);
     return doc;
   });
-  if (saved.id === doc.id) enqueue(ownerId, doc.id, source === 'upload');
+  if (saved.id === doc.id) enqueue(ownerId, doc.id, source === 'upload' ? 'first' : 'date');
   else await removeFile(ownerId, fileId);
   return { doc: saved, duplicate: saved.id !== doc.id };
 }
@@ -231,6 +245,7 @@ async function processDocument(ownerId, docId) {
       for (const key of ['from', 'to']) if (!/^\d{4}-\d{2}-\d{2}$/.test(figures.bank[key] || '')) figures.bank[key] = '';
     }
     const kind = KINDS.includes(result.kind) ? result.kind : 'other';
+    const sheetStatement = kind === 'bank_statement' && SHEET_NAME.test(doc.name);
     update({
       kind,
       period: cleanPeriod(result.period),
@@ -243,6 +258,9 @@ async function processDocument(ownerId, docId) {
       figures,
       // A document read again starts over; only a bank statement gets its pairing back below.
       statement: null,
+      // Which way of counting money in and out by month this reading used, so a restart does not
+      // read the statement again unless that way has changed (even when it found no months).
+      ...(sheetStatement ? { monthsVersion: statementMonthsVersion() } : {}),
       status: 'done',
       readAt: nowIso(),
       error: null,
@@ -284,6 +302,12 @@ function financeLib() {
   } catch {
     return null;
   }
+}
+
+const SHEET_NAME = /\.(xlsx|xls|csv)$/i;
+
+function statementMonthsVersion() {
+  return (financeLib() || {}).STATEMENT_MONTHS_VERSION || 1;
 }
 
 function verdictRow(verdict) {
@@ -448,11 +472,13 @@ function startFinanceChecks() {
   // Documents left half-read by a restart are read again.
   // Spreadsheet statements read before money in and out was counted month by month (or counted
   // under older categories) are read again.
-  const version = (financeLib() || {}).STATEMENT_MONTHS_VERSION || 1;
+  const version = statementMonthsVersion();
   for (const ownerId of financeOwners()) {
     for (const doc of load(ownerId).documents) {
-      const unsplit = doc.status === 'done' && doc.kind === 'bank_statement' && /\.(xlsx|xls|csv)$/i.test(doc.name) && !(doc.statement && doc.statement.months && doc.statement.monthsVersion >= version);
-      if (doc.status === 'pending' || unsplit) enqueue(ownerId, doc.id);
+      const counted = doc.monthsVersion >= version || Boolean(doc.statement && doc.statement.months && doc.statement.monthsVersion >= version);
+      const unsplit = doc.status === 'done' && doc.kind === 'bank_statement' && SHEET_NAME.test(doc.name) && !counted;
+      if (doc.status === 'pending') enqueue(ownerId, doc.id);
+      else if (unsplit) enqueue(ownerId, doc.id, 'last');
     }
   }
   nextRoundAt = Date.now() + 60 * 1000;
@@ -578,7 +604,7 @@ function retryDocument(ownerId, docId) {
     if (current) Object.assign(current, { status: 'pending', error: null });
     return current;
   });
-  if (doc) enqueue(ownerId, docId, true);
+  if (doc) enqueue(ownerId, docId, 'first');
   return doc;
 }
 

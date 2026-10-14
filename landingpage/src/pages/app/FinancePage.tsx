@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, CalendarClock, Download, FileText, Inbox, Landmark, Mail, RefreshCw, RotateCcw, Settings2, Trash2, Undo2, Upload } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Download, FileText, Inbox, Landmark, Loader2, Mail, RefreshCw, RotateCcw, Settings2, Trash2, Undo2, Upload } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -161,6 +161,7 @@ export function FinancePage() {
 
   const docs = useMemo(() => view?.documents || [], [view])
   const summary = useMemo(() => buildFinanceSummary(docs, invoices, year, currency), [docs, invoices, year, currency])
+  const readingCount = Math.max(view?.progress.reading || 0, summary.missing?.reading || 0)
   const current = useMemo(() => currentDocuments(docs), [docs])
   const months = useMemo(() => monthlyFigures(current, invoices, year, currency), [current, invoices, year, currency])
   const annual = useMemo(() => annualStatements(docs), [docs])
@@ -481,7 +482,15 @@ export function FinancePage() {
               </ul>
             </Card>
           ) : null}
-          {summary.missing && summary.missing.kinds.length > 0 ? (
+          {summary.missing && summary.missing.kinds.length > 0 && readingCount > 0 ? (
+            // Documents still being read may be the ones lacking: nothing is called missing yet.
+            <Card className="border border-brand-ink/8 px-4 py-3 lg:col-span-2">
+              <p className="flex items-center gap-2 text-sm text-brand-ink/65">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+                {t('finance.missingWait', { count: readingCount, period: periodText(summary.missing.period, lang) })}
+              </p>
+            </Card>
+          ) : summary.missing && summary.missing.kinds.length > 0 ? (
             <Card className="border border-[#C9A227]/50 bg-[#FFF9E8] px-4 py-3 lg:col-span-2">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <p className="flex items-center gap-2 text-sm font-semibold">
@@ -496,7 +505,7 @@ export function FinancePage() {
                   ))}
                 </ul>
               </div>
-              <p className="mt-1.5 text-xs text-brand-ink/55">{view && view.progress.reading > 0 ? t('finance.missingReading', { count: view.progress.reading }) : t('finance.missingHint')}</p>
+              <p className="mt-1.5 text-xs text-brand-ink/55">{t('finance.missingHint')}</p>
             </Card>
           ) : null}
         </div>

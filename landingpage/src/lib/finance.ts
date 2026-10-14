@@ -375,7 +375,8 @@ export type FinanceSummary = {
   annual: { year: string; revenue: N; netProfit: N; profitBeforeTax: N; margin: N; docId: string } | null
   estimate: { result: number; revenue: number; costs: number; months: number; from: string; to: string } | null
   burn: N
-  missing: { period: string; kinds: FinanceKind[] } | null
+  /** `reading`: documents not read yet, any of which may be one of the kinds still lacking. */
+  missing: { period: string; kinds: FinanceKind[]; reading: number } | null
   upcoming: FinanceDoc[]
   signals: HealthSignal[]
 }
@@ -594,7 +595,8 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
   const dueYear = Number(due.slice(0, 4))
   const dueMonth = monthlyFigures(docs, invoices, dueYear, currency).find((month) => month.period === due)
   const lacking = usual.filter((kind) => !dueMonth?.kinds.has(kind))
-  const missing = usual.length ? { period: due, kinds: lacking } : null
+  const reading = docs.filter((doc) => doc.status === 'pending').length
+  const missing = usual.length ? { period: due, kinds: lacking, reading } : null
 
   const upcoming = docs
     .filter((doc) => doc.dueDate && doc.dueDate >= isoDay(now) && has(doc.amountDue))
@@ -614,7 +616,8 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
   } else signals.push({ key: 'liquidity', status: 'unknown', params: {} })
   signals.push({
     key: 'documents',
-    status: !missing ? 'unknown' : missing.kinds.length === 0 ? 'good' : missing.kinds.length <= 1 ? 'warn' : 'bad',
+    // Something lacking while documents are still being read is not known to be missing yet.
+    status: !missing ? 'unknown' : missing.kinds.length === 0 ? 'good' : missing.reading > 0 ? 'unknown' : missing.kinds.length <= 1 ? 'warn' : 'bad',
     params: { count: missing?.kinds.length ?? 0 },
   })
   const margin = annual?.margin
