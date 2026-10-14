@@ -974,10 +974,6 @@ export function InvoiceFormPage() {
                     setError(t('clients.validationName'))
                     return
                   }
-                  if (!payload.phone) {
-                    setError(t('clients.validationPhone'))
-                    return
-                  }
                   const saved = await createClient(payload as Parameters<typeof createClient>[0])
                   applyClient(saved)
                   setAddOpen(false)
@@ -992,7 +988,7 @@ export function InvoiceFormPage() {
             <Field label={t('newInvoice.fullName')} value={addForm.fullName} placeholder={t('newInvoice.phFullName')} onChange={(e) => setAddForm((c) => ({ ...c, fullName: e.target.value }))} />
             <Field label={t('newInvoice.address')} value={addForm.address} placeholder={t('newInvoice.phAddress')} onChange={(e) => setAddForm((c) => ({ ...c, address: e.target.value }))} />
             <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={addForm.businessId} inputMode="numeric" onChange={(e) => setAddForm((c) => ({ ...c, businessId: e.target.value }))} />
-            <Field label={t('newInvoice.phone')} value={addForm.phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setAddForm((c) => ({ ...c, phone: e.target.value }))} />
+            <Field label={`${t('newInvoice.phone')} (${t('common.optional')})`} value={addForm.phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setAddForm((c) => ({ ...c, phone: e.target.value }))} />
             <Field label={`${t('docs.email')} (${t('common.optional')})`} value={addForm.email} onChange={(e) => setAddForm((c) => ({ ...c, email: e.target.value }))} />
           </div>
         </Modal>

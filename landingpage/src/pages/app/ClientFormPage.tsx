@@ -22,8 +22,9 @@ export function ClientFormPage() {
   const [email, setEmail] = useState(existing?.email || '')
   const [address, setAddress] = useState(existing?.address || '')
   const [businessId, setBusinessId] = useState(existing?.businessId || '')
-  const [vatNumber, setVatNumber] = useState(existing?.vatNumber || '')
-  const [fiscalNumber, setFiscalNumber] = useState(existing?.fiscalNumber || '')
+  // No longer asked for on the form; a value saved earlier is kept as it is.
+  const [vatNumber] = useState(existing?.vatNumber || '')
+  const [fiscalNumber] = useState(existing?.fiscalNumber || '')
   const [language, setLanguage] = useState(existing?.language || '')
   const companyRate = normalizeTaxRate(profile?.defaultTaxRate)
   // 'company' follows the default in Settings, 'none' is an export customer, 'custom' a rate of its own.
@@ -62,11 +63,6 @@ export function ClientFormPage() {
       setError(t('clients.validationName'))
       return
     }
-    // Clients brought in from a spreadsheet often have no phone; editing them must not demand one.
-    if (!payload.phone && !(existing && !existing.phone)) {
-      setError(t('clients.validationPhone'))
-      return
-    }
     setSaving(true)
     setError('')
     try {
@@ -102,9 +98,7 @@ export function ClientFormPage() {
           <div className="sm:col-span-2">
             <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={businessId} inputMode="numeric" onChange={(e) => setBusinessId(e.target.value)} />
           </div>
-          <Field label={`${t('clients.fiscalNumber')} (${t('common.optional')})`} value={fiscalNumber} onChange={(e) => setFiscalNumber(e.target.value)} />
-          <Field label={`${t('clients.vatNumber')} (${t('common.optional')})`} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
-          <Field label={t('newInvoice.phone')} value={phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setPhone(e.target.value)} />
+          <Field label={`${t('newInvoice.phone')} (${t('common.optional')})`} value={phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setPhone(e.target.value)} />
           <Field label={`${t('docs.email')} (${t('common.optional')})`} value={email} onChange={(e) => setEmail(e.target.value)} />
           <Select label={t('recurring.clientLanguage')} value={language} onChange={(e) => setLanguage(e.target.value as typeof language)}>
             <option value="">{t('recurring.clientLanguageDefault')}</option>
