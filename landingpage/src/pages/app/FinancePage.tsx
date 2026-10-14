@@ -8,7 +8,7 @@ import { Button, Card, Field, Modal, Select } from '../../components/ui'
 import { BankMatchModal } from '../../components/BankMatchModal'
 import { api, apiBase, getToken } from '../../lib/api'
 import { cn } from '../../lib/cn'
-import { formatMoney } from '../../lib/invoice'
+import { currencySymbol, formatMoney } from '../../lib/invoice'
 import {
   FINANCE_KINDS,
   annualStatements,
@@ -16,8 +16,10 @@ import {
   currentDocuments,
   financeYears,
   headlineAmount,
+  monthResult,
   monthlyFigures,
   operatingOut,
+  payrollFullCost,
   type FinanceDoc,
   type FinanceKind,
   type FinanceView,
@@ -88,17 +90,35 @@ const DOT: Record<HealthStatus, string> = {
   unknown: 'bg-brand-ink/20',
 }
 
-function Tile({ label, value, lines, tone }: { label: string; value: ReactNode; lines?: string[]; tone?: 'brand' | 'plain' }) {
+/** The six monthly documents the table marks as received, in the order of the dots. */
+const DOC_KINDS: FinanceKind[] = ['vat_return', 'payroll_tax', 'payroll', 'sales_book', 'purchase_book', 'bank_statement']
+
+const WITH_CENTS = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const WHOLE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+
+/** A figure: the headline numbers above, then the details under it. `trend` is the change in percent. */
+function Tile({ label, value, lines, primary, trend }: { label: string; value: ReactNode; lines?: string[]; primary?: boolean; trend?: number | null }) {
   const shown = (lines || []).filter(Boolean)
   return (
-    <div className={cn('h-full rounded-2xl border p-4 sm:p-5', tone === 'brand' ? 'border-brand/15 bg-brand/5' : 'border-brand-ink/8 bg-white')}>
-      <p className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', tone === 'brand' ? 'text-brand/80' : 'text-brand-ink/45')}>{label}</p>
-      <p className="mt-2 font-display text-xl font-medium tabular-nums sm:text-2xl">{value}</p>
-      {shown.map((line) => (
-        <p key={line} className="mt-1.5 text-[13px] leading-5 text-brand-ink/65">
-          {line}
-        </p>
-      ))}
+    <div className={cn('flex h-full flex-col rounded-2xl border bg-white p-4 sm:p-5', primary ? 'border-brand/20 shadow-[0_1px_2px_rgba(29,43,46,0.05)]' : 'border-brand-ink/8')}>
+      <p className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', primary ? 'text-brand' : 'text-brand-ink/45')}>{label}</p>
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <p className={cn('font-display font-medium leading-none tabular-nums', primary ? 'text-2xl sm:text-[28px]' : 'text-xl sm:text-2xl')}>{value}</p>
+        {typeof trend === 'number' ? (
+          <span className={cn('rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums', trend >= 0 ? 'bg-[#2E8B57]/10 text-[#2E8B57]' : 'bg-[#C0503A]/10 text-[#C0503A]')}>
+            {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
+          </span>
+        ) : null}
+      </div>
+      {shown.length ? (
+        <div className="mt-3 space-y-1 border-t border-brand-ink/6 pt-2.5">
+          {shown.map((line) => (
+            <p key={line} className="text-[13px] leading-5 text-brand-ink/60">
+              {line}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -217,7 +237,13 @@ export function FinancePage() {
     )
   }
 
-  const money = (amount: number | null | undefined) => (typeof amount === 'number' ? formatMoney(amount, currency) : '—')
+  const symbol = currencySymbol(currency)
+  const money = (amount: number | null | undefined) => (typeof amount === 'number' ? `${WITH_CENTS.format(amount)} ${symbol}` : '—')
+  /** A table cell: whole units, the currency is named above the table. */
+  const cell = (amount: number | null | undefined) => (typeof amount === 'number' && Math.abs(amount) >= 0.5 ? WHOLE.format(amount) : <span className="text-brand-ink/20">—</span>)
+  const total = (values: number[]) => values.reduce((sum, value) => sum + value, 0)
+  const otherTaxes = summary.taxesByKind.payroll + summary.taxesByKind.rent + summary.taxesByKind.profit + summary.taxesByKind.other
+  const thisMonth = new Date().toISOString().slice(0, 7)
   const change = summary.revenueLastYear > 0 ? Math.round(((summary.revenue - summary.revenueLastYear) / summary.revenueLastYear) * 100) : null
   const shown = docs.filter((doc) => {
     if (filter === 'all') return true
@@ -324,47 +350,57 @@ export function FinancePage() {
 
       {/* The few things an owner needs to know, first. */}
       <section className="mt-6" aria-labelledby="finance-signals">
-        <SectionTitle>
-          <span id="finance-signals">{t('finance.signalsTitle')}</span>
-        </SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {summary.signals.map((signal) => (
-            <div key={signal.key} className="rounded-2xl border border-brand-ink/8 bg-white p-4">
+        <h2 id="finance-signals" className="sr-only">
+          {t('finance.signalsTitle')}
+        </h2>
+        <div className="grid overflow-hidden rounded-2xl border border-brand-ink/8 bg-white sm:grid-cols-2 lg:grid-cols-4">
+          {summary.signals.map((signal, index) => (
+            <div
+              key={signal.key}
+              className={cn(
+                'border-brand-ink/8 p-4 sm:p-5',
+                index > 0 && 'border-t sm:border-t-0',
+                index % 2 === 1 && 'sm:border-l',
+                index >= 2 && 'sm:border-t lg:border-t-0',
+                index === 2 && 'lg:border-l',
+              )}
+            >
               <div className="flex items-center gap-2">
-                <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', DOT[signal.status])} />
-                <p className="text-sm font-semibold">{t(`finance.signal.${signal.key}.title`)}</p>
+                <span className={cn('h-2 w-2 shrink-0 rounded-full', DOT[signal.status])} />
+                <p className="text-[13px] font-semibold">{t(`finance.signal.${signal.key}.title`)}</p>
               </div>
-              <p className="mt-1.5 text-xs leading-5 text-brand-ink/60">{t(`finance.signal.${signal.key}.${signal.status}`, signal.params)}</p>
+              <p className="mt-1.5 text-[13px] leading-5 text-brand-ink/60">{t(`finance.signal.${signal.key}.${signal.status}`, signal.params)}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="mt-6" aria-labelledby="finance-figures">
+      <section className="mt-8" aria-labelledby="finance-figures">
         <SectionTitle>
           <span id="finance-figures">{t('finance.figuresTitle', { year })}</span>
         </SectionTitle>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile
-            tone="brand"
+            primary
             label={t(isThisYear ? 'finance.revenueYtd' : 'finance.revenueYear', { year })}
             value={money(summary.revenue)}
-            lines={[change === null ? '' : `${change >= 0 ? '+' : ''}${change}% ${t('finance.vsLastYear')}`, t('finance.collectedHint', { amount: money(summary.collected) })]}
+            trend={change}
+            lines={[t('finance.collectedHint', { amount: money(summary.collected) })]}
           />
           <Tile
-            tone="brand"
+            primary
             label={t('finance.receivables')}
             value={money(summary.receivables)}
             lines={[summary.overdue > 0 ? t('finance.overdueHint', { amount: money(summary.overdue) }) : t('finance.noOverdue')]}
           />
           <Tile
-            tone="brand"
+            primary
             label={t('finance.cash')}
             value={summary.cash ? money(summary.cash.amount) : '—'}
             lines={[summary.cash ? t('finance.cashHint', { date: shortDate(summary.cash.date) }) : t('finance.cashMissing')]}
           />
           <Tile
-            tone="brand"
+            primary
             label={t(isThisYear ? 'finance.profitYtd' : 'finance.profitYear', { year })}
             value={summary.estimate ? <span className={summary.estimate.result < 0 ? 'text-[#C0503A]' : undefined}>{money(summary.estimate.result)}</span> : '—'}
             lines={[
@@ -381,11 +417,11 @@ export function FinancePage() {
                     [t('finance.payrollLast', { period: periodText(summary.payroll.period, lang), amount: money(summary.payroll.cost ?? summary.payroll.net) }), summary.payroll.employees ? t('finance.employees', { count: summary.payroll.employees }) : ''].filter(Boolean).join(' · '),
                     summary.payroll.taxes !== null && summary.payroll.net !== null
                       ? t('finance.payrollBreakdown', { net: money(summary.payroll.net), taxes: money(summary.payroll.taxes) })
-                      : summary.payroll.cost !== null && summary.payroll.net !== null
+                      : summary.payroll.cost !== null && summary.payroll.net !== null && summary.payroll.cost !== summary.payroll.net
                         ? t('finance.netHint', { amount: money(summary.payroll.net) })
                         : summary.payroll.fromBank
                           ? t('finance.payrollFromBank')
-                          : t('finance.onlyNet'),
+                          : '',
                   ]
                 : [t('finance.noPayroll')]
             }
@@ -397,9 +433,9 @@ export function FinancePage() {
           />
           <Tile
             label={t('finance.otherTaxTile', { year })}
-            value={money(summary.taxesByKind.payroll + summary.taxesByKind.rent + summary.taxesByKind.profit + summary.taxesByKind.other)}
+            value={money(otherTaxes)}
             lines={
-              summary.taxesByKind.payroll + summary.taxesByKind.rent + summary.taxesByKind.profit + summary.taxesByKind.other > 0
+              otherTaxes > 0
                 ? [
                     summary.taxesByKind.payroll ? `${t('finance.short.payroll')} ${money(summary.taxesByKind.payroll)}` : '',
                     [
@@ -427,38 +463,6 @@ export function FinancePage() {
           />
         </div>
       </section>
-
-      {summary.spending ? (
-        <section className="mt-6" aria-labelledby="finance-spending">
-          <SectionTitle>
-            <span id="finance-spending">{t('finance.spendTitle', { year })}</span>
-          </SectionTitle>
-          <Card className="p-5">
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <p className="font-display text-2xl font-medium tabular-nums">{money(summary.spending.total)}</p>
-              {summary.spending.months > 0 ? <p className="text-sm text-brand-ink/60">{t('finance.spendAverage', { amount: money(summary.spending.average), count: summary.spending.months })}</p> : null}
-              {summary.spending.dividends > 0 ? <p className="text-sm text-brand-ink/60">{t('finance.spendDividends', { amount: money(summary.spending.dividends) })}</p> : null}
-            </div>
-            <ul className="mt-4 space-y-2.5">
-              {summary.spending.byCategory.map((item) => {
-                const share = summary.spending!.total > 0 ? item.amount / summary.spending!.total : 0
-                return (
-                  <li key={item.category} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-3 text-sm sm:grid-cols-[12rem_1fr_9rem]">
-                    <span className="truncate">{t(`finance.spend.${item.category}`)}</span>
-                    <span className="h-2 overflow-hidden rounded-full bg-brand-ink/[0.06]">
-                      <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.max(1, Math.round(share * 100))}%` }} />
-                    </span>
-                    <span className="text-right font-semibold tabular-nums">
-                      {money(item.amount)} <span className="font-normal text-brand-ink/45">{Math.round(share * 100)}%</span>
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-            <p className="mt-4 text-[11px] text-brand-ink/45">{t('finance.spendNote')}</p>
-          </Card>
-        </section>
-      ) : null}
 
       {summary.upcoming.length > 0 || (summary.missing && summary.missing.kinds.length > 0) ? (
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
@@ -511,60 +515,87 @@ export function FinancePage() {
         </div>
       ) : null}
 
-      {/* Month by month: what was invoiced here, and what the accountant's documents say. */}
-      <section className="mt-8">
-        <SectionTitle>{t('finance.monthlyTitle', { year })}</SectionTitle>
+      {/* Month by month: invoices here, the bank, the accountant's books, and what each month earned. */}
+      <section className="mt-8" aria-labelledby="finance-monthly">
+        <SectionTitle action={<span className="text-[11px] text-brand-ink/40">{t('finance.amountsIn', { currency })}</span>}>
+          <span id="finance-monthly">{t('finance.monthlyTitle', { year })}</span>
+        </SectionTitle>
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-right text-sm tabular-nums">
-              <thead>
-                <tr className="border-b border-brand-ink/8 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-brand-ink/45">
-                  <th className="px-4 py-3 text-left">{t('finance.col.month')}</th>
-                  <th className="px-3 py-3">{t('finance.col.invoiced')}</th>
-                  <th className="px-3 py-3">{t('finance.col.collected')}</th>
-                  <th className="px-3 py-3">{t('finance.col.bankIn')}</th>
-                  <th className="px-3 py-3">{t('finance.col.bankOut')}</th>
-                  <th className="px-3 py-3">{t('finance.col.sales')}</th>
-                  <th className="px-3 py-3">{t('finance.col.purchases')}</th>
-                  <th className="px-3 py-3">{t('finance.col.payroll')}</th>
-                  <th className="px-3 py-3">{t('finance.col.vat')}</th>
-                  <th className="px-3 py-3">{t('finance.col.payrollTax')}</th>
-                  <th className="px-3 py-3">{t('finance.col.otherTax')}</th>
-                  <th className="px-4 py-3 text-left">{t('finance.col.documents')}</th>
+            <table className="w-full min-w-[940px] border-collapse text-right text-[13px] tabular-nums">
+              <thead className="text-[10px] font-semibold uppercase tracking-[0.07em] text-brand-ink/40">
+                <tr>
+                  <th rowSpan={2} className="px-4 pb-2 pt-3 text-left align-bottom">
+                    {t('finance.col.month')}
+                  </th>
+                  <th colSpan={2} className="border-l border-brand-ink/6 px-3 pt-3 text-center text-brand/70">
+                    {t('finance.group.app')}
+                  </th>
+                  <th colSpan={2} className="border-l border-brand-ink/6 px-3 pt-3 text-center text-brand/70">
+                    {t('finance.group.bank')}
+                  </th>
+                  <th colSpan={5} className="border-l border-brand-ink/6 px-3 pt-3 text-center text-brand/70">
+                    {t('finance.group.books')}
+                  </th>
+                  <th rowSpan={2} className="border-l border-brand-ink/6 bg-brand/[0.04] px-3 pb-2 pt-3 align-bottom text-brand-ink/60">
+                    {t('finance.col.profit')}
+                  </th>
+                  <th rowSpan={2} className="px-4 pb-2 pt-3 text-center align-bottom">
+                    {t('finance.col.docsShort')}
+                  </th>
+                </tr>
+                <tr className="border-b border-brand-ink/8">
+                  <th className="border-l border-brand-ink/6 px-3 pb-2 pt-1.5">{t('finance.col.invoiced')}</th>
+                  <th className="px-3 pb-2 pt-1.5">{t('finance.col.collected')}</th>
+                  <th className="border-l border-brand-ink/6 px-3 pb-2 pt-1.5">{t('finance.col.in')}</th>
+                  <th className="px-3 pb-2 pt-1.5">{t('finance.col.out')}</th>
+                  <th className="border-l border-brand-ink/6 px-3 pb-2 pt-1.5">{t('finance.col.sales')}</th>
+                  <th className="px-3 pb-2 pt-1.5">{t('finance.col.purchases')}</th>
+                  <th className="px-3 pb-2 pt-1.5">{t('finance.col.payroll')}</th>
+                  <th className="px-3 pb-2 pt-1.5">{t('finance.col.vat')}</th>
+                  <th className="px-3 pb-2 pt-1.5">{t('finance.col.taxes')}</th>
                 </tr>
               </thead>
               <tbody>
                 {months.map((month) => {
-                  const other = [month.rentTax, month.profitTax, month.otherTax].some((value) => value !== null)
-                    ? (month.rentTax ?? 0) + (month.profitTax ?? 0) + (month.otherTax ?? 0)
-                    : null
+                  const open = month.period >= thisMonth
                   const empty = month.invoiced === 0 && month.collected === 0 && month.kinds.size === 0
+                  const result = open ? null : monthResult(month)
+                  const taxes = [month.payrollTax, month.rentTax, month.profitTax, month.otherTax].some((value) => value !== null)
+                    ? (month.payrollTax ?? 0) + (month.rentTax ?? 0) + (month.profitTax ?? 0) + (month.otherTax ?? 0)
+                    : null
                   return (
-                    <tr key={month.period} className={cn('border-b border-brand-ink/5 last:border-0', empty && 'text-brand-ink/30')}>
+                    <tr key={month.period} className={cn('border-b border-brand-ink/5 transition-colors last:border-0 hover:bg-brand-bg/60', empty && 'text-brand-ink/25')}>
                       <td className="px-4 py-2.5 text-left font-semibold capitalize">{monthName(month.period, lang)}</td>
-                      <td className="px-3 py-2.5">{month.invoiced ? money(month.invoiced) : '—'}</td>
-                      <td className="px-3 py-2.5">{month.collected ? money(month.collected) : '—'}</td>
-                      <td className="px-3 py-2.5">{month.bank ? money(month.bank.in) : '—'}</td>
-                      <td className="px-3 py-2.5">{month.bank ? money(operatingOut(month.bank)) : '—'}</td>
-                      <td className="px-3 py-2.5">{money(month.salesNet)}</td>
-                      <td className="px-3 py-2.5">{money(month.purchasesNet)}</td>
-                      <td className="px-3 py-2.5">{money(month.payrollCost ?? month.payrollNet ?? (month.bank?.spend.payroll || null))}</td>
-                      <td className="px-3 py-2.5">{money(month.vat)}</td>
-                      <td className="px-3 py-2.5">{money(month.payrollTax)}</td>
-                      <td className="px-3 py-2.5">{money(other)}</td>
-                      <td className="px-4 py-2.5 text-left">
-                        <span className="flex flex-wrap gap-1">
-                          {(['vat_return', 'payroll_tax', 'payroll', 'sales_book', 'purchase_book', 'bank_statement'] as FinanceKind[]).map((kind) => (
+                      <td className="border-l border-brand-ink/6 px-3 py-2.5">{cell(month.invoiced || null)}</td>
+                      <td className="px-3 py-2.5">{cell(month.collected || null)}</td>
+                      <td className="border-l border-brand-ink/6 px-3 py-2.5">{cell(month.bank ? month.bank.in : null)}</td>
+                      <td className="px-3 py-2.5">{cell(month.bank ? operatingOut(month.bank) : null)}</td>
+                      <td className="border-l border-brand-ink/6 px-3 py-2.5">{cell(month.salesNet)}</td>
+                      <td className="px-3 py-2.5">{cell(month.purchasesNet)}</td>
+                      <td className="px-3 py-2.5">{cell(payrollFullCost(month).cost)}</td>
+                      <td className="px-3 py-2.5">{cell(month.vat)}</td>
+                      <td className="px-3 py-2.5">{cell(taxes)}</td>
+                      <td
+                        className={cn('border-l border-brand-ink/6 bg-brand/[0.04] px-3 py-2.5 font-semibold', result && result.value < 0 && 'text-[#C0503A]')}
+                        title={
+                          open
+                            ? t('finance.monthOpen')
+                            : result
+                              ? `${t('finance.profitTitle', { revenue: money(result.revenue), costs: money(result.costs) })} · ${t(result.books ? 'finance.profitBooks' : 'finance.profitMixed')}`
+                              : undefined
+                        }
+                      >
+                        {open && !empty ? <span className="font-normal text-brand-ink/30">…</span> : cell(result ? result.value : null)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="flex justify-center gap-1">
+                          {DOC_KINDS.map((kind) => (
                             <span
                               key={kind}
-                              title={t(`finance.kinds.${kind}`)}
-                              className={cn(
-                                'rounded-md px-1.5 py-0.5 text-[10px] font-bold',
-                                month.kinds.has(kind) ? 'bg-brand/10 text-brand' : 'bg-brand-ink/[0.04] text-brand-ink/25',
-                              )}
-                            >
-                              {t(`finance.badge.${kind}`)}
-                            </span>
+                              title={`${t(`finance.kinds.${kind}`)}${month.kinds.has(kind) ? '' : ` — ${t('finance.notReceived')}`}`}
+                              className={cn('h-2 w-2 rounded-full', month.kinds.has(kind) ? 'bg-brand' : 'bg-brand-ink/10')}
+                            />
                           ))}
                         </span>
                       </td>
@@ -573,32 +604,86 @@ export function FinancePage() {
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t border-brand-ink/10 font-semibold">
+                <tr className="border-t border-brand-ink/12 bg-brand-bg/50 font-semibold">
                   <td className="px-4 py-3 text-left">{t('finance.col.total')}</td>
-                  {(['invoiced', 'collected'] as const).map((key) => (
-                    <td key={key} className="px-3 py-3">
-                      {money(months.reduce((total, month) => total + month[key], 0))}
-                    </td>
-                  ))}
-                  <td className="px-3 py-3">{money(months.reduce((total, month) => total + (month.bank?.in ?? 0), 0))}</td>
-                  <td className="px-3 py-3">{money(months.reduce((total, month) => total + (month.bank ? operatingOut(month.bank) : 0), 0))}</td>
-                  {(['salesNet', 'purchasesNet'] as const).map((key) => (
-                    <td key={key} className="px-3 py-3">
-                      {money(months.reduce((total, month) => total + (month[key] ?? 0), 0))}
-                    </td>
-                  ))}
-                  <td className="px-3 py-3">{money(months.reduce((total, month) => total + (month.payrollCost ?? month.payrollNet ?? month.bank?.spend.payroll ?? 0), 0))}</td>
-                  <td className="px-3 py-3">{money(summary.taxesByKind.vat)}</td>
-                  <td className="px-3 py-3">{money(summary.taxesByKind.payroll)}</td>
-                  <td className="px-3 py-3">{money(summary.taxesByKind.rent + summary.taxesByKind.profit + summary.taxesByKind.other)}</td>
+                  <td className="border-l border-brand-ink/6 px-3 py-3">{cell(total(months.map((month) => month.invoiced)))}</td>
+                  <td className="px-3 py-3">{cell(total(months.map((month) => month.collected)))}</td>
+                  <td className="border-l border-brand-ink/6 px-3 py-3">{cell(total(months.map((month) => month.bank?.in ?? 0)))}</td>
+                  <td className="px-3 py-3">{cell(total(months.map((month) => (month.bank ? operatingOut(month.bank) : 0))))}</td>
+                  <td className="border-l border-brand-ink/6 px-3 py-3">{cell(total(months.map((month) => month.salesNet ?? 0)))}</td>
+                  <td className="px-3 py-3">{cell(total(months.map((month) => month.purchasesNet ?? 0)))}</td>
+                  <td className="px-3 py-3">{cell(summary.payrollYear?.total ?? null)}</td>
+                  <td className="px-3 py-3">{cell(summary.taxesByKind.vat || null)}</td>
+                  <td className="px-3 py-3">{cell(otherTaxes || null)}</td>
+                  <td className={cn('border-l border-brand-ink/6 bg-brand/[0.06] px-3 py-3', summary.estimate && summary.estimate.result < 0 && 'text-[#C0503A]')}>{cell(summary.estimate?.result ?? null)}</td>
                   <td />
                 </tr>
               </tfoot>
             </table>
           </div>
         </Card>
-        <p className="mt-2 text-[11px] text-brand-ink/45">{t('finance.monthlyNote')}</p>
+        <div className="mt-2.5 flex flex-wrap items-start justify-between gap-x-6 gap-y-2 text-[11px] leading-4 text-brand-ink/45">
+          <p className="max-w-2xl">{t('finance.monthlyNote')}</p>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {DOC_KINDS.map((kind) => (
+              <span key={kind} className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+                {t(`finance.badge.${kind}`)}
+              </span>
+            ))}
+          </p>
+        </div>
       </section>
+
+      {summary.spending ? (
+        <section className="mt-8" aria-labelledby="finance-spending">
+          <SectionTitle>
+            <span id="finance-spending">{t('finance.spendTitle', { year })}</span>
+          </SectionTitle>
+          <Card className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[15rem_1fr] lg:gap-10">
+            <div className="space-y-5">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('finance.spendTotal')}</p>
+                <p className="mt-2 font-display text-[28px] font-medium leading-none tabular-nums">{money(summary.spending.total)}</p>
+              </div>
+              {summary.spending.months > 0 ? (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('finance.spendMonthly')}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums">{money(summary.spending.average)}</p>
+                  <p className="text-xs text-brand-ink/50">{t('finance.spendMonths', { count: summary.spending.months })}</p>
+                </div>
+              ) : null}
+              {summary.spending.dividends > 0 ? (
+                <div className="rounded-xl bg-brand-bg px-3.5 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('finance.spend.dividends')}</p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">{money(summary.spending.dividends)}</p>
+                  <p className="mt-0.5 text-[11px] leading-4 text-brand-ink/50">{t('finance.dividendsApart')}</p>
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <ul className="space-y-3.5">
+                {summary.spending.byCategory.map((item) => {
+                  const share = summary.spending!.total > 0 ? item.amount / summary.spending!.total : 0
+                  return (
+                    <li key={item.category} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 sm:grid-cols-[11rem_1fr_9rem]">
+                      <span className="truncate text-[13px] font-medium">{t(`finance.spend.${item.category}`)}</span>
+                      <span className="order-3 col-span-2 h-1.5 overflow-hidden rounded-full bg-brand-ink/[0.06] sm:order-none sm:col-span-1">
+                        <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.max(1, Math.round(share * 100))}%` }} />
+                      </span>
+                      <span className="text-right text-[13px] font-semibold tabular-nums">
+                        {money(item.amount)}
+                        <span className="ml-2 inline-block w-8 text-right font-normal text-brand-ink/40">{Math.round(share * 100)}%</span>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+              <p className="mt-5 text-[11px] leading-4 text-brand-ink/45">{t('finance.spendNote')}</p>
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       {annual.length > 0 ? (
         <section className="mt-8">

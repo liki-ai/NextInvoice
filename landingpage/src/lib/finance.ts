@@ -252,7 +252,9 @@ export function bankMonths(docs: FinanceDoc[]) {
     if (doc.kind !== 'bank_statement' || !statement?.months) continue
     for (const [period, month] of Object.entries(statement.months)) {
       const full = Boolean(statement.from && statement.to && statement.from <= `${period}-01` && statement.to >= monthEndDay(period))
-      const key = `${statement.iban || doc.figures?.bank?.iban || ''}|${period}`
+      // The account: from the sheet, the model's reading, or the file name ("XK05… 09-2026.csv").
+      const iban = (statement.iban || doc.figures?.bank?.iban || /XK\d{18}/i.exec(doc.name.replace(/\s+/g, ''))?.[0] || '').toUpperCase().replace(/\s+/g, '')
+      const key = `${iban}|${period}`
       const seen = best.get(key)
       const newer = !seen || String(statement.to) > String(seen.doc.statement?.to) || (String(statement.to) === String(seen.doc.statement?.to) && doc.receivedAt > seen.doc.receivedAt)
       if (!seen || (full && !seen.full) || (full === seen.full && newer)) best.set(key, { doc, full, month })
@@ -353,6 +355,37 @@ export function monthlyFigures(docs: FinanceDoc[], invoices: Invoice[], year: nu
   return months
 }
 
+/**
+ * The full cost of a month's pay: the payroll list's gross with the employer's share, or else the
+ * net pay (from the list, the table of net salaries, or the bank) with the wage tax and contributions
+ * on top (from the WM-CM slip, or what the bank paid the pension fund). Null without any figure.
+ */
+export function payrollFullCost(month: MonthFigures): { cost: N; net: N; taxes: N } {
+  if (has(month.payrollCost)) return { cost: month.payrollCost, net: month.payrollNet, taxes: null }
+  const net = has(month.payrollNet) ? month.payrollNet : month.bank?.spend.payroll ? month.bank.spend.payroll : null
+  if (!has(net)) return { cost: null, net: null, taxes: null }
+  const taxes = has(month.payrollTax) ? month.payrollTax : month.bank?.spend.pension ? month.bank.spend.pension : null
+  return { cost: round(net + (taxes ?? 0)), net, taxes }
+}
+
+const RUNNING_COSTS: SpendCategory[] = ['suppliers', 'card', 'rent', 'cash', 'fees', 'other']
+
+/**
+ * What one month earned before profit tax, from the best source it has: sales from the sales book
+ * (or the invoices here, without VAT), less purchases from the purchase book (or what the bank paid
+ * suppliers, by card, for rent and in cash), less the full cost of pay. `books` says the sales and
+ * purchase books were used; otherwise the invoices and the bank. Null when the month lacks either side.
+ */
+export function monthResult(month: MonthFigures): { revenue: number; costs: number; value: number; books: boolean } | null {
+  const revenue = has(month.salesNet) ? month.salesNet : month.invoicedNet > 0 ? month.invoicedNet : null
+  const bankCosts = month.bank ? RUNNING_COSTS.reduce((total, item) => total + (month.bank!.spend[item] ?? 0), 0) : null
+  const purchases = has(month.purchasesNet) ? month.purchasesNet : bankCosts
+  const pay = payrollFullCost(month).cost
+  if (revenue === null || (purchases === null && pay === null)) return null
+  const costs = round((purchases ?? 0) + (pay ?? 0))
+  return { revenue: round(revenue), costs, value: round(revenue - costs), books: has(month.salesNet) && has(month.purchasesNet) }
+}
+
 export type HealthStatus = 'good' | 'warn' | 'bad' | 'unknown'
 export type HealthSignal = { key: 'collection' | 'liquidity' | 'documents' | 'profit' | 'result'; status: HealthStatus; params: Record<string, string | number> }
 
@@ -441,37 +474,11 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
   const payrollMonth = [...months].reverse().find((month) => complete(month) && (has(month.payrollCost) || has(month.payrollNet)))
   // Without a payroll list the bank still shows what was paid out as pay and contributions.
   const bankPayMonth = [...months].reverse().find((month) => complete(month) && (month.bank?.spend.payroll ?? 0) > 0)
-  // The full cost of a month's pay: the payroll list's gross with the employer's share, or else the
-  // net pay with the wage tax and contributions on top (from the WM-CM slip, or what the bank paid
-  // the pension fund).
-  const fullCost = (month: MonthFigures, net: number) => {
-    const taxes = has(month.payrollTax) ? month.payrollTax : month.bank?.spend.pension ? month.bank.spend.pension : null
-    return { cost: has(taxes) ? round(net + taxes) : null, taxes }
-  }
-  const payroll = payrollMonth
-    ? {
-        period: payrollMonth.period,
-        net: payrollMonth.payrollNet,
-        employees: payrollMonth.employees,
-        fromBank: false,
-        ...(has(payrollMonth.payrollCost)
-          ? { cost: payrollMonth.payrollCost, taxes: null }
-          : has(payrollMonth.payrollNet)
-            ? fullCost(payrollMonth, payrollMonth.payrollNet)
-            : { cost: null, taxes: null }),
-      }
-    : bankPayMonth
-      ? { period: bankPayMonth.period, net: bankPayMonth.bank!.spend.payroll as number, employees: null, fromBank: true, ...fullCost(bankPayMonth, bankPayMonth.bank!.spend.payroll as number) }
-      : null
+  const lastPay = payrollMonth || bankPayMonth
+  const payroll = lastPay ? { period: lastPay.period, employees: lastPay.employees, fromBank: !payrollMonth, ...payrollFullCost(lastPay) } : null
 
   // What pay cost over the whole year: each month's full cost, from the best source that month has.
-  const payrollMonthCost = (month: MonthFigures) => {
-    if (has(month.payrollCost)) return month.payrollCost
-    const net = has(month.payrollNet) ? month.payrollNet : month.bank?.spend.payroll ? month.bank.spend.payroll : null
-    if (!has(net)) return null
-    return fullCost(month, net).cost ?? net
-  }
-  const paidMonths = months.map(payrollMonthCost).filter(has)
+  const paidMonths = months.map((month) => payrollFullCost(month).cost).filter(has)
   const payrollYear = paidMonths.length ? { total: round(paidMonths.reduce((total, value) => total + value, 0)), months: paidMonths.length } : null
 
   // Everything else it takes to run the company: suppliers, rent, power, internet, card purchases,
@@ -528,15 +535,9 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
   // sales from the sales book (or the invoices here, without VAT); purchases from the purchase book
   // (or what the bank paid suppliers, by card, for rent and in cash); pay from the payroll list (or
   // the net pay and pension contributions the bank paid, with the wage tax slip when there is one).
-  const BANK_COSTS: SpendCategory[] = ['suppliers', 'card', 'rent', 'cash', 'fees', 'other']
   const earned = months.filter(complete).flatMap((month) => {
-    const revenue = has(month.salesNet) ? month.salesNet : month.invoicedNet > 0 ? month.invoicedNet : null
-    const bankCosts = month.bank ? BANK_COSTS.reduce((total, item) => total + (month.bank!.spend[item] ?? 0), 0) : null
-    const purchases = has(month.purchasesNet) ? month.purchasesNet : bankCosts
-    const bankPay = month.bank ? (month.bank.spend.payroll ?? 0) + (month.bank.spend.pension ?? 0) : null
-    const pay = has(month.payrollCost) ? month.payrollCost : has(month.payrollNet) || bankPay ? (month.payrollNet ?? month.bank?.spend.payroll ?? 0) + (has(month.payrollTax) ? month.payrollTax : (month.bank?.spend.pension ?? 0)) : null
-    if (revenue === null || (purchases === null && pay === null)) return []
-    return [{ period: month.period, revenue, costs: (purchases ?? 0) + (pay ?? 0) }]
+    const result = monthResult(month)
+    return result ? [{ period: month.period, ...result }] : []
   })
   const estimate = earned.length
     ? {
