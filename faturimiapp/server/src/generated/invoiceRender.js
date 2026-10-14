@@ -76,7 +76,8 @@ const sq = {
 		other: "Tjera"
 	},
 	noTaxDocs: "Nga fletëpagesat e kontabilistit",
-	payroll: "Kosto e pagave / muaj",
+	payrollYear: "Kosto e pagave · {year}",
+	payrollLast: "{period}: {amount}",
 	employees: "{count} punonjës",
 	netHint: "neto {amount}",
 	onlyNet: "vetëm pagat neto",
@@ -326,7 +327,8 @@ const en = {
 		other: "Other"
 	},
 	noTaxDocs: "From the accountant’s payment slips",
-	payroll: "Payroll cost / month",
+	payrollYear: "Payroll cost · {year}",
+	payrollLast: "{period}: {amount}",
 	employees: "{count} employees",
 	netHint: "net {amount}",
 	onlyNet: "net pay only",
@@ -580,7 +582,8 @@ const financeTexts = {
 			other: "Altre"
 		},
 		noTaxDocs: "Dai modelli di pagamento del commercialista",
-		payroll: "Costo del personale / mese",
+		payrollYear: "Costo del personale · {year}",
+		payrollLast: "{period}: {amount}",
 		employees: "{count} dipendenti",
 		netHint: "netto {amount}",
 		onlyNet: "solo netto",
