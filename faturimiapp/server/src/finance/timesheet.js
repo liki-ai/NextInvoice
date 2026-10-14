@@ -7,6 +7,7 @@ const { getFinance, saveFinance } = require('../store');
 const ENTRIES_MAX = 20000;
 const PROJECTS_MAX = 2000;
 const NAME_MAX = 120;
+const BANK_RULES_MAX = 20;
 
 function timesheetError(code) {
   const err = new Error(code);
@@ -88,6 +89,12 @@ function setProject(ownerId, body) {
   if (body.clientId !== undefined) next.clientId = body.clientId ? String(body.clientId).slice(0, 100) : null;
   if (body.internal !== undefined) next.internal = Boolean(body.internal);
   if (next.internal) next.clientId = null;
+  // Words of a bank payment that mark money for this project without an invoice (a transfer from
+  // the product's own account abroad, say).
+  if (body.bank !== undefined) {
+    const list = (Array.isArray(body.bank) ? body.bank : []).map((item) => String(item ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)).filter((item) => item.length >= 3);
+    next.bank = [...new Set(list)].slice(0, BANK_RULES_MAX);
+  }
   const projects = { ...timesheet.projects, [name]: next };
   if (Object.keys(projects).length > PROJECTS_MAX) throw timesheetError('TIMESHEET_PROJECT');
   save(ownerId, { ...timesheet, projects });

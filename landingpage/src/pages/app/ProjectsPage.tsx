@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ChevronDown, ChevronRight, FolderKanban, Info, Landmark, Loader2, Sparkles, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, FolderKanban, Info, Landmark, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -15,9 +15,11 @@ import {
   MONTH_HOURS_LIMIT,
   buildProjectsReport,
   ownClientIds,
+  payerWords,
   readTimesheet,
   type MonthCosts,
   type ProjectKind,
+  type BankCredit,
   type ProjectsReport,
   type Signal,
   type TimesheetView,
@@ -196,9 +198,10 @@ export function ProjectsPage() {
   const docs = useMemo(() => finance?.documents || [], [finance])
   const monthCosts = useMemo(() => (timesheet ? costsByMonth(docs, invoices, timesheet.months, currency) : {}), [docs, invoices, timesheet, currency])
   const ownClients = useMemo(() => ownClientIds(clients, profile?.companyName), [clients, profile?.companyName])
+  const bankCredits = useMemo(() => (bank?.lines || []).map((line) => ({ date: line.date, amount: line.rest, text: line.text })), [bank])
   const report = useMemo(
-    () => (timesheet && timesheet.entries.length ? buildProjectsReport({ timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct }) : null),
-    [timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct],
+    () => (timesheet && timesheet.entries.length ? buildProjectsReport({ timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct, bankCredits }) : null),
+    [timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct, bankCredits],
   )
   const sortedClients = useMemo(() => [...clients].filter((client) => client.id).sort((a, b) => String(a.fullName).localeCompare(String(b.fullName))), [clients])
   const clientName = useMemo(() => new Map(sortedClients.map((client) => [client.id as string, client.fullName])), [sortedClients])
@@ -255,6 +258,14 @@ export function ProjectsPage() {
     const body = value === 'internal' ? { project, internal: true } : { project, internal: false, clientId: value || null }
     try {
       setView(await api<TimesheetView>('/api/finance/projects/project', { method: 'PATCH', body }))
+    } catch (err) {
+      setNotice(errorText(t, err))
+    }
+  }
+
+  async function setBankWords(project: string, bank: string[]) {
+    try {
+      setView(await api<TimesheetView>('/api/finance/projects/project', { method: 'PATCH', body: { project, bank } }))
     } catch (err) {
       setNotice(errorText(t, err))
     }
@@ -449,9 +460,10 @@ export function ProjectsPage() {
                       <dt className="text-brand-ink/55">{t('finance.projects.cols.hours')}</dt>
                       <dd className="text-right">{hoursText(product.hours)}</dd>
                     </dl>
-                    <p className="mt-3 border-t border-brand-ink/6 pt-2 text-xs text-brand-ink/50">
-                      {product.invoices ? `${t('finance.projects.productRevenue', { product: product.name })}: ${product.invoices}` : t('finance.projects.productNone', { product: product.name })}
-                    </p>
+                    <div className="mt-3 space-y-0.5 border-t border-brand-ink/6 pt-2 text-xs text-brand-ink/50">
+                      <p>{product.invoices ? `${t('finance.projects.productRevenue', { product: product.name })}: ${product.invoices}` : t('finance.projects.productNone', { product: product.name })}</p>
+                      {product.bankPayments ? <p>{t('finance.projects.productBank', { amount: money(product.bankRevenue), count: product.bankPayments })}</p> : null}
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -779,29 +791,16 @@ export function ProjectsPage() {
                   </p>
                 ) : bank.statements === 0 ? (
                   <p className="mt-3 text-[13px] text-brand-ink/50">{t('finance.projects.bankMissing')}</p>
-                ) : bank.lines.length === 0 ? (
-                  <p className="mt-3 text-[13px] text-brand-ink/50">{t('finance.projects.bankNone')}</p>
                 ) : (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full min-w-[560px] text-[13px] tabular-nums">
-                      <tbody>
-                        {bank.lines.map((line, index) => (
-                          <tr key={index} className="border-t border-brand-ink/6 first:border-t-0">
-                            <td className="w-24 py-2 pr-3 text-brand-ink/60">{shortDate(line.date)}</td>
-                            <td className="py-2 pr-3 text-brand-ink/80">
-                              <span className="line-clamp-2">{line.text}</span>
-                            </td>
-                            <td className="w-28 py-2 text-right font-semibold">{money(line.rest)}</td>
-                          </tr>
-                        ))}
-                        <tr className="border-t border-brand-ink/10">
-                          <td />
-                          <td className="py-2 pr-3 text-right font-semibold">{t('finance.projects.sharedTotal')}</td>
-                          <td className="py-2 text-right font-semibold">{money(bank.lines.reduce((sum, line) => sum + line.rest, 0))}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  <BankCredits
+                    left={report.bankLeft}
+                    rules={Object.entries(timesheet?.projects || {}).flatMap(([name, item]) => (item.bank || []).map((words) => ({ project: name, words })))}
+                    targets={report.projects.filter((project) => project.kind === 'client' || project.kind === 'product').map((project) => project.name)}
+                    money={money}
+                    t={t}
+                    onSave={(project, words) => void setBankWords(project, [...(timesheet?.projects[project]?.bank || []), words])}
+                    onRemove={(project, words) => void setBankWords(project, (timesheet?.projects[project]?.bank || []).filter((item) => item !== words))}
+                  />
                 )}
               </div>
             </Card>
@@ -909,5 +908,115 @@ function MonthColumns({ report, t }: { report: ProjectsReport; t: T }) {
         </div>
       ))}
     </div>
+  )
+}
+
+/** Bank money with no invoice: each payment can be given to a project by the words that name its payer. */
+function BankCredits({
+  left,
+  rules,
+  targets,
+  money,
+  t,
+  onSave,
+  onRemove,
+}: {
+  left: BankCredit[]
+  rules: { project: string; words: string }[]
+  targets: string[]
+  money: (amount: number) => string
+  t: T
+  onSave: (project: string, words: string) => void
+  onRemove: (project: string, words: string) => void
+}) {
+  const [editing, setEditing] = useState<{ index: number; project: string; words: string } | null>(null)
+  return (
+    <>
+      {rules.length ? (
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {rules.map((rule) => (
+            <li key={`${rule.project}|${rule.words}`} className="inline-flex items-center gap-2 rounded-lg bg-[#6B8E5A]/10 px-2.5 py-1 text-[12px]">
+              <span>
+                “{rule.words}” → <strong>{rule.project}</strong>
+              </span>
+              <button type="button" aria-label={t('finance.projects.bankRemove')} className="text-brand-ink/40 hover:text-[#C0503A]" onClick={() => onRemove(rule.project, rule.words)}>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {left.length === 0 ? (
+        <p className="mt-3 text-[13px] text-brand-ink/50">{t('finance.projects.bankNone')}</p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[680px] text-[13px] tabular-nums">
+            <tbody>
+              {left.map((line, index) => (
+                <Fragment key={index}>
+                  <tr className="border-t border-brand-ink/6 first:border-t-0">
+                    <td className="w-24 py-2 pr-3 align-top text-brand-ink/60">{shortDate(line.date)}</td>
+                    <td className="py-2 pr-3 align-top text-brand-ink/80">
+                      <span className="line-clamp-2">{line.text}</span>
+                      {line.client ? <span className="mt-0.5 block text-[11px] text-brand">{t('finance.projects.bankClient', { client: line.client })}</span> : null}
+                    </td>
+                    <td className="w-28 py-2 pr-3 text-right align-top font-semibold">{money(line.amount)}</td>
+                    <td className="w-44 py-1.5 text-right align-top">
+                      <select
+                        aria-label={t('finance.projects.bankAssign')}
+                        value={editing?.index === index ? editing.project : ''}
+                        onChange={(e) => setEditing(e.target.value ? { index, project: e.target.value, words: payerWords(line.text) } : null)}
+                        className="w-full rounded-lg border border-brand-ink/10 bg-white px-2 py-1.5 text-[12px] text-brand-ink/70"
+                      >
+                        <option value="">{t('finance.projects.bankAssign')}</option>
+                        {targets.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                  {editing?.index === index ? (
+                    <tr>
+                      <td />
+                      <td colSpan={3} className="pb-3">
+                        <form
+                          className="flex flex-wrap items-center gap-2 rounded-xl bg-brand-bg/70 p-2.5"
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            if (editing.words.trim().length < 3) return
+                            onSave(editing.project, editing.words.trim())
+                            setEditing(null)
+                          }}
+                        >
+                          <span className="text-[12px] text-brand-ink/60">{t('finance.projects.bankWords', { project: editing.project })}</span>
+                          <input
+                            aria-label={t('finance.projects.bankWords', { project: editing.project })}
+                            value={editing.words}
+                            onChange={(e) => setEditing({ ...editing, words: e.target.value })}
+                            className="min-w-[220px] flex-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1.5 text-[13px]"
+                          />
+                          <Button type="submit">{t('finance.projects.bankSave')}</Button>
+                          <Button type="button" variant="ghost" onClick={() => setEditing(null)}>
+                            {t('finance.projects.bankCancel')}
+                          </Button>
+                        </form>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              ))}
+              <tr className="border-t border-brand-ink/10">
+                <td />
+                <td className="py-2 pr-3 text-right font-semibold">{t('finance.projects.sharedTotal')}</td>
+                <td className="py-2 pr-3 text-right font-semibold">{money(left.reduce((sum, line) => sum + line.amount, 0))}</td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   )
 }

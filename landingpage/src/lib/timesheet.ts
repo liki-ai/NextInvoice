@@ -8,7 +8,41 @@ import type { CellValue, Workbook } from './xlsx'
 
 export type TimesheetEntry = { month: string; project: string; person: string; hours: number; pay: number | null }
 /** `internal`: work for the whole company, whose cost is spread over the projects. */
-export type ProjectMeta = { clientId?: string | null; internal?: boolean }
+export type ProjectMeta = { clientId?: string | null; internal?: boolean; bank?: string[] }
+
+/** A bank payment no invoice accounts for: `amount` is what is left of it after any invoices. */
+export type BankCredit = { date: string; amount: number; text: string; /** A client the payment names, when no project is linked to it. */ client?: string }
+
+/** Lower case words only, so "WISE PAYMENTS LIMITED, Lirim" and "wise payments limited lirim" compare equal. */
+function looseText(text: unknown) {
+  return plain(String(text ?? ''))
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+/** The project whose bank words this payment carries, if any. */
+export function bankProject(text: string, projects: Record<string, ProjectMeta>) {
+  const line = ` ${looseText(text)} `
+  for (const [name, meta] of Object.entries(projects)) {
+    if ((meta.bank || []).some((words) => looseText(words) && line.includes(` ${looseText(words)} `))) return name
+  }
+  return null
+}
+
+/** The words that name who sent a payment: "…hyrese, WISE PAYMENTS LIMITED, Lirim Sylejmani ;CRED ;71A:OUR" → "WISE PAYMENTS LIMITED, Lirim Sylejmani". */
+export function payerWords(text: string) {
+  const parts = String(text || '')
+    .split(/[,;]/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter((part) => part.length >= 3 && !/transfer|hyrese|hyrëse|^pages|^cred$|^debi?t?$|\d{2}[a-z]:|^our$|^sha$|^ben$/i.test(part))
+  // The sender's bank says nothing about who paid; a payment service (Wise and the like) needs the
+  // name of the person who sent through it.
+  while (parts.length > 1 && /\bbanc|\bbank|\bbanka\b/i.test(parts[0])) parts.shift()
+  if (parts.length > 1 && /wise|payments|paypal|revolut|payoneer|stripe|remitly/i.test(parts[0])) return `${parts[0]}, ${parts[1]}`
+  return parts[0] || String(text || '').slice(0, 60).trim()
+}
+
+
 export type Timesheet = {
   fileName: string
   importedAt: string | null
@@ -157,6 +191,9 @@ export type ProjectFigures = {
   revenuePerHour: number | null
   costPerHour: number | null
   invoices: number
+  /** Of the revenue, what came into the bank without an invoice, and in how many payments. */
+  bankRevenue: number
+  bankPayments: number
   people: { person: string; hours: number }[]
   lead: { person: string; share: number } | null
   byMonth: Record<string, number>
@@ -230,6 +267,9 @@ export type ProjectsReport = {
   revenue: number
   otherRevenue: OtherRevenue[]
   otherTotal: number
+  /** Bank money with no invoice that no project's words claim. */
+  bankLeft: BankCredit[]
+  bankRevenue: number
   linkedHours: number
   sharedHours: number
   projects: ProjectFigures[]
@@ -360,6 +400,7 @@ export function buildProjectsReport({
   currency,
   ownClients = new Set<string>(),
   monthCosts = {},
+  bankCredits = [],
   correct = true,
 }: {
   timesheet: Timesheet
@@ -369,6 +410,7 @@ export function buildProjectsReport({
   currency: string
   ownClients?: Set<string>
   monthCosts?: Record<string, MonthCosts>
+  bankCredits?: BankCredit[]
   correct?: boolean
 }): ProjectsReport {
   const wanted = new Set(months)
@@ -524,6 +566,48 @@ export function buildProjectsReport({
     others.set(key, group)
   }
 
+  // Money into the bank with no invoice is a project's revenue when it carries the words saved for
+  // the project, names the project, or names the client the project is for (GIS S.R.L. → Dentora).
+  // A client with several projects shares it by their hours, as with invoices.
+  const bankRevenue = new Map<string, number>()
+  const bankCount = new Map<string, number>()
+  const bankLeft: BankCredit[] = []
+  const clientWords = [...byClient.keys()]
+    .map((id) => ({ id, words: looseText(words(clientName.get(id)).filter((word) => !COMPANY_WORDS.has(word)).join(' ')) }))
+    .filter((item) => item.words.replace(/ /g, '').length >= 3)
+  const bankCredit = (name: string, amount: number) => {
+    revenue.set(name, (revenue.get(name) ?? 0) + amount)
+    bankRevenue.set(name, (bankRevenue.get(name) ?? 0) + amount)
+    bankCount.set(name, (bankCount.get(name) ?? 0) + 1)
+  }
+  for (const line of bankCredits) {
+    if (!wanted.has(line.date.slice(0, 7))) continue
+    const saved = bankProject(line.text, timesheet.projects)
+    if (saved && projects.has(saved) && (kindOf(saved) === 'client' || kindOf(saved) === 'product')) {
+      bankCredit(saved, line.amount)
+      continue
+    }
+    const text = plain(line.text)
+    const named = linked.find((name) => mentions(text, name))
+    if (named) {
+      bankCredit(named, line.amount)
+      continue
+    }
+    const loose = ` ${looseText(line.text)} `
+    const client = clientWords.find((item) => loose.includes(` ${item.words} `))
+    if (client) {
+      const own = byClient.get(client.id)!
+      const total = own.reduce((sum, name) => sum + (projects.get(name)?.hours ?? 0), 0)
+      for (const name of own) bankCredit(name, total ? line.amount * ((projects.get(name)?.hours ?? 0) / total) : line.amount / own.length)
+      continue
+    }
+    const anyClient = clients.find((item) => {
+      const name = looseText(words(item.fullName).filter((word) => !COMPANY_WORDS.has(word)).join(' '))
+      return name.replace(/ /g, '').length >= 3 && loose.includes(` ${name} `)
+    })
+    bankLeft.push(anyClient ? { ...line, client: String(anyClient.fullName || '') } : line)
+  }
+
   const projectRows: ProjectFigures[] = [...projects.entries()].map(([name, project]) => {
     const kind = kindOf(name)
     const team = [...project.people.entries()].map(([person, value]) => ({ person, hours: round(value) })).sort((a, b) => b.hours - a.hours)
@@ -547,6 +631,8 @@ export function buildProjectsReport({
       revenuePerHour: projectRevenue === null || !project.hours ? null : round(projectRevenue / project.hours),
       costPerHour: project.hours ? round(cost / project.hours) : null,
       invoices: invoiceCount.get(name) ?? 0,
+      bankRevenue: round(bankRevenue.get(name) ?? 0),
+      bankPayments: bankCount.get(name) ?? 0,
       people: team,
       lead: team.length ? { person: team[0].person, share: team[0].hours / project.hours } : null,
       byMonth: project.byMonth,
@@ -641,6 +727,8 @@ export function buildProjectsReport({
     revenue: round(projectRows.reduce((sum, project) => sum + (project.revenue ?? 0), 0)),
     otherRevenue,
     otherTotal: round(otherRevenue.reduce((sum, group) => sum + group.total, 0)),
+    bankLeft,
+    bankRevenue: round([...bankRevenue.values()].reduce((sum, value) => sum + value, 0)),
     linkedHours: round(projectRows.filter((project) => project.kind === 'client' || project.kind === 'product').reduce((sum, project) => sum + project.hours, 0)),
     sharedHours: round(sharedHours),
     projects: projectRows,
