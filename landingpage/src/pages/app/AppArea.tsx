@@ -11,6 +11,8 @@ import { StatementPage } from './StatementPage'
 import { ProfilePage } from './ProfilePage'
 import { OverviewPage } from './OverviewPage'
 import { FinancePage } from './FinancePage'
+import { ProjectsPage } from './ProjectsPage'
+import { ReportsLayout } from './ReportsLayout'
 import { UpgradePage } from './UpgradePage'
 import { ClientListPage } from './ClientListPage'
 import { ClientFormPage } from './ClientFormPage'
@@ -37,8 +39,11 @@ export default function AppArea() {
         <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
         <Route path="invoices/:invoiceId/edit" element={<InvoiceFormPage />} />
         <Route path="statement" element={<StatementPage />} />
-        <Route path="overview" element={<OverviewPage />} />
-        <Route path="finance" element={<FinancePage />} />
+        <Route element={<ReportsLayout />}>
+          <Route path="finance" element={<FinancePage />} />
+          <Route path="overview" element={<OverviewPage />} />
+          <Route path="projects" element={<ProjectsPage />} />
+        </Route>
         <Route path="obligations" element={<ObligationListPage />} />
         <Route path="obligations/new" element={<ObligationFormPage />} />
         <Route path="obligations/:obligationId/edit" element={<ObligationFormPage />} />

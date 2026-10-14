@@ -151,9 +151,11 @@ function parseSheet(xml: string, strings: string[], dates: boolean[], date1904: 
 export async function readWorkbook(file: Blob | ArrayBuffer): Promise<Workbook> {
   const bytes = new Uint8Array(file instanceof ArrayBuffer ? file : await file.arrayBuffer())
   const entries = readEntries(bytes)
+  // Workbooks written by some tools (the .NET Open XML SDK among them) name every element with a
+  // namespace prefix, <x:row> for <row>; without the prefixes they read like any other.
   const read = async (name: string) => {
     const entry = entries.find((item) => item.name === name)
-    return entry ? readEntry(bytes, entry) : ''
+    return entry ? (await readEntry(bytes, entry)).replace(/<(\/?)[A-Za-z_][\w.-]*:(?=[A-Za-z_])/g, '<$1') : ''
   }
 
   const workbookXml = await read('xl/workbook.xml')

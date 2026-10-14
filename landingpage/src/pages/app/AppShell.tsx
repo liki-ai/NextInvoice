@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, HeartPulse, LayoutDashboard, LogOut, Menu, Plus, Repeat, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
+import { FileText, LayoutDashboard, LogOut, Menu, Plus, Repeat, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider, useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -8,7 +8,7 @@ import { LanguagePicker } from '../../components/LangSwitch'
 import { cn } from '../../lib/cn'
 import { displayCompanyValue } from '../../lib/companySamples'
 
-type NavItem = { to: string; icon: LucideIcon; key: string; active: (pathname: string, search: string) => boolean; managerOnly?: boolean }
+type NavItem = { to: string; managerTo?: string; icon: LucideIcon; key: string; active: (pathname: string, search: string) => boolean; managerOnly?: boolean }
 
 const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
@@ -26,12 +26,13 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { to: '/app/recurring', icon: Repeat, key: 'nav.recurring', active: (pathname) => pathname.startsWith('/app/recurring') },
       { to: '/app/obligations', icon: Wallet, key: 'nav.obligations', active: (pathname) => pathname.startsWith('/app/obligations') },
       {
+        // Its tabs: financial health (first, for managers), the overview, and projects.
         to: '/app/overview',
+        managerTo: '/app/finance',
         icon: LayoutDashboard,
         key: 'nav.overview',
-        active: (pathname, search) => pathname.startsWith('/app/overview') || search.includes('from=overview'),
+        active: (pathname, search) => ['/app/overview', '/app/finance', '/app/projects'].some((path) => pathname.startsWith(path)) || search.includes('from=overview'),
       },
-      { to: '/app/finance', icon: HeartPulse, key: 'nav.finance', active: (pathname) => pathname.startsWith('/app/finance'), managerOnly: true },
     ],
   },
   {
@@ -81,10 +82,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="space-y-1">
               {group.items.filter((item) => !item.managerOnly || user?.role !== 'member').map((item) => {
                 const active = item.active(pathname, search)
+                const to = item.managerTo && user?.role !== 'member' ? item.managerTo : item.to
                 return (
                   <Link
                     key={item.to}
-                    to={item.to}
+                    to={to}
                     onClick={onNavigate}
                     aria-current={active ? 'page' : undefined}
                     className={cn(

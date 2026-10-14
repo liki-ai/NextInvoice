@@ -1,6 +1,8 @@
 // The words of the Financial health page, kept apart from i18nCore.ts because there are many of them.
 // Each language's set is placed under `finance` in i18nCore.ts.
 
+import { projectsTexts, reportTabs } from './i18nProjects'
+
 const kindsSq = {
   vat_return: 'TVSH',
   payroll_tax: 'Tatimi në paga e kontributet',
@@ -658,5 +660,9 @@ const it: typeof sq = {
   },
 }
 
-export const financeTexts = { sq, en, it }
+export const financeTexts = {
+  sq: { ...sq, projects: projectsTexts.sq, tabs: reportTabs.sq },
+  en: { ...en, projects: projectsTexts.en, tabs: reportTabs.en },
+  it: { ...it, projects: projectsTexts.it, tabs: reportTabs.it },
+}
 export const financeNav = { sq: 'Shëndeti financiar', en: 'Financial health', it: 'Salute finanziaria' }

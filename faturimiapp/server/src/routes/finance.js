@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { authRequired, managerRequired } = require('../auth');
 const finance = require('../finance/service');
+const timesheet = require('../finance/timesheet');
 const { sendMailError } = require('./mail');
 
 // The company's finance inbox and health figures. Salaries, taxes and bank balances are for the
@@ -19,6 +20,9 @@ const FINANCE_ERRORS = {
   FINANCE_HOST: [400, 'This mail server name is not valid.'],
   FINANCE_FULL: [409, 'The finance inbox is full.'],
   MAIL_READ: [502, 'The mailbox could not be read.'],
+  TIMESHEET_EMPTY: [400, 'The workbook has no hours to bring in.'],
+  TIMESHEET_ROW: [400, 'A row of hours is not valid.'],
+  TIMESHEET_PROJECT: [400, 'Name the project.'],
 };
 
 function sendError(res, err) {
@@ -118,6 +122,31 @@ router.delete('/documents/:id', async (req, res, next) => {
     res.json(finance.describe(req.user.id, req.user));
   } catch (err) {
     next(err);
+  }
+});
+
+/** The hours the team logged by project, and which client each project is for. */
+router.get('/projects', (req, res) => {
+  res.json(timesheet.describe(req.user.id));
+});
+
+router.put('/projects/hours', (req, res, next) => {
+  try {
+    res.json(timesheet.importHours(req.user.id, req.user, req.body || {}));
+  } catch (err) {
+    if (!sendError(res, err)) next(err);
+  }
+});
+
+router.delete('/projects/hours', (req, res) => {
+  res.json(timesheet.clearHours(req.user.id));
+});
+
+router.patch('/projects/project', (req, res, next) => {
+  try {
+    res.json(timesheet.setProject(req.user.id, req.body || {}));
+  } catch (err) {
+    if (!sendError(res, err)) next(err);
   }
 });
 
