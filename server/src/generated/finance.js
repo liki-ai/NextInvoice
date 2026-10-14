@@ -924,6 +924,20 @@ function reconcilePayload(verdicts) {
 	}));
 }
 //#endregion
+//#region src/lib/finance.ts
+/** What money leaving the bank went to, as the server sorts a statement's outgoing payments. */
+const SPEND_CATEGORIES = [
+	"payroll",
+	"taxes",
+	"rent",
+	"suppliers",
+	"card",
+	"cash",
+	"fees",
+	"dividends",
+	"other"
+];
+//#endregion
 //#region src/lib/serverFinance.ts
 /** Splits comma-, semicolon- or tab-separated text into rows, honouring quoted cells. */
 function readCsv(text) {
@@ -1081,6 +1095,80 @@ function statementFigures(workbook) {
 	}
 	return result;
 }
+/** What an outgoing payment was for, from the words the bank wrote on it. */
+function spendCategory(text) {
+	const words = plainText(text);
+	if (/pagese e komisionit|komisioni mujor|commission|provizion/.test(words)) return "fees";
+	if (/\bdividen(t|d)/.test(words)) return "dividends";
+	if (/administraten tatimore|administrata tatimore|\batk\b|fiscal no|kontribut\w* pensional|mfakp|\btrust\b/.test(words)) return "taxes";
+	if (/\bpag(a|at|en)\b|\brrog|salary|salaries|pune praktike/.test(words)) return "payroll";
+	if (/\bqira|\brent\b/.test(words)) return "rent";
+	if (/terheqje|bankomat|\batm\b|cash withdrawal/.test(words)) return "cash";
+	if (/blerje me kartel|\bpos\b|card purchase/.test(words)) return "card";
+	if (/fatur|invoice|proforma|pagese|payment|transfert/.test(words)) return "suppliers";
+	return "other";
+}
+function excelDay(value) {
+	const iso = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+	if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+	if (typeof value === "number") return value > 2e4 && value < 8e4 ? iso(new Date(Math.round((value - 25569) * 864e5))) : "";
+	const text = String(value ?? "").trim();
+	if (/^\d{5}(\.\d+)?$/.test(text)) return excelDay(Number(text));
+	const ymd = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
+	if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
+	const dmy = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/.exec(text);
+	return dmy ? `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}` : "";
+}
+/**
+* Money in and out of the account month by month, and what went out for: pay, taxes and
+* contributions, rent, suppliers, card purchases, cash, bank fees. Null when the sheet has no
+* debit and credit columns with dates.
+*/
+function statementMonths(workbook) {
+	for (const sheet of workbook.sheets) {
+		const head = sheet.rows.findIndex((row) => {
+			const names = row.map(plainText);
+			return names.some((name) => /debit/.test(name)) && names.some((name) => /kredit|credit/.test(name)) && names.some((name) => /data|date|datum/.test(name));
+		});
+		if (head === -1) continue;
+		const names = sheet.rows[head].map(plainText);
+		const debit = names.findIndex((name) => /debit/.test(name) && !/kredit|credit/.test(name));
+		const credit = names.findIndex((name) => /kredit|credit/.test(name) && !/debit/.test(name));
+		const date = names.findIndex((name) => /data|date|datum/.test(name) && !/debit|kredit|credit/.test(name));
+		const months = {};
+		for (const row of sheet.rows.slice(head + 1)) {
+			const day = excelDay(row[date] ?? null);
+			if (!day) continue;
+			const inAmount = Math.max(amountOf(row[credit] ?? null) ?? 0, 0);
+			const outAmount = Math.max(amountOf(row[debit] ?? null) ?? 0, 0);
+			if (!inAmount && !outAmount) continue;
+			const key = day.slice(0, 7);
+			const month = months[key] ||= {
+				in: 0,
+				out: 0,
+				spend: Object.fromEntries(SPEND_CATEGORIES.map((item) => [item, 0]))
+			};
+			month.in += inAmount;
+			if (outAmount) {
+				month.out += outAmount;
+				const text = row.filter((cell, index) => typeof cell === "string" && index !== date).join(" ");
+				month.spend[spendCategory(text)] += outAmount;
+			}
+		}
+		for (const month of Object.values(months)) {
+			month.in = Math.round(month.in * 100) / 100;
+			month.out = Math.round(month.out * 100) / 100;
+			for (const item of SPEND_CATEGORIES) month.spend[item] = Math.round(month.spend[item] * 100) / 100;
+		}
+		let iban = "";
+		for (const row of sheet.rows.slice(0, head)) for (const cell of row) iban ||= /\bXK\d{18}\b/.exec(String(cell ?? "").replace(/\s+/g, ""))?.[0] || "";
+		return Object.keys(months).length ? {
+			iban,
+			months
+		} : null;
+	}
+	return null;
+}
 /** The incoming payments of a statement file, or null when the file holds no statement. */
 async function statementFromFile(bytes, name = "") {
 	try {
@@ -1090,11 +1178,14 @@ async function statementFromFile(bytes, name = "") {
 	}
 }
 //#endregion
+exports.SPEND_CATEGORIES = SPEND_CATEGORIES;
 exports.matchStatement = matchStatement;
 exports.readAnyWorkbook = readAnyWorkbook;
 exports.readCsv = readCsv;
 exports.readStatement = readStatement;
 exports.reconcilePayload = reconcilePayload;
+exports.spendCategory = spendCategory;
 exports.statementFigures = statementFigures;
 exports.statementFromFile = statementFromFile;
+exports.statementMonths = statementMonths;
 exports.workbookText = workbookText;
