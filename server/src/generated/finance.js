@@ -1016,6 +1016,71 @@ function workbookText(workbook, maxChars = 6e4) {
 	}
 	return parts.join("\n\n").slice(0, maxChars);
 }
+function amountOf(value) {
+	if (typeof value === "number") return Number.isFinite(value) ? value : null;
+	let text = String(value ?? "").replace(/[^\d.,-]/g, "");
+	if (!/\d/.test(text)) return null;
+	const comma = text.lastIndexOf(",");
+	const dot = text.lastIndexOf(".");
+	if (comma !== -1 && dot !== -1) text = comma > dot ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
+	else if (comma !== -1) text = /,\d{1,2}$/.test(text) ? text.replace(",", ".") : text.replace(/,/g, "");
+	const amount = Number(text);
+	return Number.isFinite(amount) ? amount : null;
+}
+const plainText = (value) => String(value ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+/**
+* The balances and totals a bank statement prints, read from the sheet itself: the opening and
+* final balance written above the table ("Previous balance : 103,980.21"), or else the balance
+* column, and the sums of the debit and credit columns. Null for what the sheet does not show.
+*/
+function statementFigures(workbook) {
+	const result = {
+		openingBalance: null,
+		closingBalance: null,
+		totalIn: null,
+		totalOut: null
+	};
+	for (const sheet of workbook.sheets) {
+		for (const row of sheet.rows.slice(0, 40)) for (const cell of row) {
+			const text = plainText(cell);
+			const stated = /(previous balance|opening balance|gjendja fillestare|saldo fillestare|saldo e fillimit)[^\d-]*(-?[\d.,]+\d)/.exec(text);
+			if (stated && result.openingBalance === null) result.openingBalance = amountOf(stated[2]);
+			const final = /(final balance|closing balance|gjendja e fundit|saldo perfundimtare|saldo e fundit)[^\d-]*(-?[\d.,]+\d)/.exec(text);
+			if (final && result.closingBalance === null) result.closingBalance = amountOf(final[2]);
+		}
+		const head = sheet.rows.findIndex((row) => {
+			const names = row.map(plainText);
+			return names.some((name) => /debit/.test(name)) && names.some((name) => /kredit|credit/.test(name));
+		});
+		if (head === -1) continue;
+		const names = sheet.rows[head].map(plainText);
+		const debit = names.findIndex((name) => /debit/.test(name) && !/kredit|credit/.test(name));
+		const credit = names.findIndex((name) => /kredit|credit/.test(name) && !/debit/.test(name));
+		const balance = names.findIndex((name) => /bilanc|balance|saldo|gjendja/.test(name));
+		let totalIn = 0;
+		let totalOut = 0;
+		const balances = [];
+		for (const row of sheet.rows.slice(head + 1)) {
+			if (row.some((cell) => /permbledhje|summary|total/.test(plainText(cell)))) continue;
+			const inAmount = credit !== -1 ? amountOf(row[credit] ?? null) : null;
+			const outAmount = debit !== -1 ? amountOf(row[debit] ?? null) : null;
+			if (inAmount === null && outAmount === null) continue;
+			totalIn += Math.max(inAmount ?? 0, 0);
+			totalOut += Math.max(outAmount ?? 0, 0);
+			const left = balance !== -1 ? amountOf(row[balance] ?? null) : null;
+			if (left !== null) balances.push(left);
+		}
+		result.totalIn = Math.round(totalIn * 100) / 100;
+		result.totalOut = Math.round(totalOut * 100) / 100;
+		if (result.closingBalance === null && balances.length > 0 && result.openingBalance !== null) {
+			const first = balances[0];
+			const last = balances[balances.length - 1];
+			result.closingBalance = Math.abs(last - result.openingBalance) < Math.abs(first - result.openingBalance) ? first : last;
+		}
+		break;
+	}
+	return result;
+}
 /** The incoming payments of a statement file, or null when the file holds no statement. */
 async function statementFromFile(bytes, name = "") {
 	try {
@@ -1030,5 +1095,6 @@ exports.readAnyWorkbook = readAnyWorkbook;
 exports.readCsv = readCsv;
 exports.readStatement = readStatement;
 exports.reconcilePayload = reconcilePayload;
+exports.statementFigures = statementFigures;
 exports.statementFromFile = statementFromFile;
 exports.workbookText = workbookText;
