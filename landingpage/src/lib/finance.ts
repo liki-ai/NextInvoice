@@ -366,6 +366,8 @@ export type FinanceSummary = {
   taxesPaid: number
   taxesByKind: Record<'vat' | 'payroll' | 'rent' | 'profit' | 'other', number>
   payroll: { period: string; cost: N; net: N; taxes: N; employees: N; fromBank: boolean } | null
+  /** The full cost of pay over the year, and how many months it covers. */
+  payrollYear: { total: number; months: number } | null
   /** Running costs other than pay and taxes, from the bank. */
   otherSpending: { total: number; average: number; top: { category: SpendCategory; amount: number }[] } | null
   /** The year's spending as the bank shows it, by what it went to; dividends are kept apart. */
@@ -460,6 +462,16 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
     : bankPayMonth
       ? { period: bankPayMonth.period, net: bankPayMonth.bank!.spend.payroll as number, employees: null, fromBank: true, ...fullCost(bankPayMonth, bankPayMonth.bank!.spend.payroll as number) }
       : null
+
+  // What pay cost over the whole year: each month's full cost, from the best source that month has.
+  const payrollMonthCost = (month: MonthFigures) => {
+    if (has(month.payrollCost)) return month.payrollCost
+    const net = has(month.payrollNet) ? month.payrollNet : month.bank?.spend.payroll ? month.bank.spend.payroll : null
+    if (!has(net)) return null
+    return fullCost(month, net).cost ?? net
+  }
+  const paidMonths = months.map(payrollMonthCost).filter(has)
+  const payrollYear = paidMonths.length ? { total: round(paidMonths.reduce((total, value) => total + value, 0)), months: paidMonths.length } : null
 
   // Everything else it takes to run the company: suppliers, rent, power, internet, card purchases,
   // cash and bank fees; not pay, taxes or what the owners took out.
@@ -625,6 +637,7 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
     burn,
     spending,
     otherSpending,
+    payrollYear,
     missing,
     upcoming,
     signals,

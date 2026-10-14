@@ -95,7 +95,7 @@ function Tile({ label, value, lines, tone }: { label: string; value: ReactNode; 
       <p className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', tone === 'brand' ? 'text-brand/80' : 'text-brand-ink/45')}>{label}</p>
       <p className="mt-2 font-display text-xl font-medium tabular-nums sm:text-2xl">{value}</p>
       {shown.map((line) => (
-        <p key={line} className="mt-1 text-xs leading-[1.1rem] text-brand-ink/55">
+        <p key={line} className="mt-1.5 text-[13px] leading-5 text-brand-ink/65">
           {line}
         </p>
       ))}
@@ -372,12 +372,12 @@ export function FinancePage() {
             ]}
           />
           <Tile
-            label={t('finance.payroll')}
-            value={summary.payroll ? money(summary.payroll.cost ?? summary.payroll.net) : '—'}
+            label={t('finance.payrollYear', { year })}
+            value={summary.payrollYear ? money(summary.payrollYear.total) : '—'}
             lines={
               summary.payroll
                 ? [
-                    [periodText(summary.payroll.period, lang), summary.payroll.employees ? t('finance.employees', { count: summary.payroll.employees }) : ''].filter(Boolean).join(' · '),
+                    [t('finance.payrollLast', { period: periodText(summary.payroll.period, lang), amount: money(summary.payroll.cost ?? summary.payroll.net) }), summary.payroll.employees ? t('finance.employees', { count: summary.payroll.employees }) : ''].filter(Boolean).join(' · '),
                     summary.payroll.taxes !== null && summary.payroll.net !== null
                       ? t('finance.payrollBreakdown', { net: money(summary.payroll.net), taxes: money(summary.payroll.taxes) })
                       : summary.payroll.cost !== null && summary.payroll.net !== null
