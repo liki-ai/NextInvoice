@@ -142,6 +142,15 @@ router.delete('/projects/hours', (req, res) => {
   res.json(timesheet.clearHours(req.user.id));
 });
 
+/** Money outside the projects, grouped by the words its bank payments carry. */
+router.patch('/projects/source', (req, res, next) => {
+  try {
+    res.json(timesheet.setSource(req.user.id, req.body || {}));
+  } catch (err) {
+    if (!sendError(res, err)) next(err);
+  }
+});
+
 router.patch('/projects/project', (req, res, next) => {
   try {
     res.json(timesheet.setProject(req.user.id, req.body || {}));

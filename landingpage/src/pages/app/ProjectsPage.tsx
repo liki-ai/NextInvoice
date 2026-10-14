@@ -263,6 +263,22 @@ export function ProjectsPage() {
     }
   }
 
+  async function setExtraClients(project: string, list: string[]) {
+    try {
+      setView(await api<TimesheetView>('/api/finance/projects/project', { method: 'PATCH', body: { project, clients: list } }))
+    } catch (err) {
+      setNotice(errorText(t, err))
+    }
+  }
+
+  async function setSource(name: string, bank: string[]) {
+    try {
+      setView(await api<TimesheetView>('/api/finance/projects/source', { method: 'PATCH', body: { name, bank } }))
+    } catch (err) {
+      setNotice(errorText(t, err))
+    }
+  }
+
   async function setBankWords(project: string, bank: string[]) {
     try {
       setView(await api<TimesheetView>('/api/finance/projects/project', { method: 'PATCH', body: { project, bank } }))
@@ -302,6 +318,8 @@ export function ProjectsPage() {
   )
 
   const suggestions = report?.projects.filter((project) => project.suggestion) || []
+  // What money can be given to: any project that is not shared work.
+  const projectTargets = report?.projects.filter((project) => project.kind !== 'shared').map((project) => project.name) || []
   const products = report?.projects.filter((project) => project.kind === 'product') || []
   const totalRevenue = report ? report.revenue + report.otherTotal : 0
   const productiveHours = report ? report.byMonth.reduce((sum, item) => sum + item.productiveHours, 0) : 0
@@ -540,6 +558,23 @@ export function ProjectsPage() {
                               </p>
                             ) : null}
                             {sharedClient ? <p className="mt-1 max-w-[220px] text-[11px] leading-4 text-brand-ink/45">{t('finance.projects.shared')}</p> : null}
+                            {(timesheet?.projects[project.name]?.clients || []).length ? (
+                              <ul className="mt-1 flex max-w-[220px] flex-wrap gap-1">
+                                {(timesheet?.projects[project.name]?.clients || []).map((id) => (
+                                  <li key={id} className="inline-flex items-center gap-1 rounded bg-brand/10 px-1.5 py-0.5 text-[11px] text-brand-ink/70">
+                                    + {clientName.get(id) || id}
+                                    <button
+                                      type="button"
+                                      aria-label={t('finance.projects.unlinkClient')}
+                                      className="text-brand-ink/40 hover:text-[#C0503A]"
+                                      onClick={() => void setExtraClients(project.name, (timesheet?.projects[project.name]?.clients || []).filter((item) => item !== id))}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
                           </td>
                           <td className={cn(TD, 'font-semibold')}>
                             {hoursText(project.hours)}
@@ -750,7 +785,7 @@ export function ProjectsPage() {
                 <ul className="mt-3 divide-y divide-brand-ink/6">
                   {report.otherRevenue.map((group) => (
                     <li key={group.clientId || group.client} className="py-2.5">
-                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
                         <span className="min-w-0 truncate font-semibold">
                           {group.clientId ? (
                             <Link to={`/app/clients/${group.clientId}`} className="hover:underline">
@@ -760,7 +795,24 @@ export function ProjectsPage() {
                             group.client
                           )}
                         </span>
-                        <span className="shrink-0 font-semibold tabular-nums">{money(group.total)}</span>
+                        <span className="flex shrink-0 items-center gap-3">
+                          {group.clientId && projectTargets.length ? (
+                            <select
+                              aria-label={`${t('finance.projects.bankAssign')} ${group.client}`}
+                              value=""
+                              onChange={(e) => e.target.value && void setExtraClients(e.target.value, [...(timesheet?.projects[e.target.value]?.clients || []), group.clientId])}
+                              className="rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[12px] text-brand-ink/70"
+                            >
+                              <option value="">{t('finance.projects.bankAssign')}</option>
+                              {projectTargets.map((name) => (
+                                <option key={name} value={name}>
+                                  {name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : null}
+                          <span className="font-semibold tabular-nums">{money(group.total)}</span>
+                        </span>
                       </div>
                       <p className="mt-0.5 text-xs leading-5 text-brand-ink/55">
                         {group.invoices.map((item, index) => (
@@ -772,10 +824,48 @@ export function ProjectsPage() {
                             {shortDate(item.date)} {money(item.net)}
                           </Fragment>
                         ))}
+                        {group.bank.map((line, index) => (
+                          <Fragment key={`bank${index}`}>
+                            {index || group.invoices.length ? ' · ' : ''}
+                            {t('finance.projects.fromBank')} {shortDate(line.date)} {money(line.amount)}
+                          </Fragment>
+                        ))}
                       </p>
                     </li>
                   ))}
                 </ul>
+              ) : null}
+
+              {report.sources.length ? (
+                <div className="mt-5 border-t border-brand-ink/8 pt-4">
+                  <p className="text-sm font-semibold">{t('finance.projects.sourcesTitle')}</p>
+                  <ul className="mt-2 divide-y divide-brand-ink/6">
+                    {report.sources.map((source) => (
+                      <li key={source.name} className="py-2.5">
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <span className="font-semibold">{source.name}</span>
+                          <span className="shrink-0 font-semibold tabular-nums">{money(source.total)}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-ink/55">
+                          <span>{t('finance.projects.sourcePayments', { count: source.payments.length })}</span>
+                          {source.words.map((words) => (
+                            <span key={words} className="inline-flex items-center gap-1 rounded bg-brand-accent/15 px-1.5 py-0.5 text-[11px] text-brand-ink/70">
+                              “{words}”
+                              <button
+                                type="button"
+                                aria-label={t('finance.projects.bankRemove')}
+                                className="text-brand-ink/40 hover:text-[#C0503A]"
+                                onClick={() => void setSource(source.name, source.words.filter((item) => item !== words))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
 
               <div className="mt-5 border-t border-brand-ink/8 pt-4">
@@ -795,10 +885,12 @@ export function ProjectsPage() {
                   <BankCredits
                     left={report.bankLeft}
                     rules={Object.entries(timesheet?.projects || {}).flatMap(([name, item]) => (item.bank || []).map((words) => ({ project: name, words })))}
-                    targets={report.projects.filter((project) => project.kind === 'client' || project.kind === 'product').map((project) => project.name)}
+                    targets={projectTargets}
+                    sources={report.sources.map((source) => source.name)}
                     money={money}
                     t={t}
                     onSave={(project, words) => void setBankWords(project, [...(timesheet?.projects[project]?.bank || []), words])}
+                    onSource={(name, words) => void setSource(name, [...(timesheet?.sources?.[name] || []), words])}
                     onRemove={(project, words) => void setBankWords(project, (timesheet?.projects[project]?.bank || []).filter((item) => item !== words))}
                   />
                 )}
@@ -911,25 +1003,34 @@ function MonthColumns({ report, t }: { report: ProjectsReport; t: T }) {
   )
 }
 
-/** Bank money with no invoice: each payment can be given to a project by the words that name its payer. */
+/**
+ * Bank money with no invoice: each payment can be given to a project, or to a source of money
+ * outside the projects (a subsidy), by the words that name it; later payments with the same words follow.
+ */
 function BankCredits({
   left,
   rules,
   targets,
+  sources,
   money,
   t,
   onSave,
+  onSource,
   onRemove,
 }: {
   left: BankCredit[]
   rules: { project: string; words: string }[]
   targets: string[]
+  sources: string[]
   money: (amount: number) => string
   t: T
   onSave: (project: string, words: string) => void
+  onSource: (name: string, words: string) => void
   onRemove: (project: string, words: string) => void
 }) {
-  const [editing, setEditing] = useState<{ index: number; project: string; words: string } | null>(null)
+  // `target`: a project's name, "source:<name>" for a source, or "source:" for a new one.
+  const [editing, setEditing] = useState<{ index: number; target: string; name: string; words: string } | null>(null)
+  const isSource = editing?.target.startsWith('source:')
   return (
     <>
       {rules.length ? (
@@ -958,22 +1059,34 @@ function BankCredits({
                     <td className="w-24 py-2 pr-3 align-top text-brand-ink/60">{shortDate(line.date)}</td>
                     <td className="py-2 pr-3 align-top text-brand-ink/80">
                       <span className="line-clamp-2">{line.text}</span>
-                      {line.client ? <span className="mt-0.5 block text-[11px] text-brand">{t('finance.projects.bankClient', { client: line.client })}</span> : null}
                     </td>
                     <td className="w-28 py-2 pr-3 text-right align-top font-semibold">{money(line.amount)}</td>
-                    <td className="w-44 py-1.5 text-right align-top">
+                    <td className="w-48 py-1.5 text-right align-top">
                       <select
                         aria-label={t('finance.projects.bankAssign')}
-                        value={editing?.index === index ? editing.project : ''}
-                        onChange={(e) => setEditing(e.target.value ? { index, project: e.target.value, words: payerWords(line.text) } : null)}
+                        value={editing?.index === index ? editing.target : ''}
+                        onChange={(e) => {
+                          const target = e.target.value
+                          setEditing(target ? { index, target, name: target.startsWith('source:') ? target.slice(7) : '', words: payerWords(line.text) } : null)
+                        }}
                         className="w-full rounded-lg border border-brand-ink/10 bg-white px-2 py-1.5 text-[12px] text-brand-ink/70"
                       >
                         <option value="">{t('finance.projects.bankAssign')}</option>
-                        {targets.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
+                        <optgroup label={t('finance.projects.projectsGroup')}>
+                          {targets.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label={t('finance.projects.outsideGroup')}>
+                          {sources.map((name) => (
+                            <option key={name} value={`source:${name}`}>
+                              {name}
+                            </option>
+                          ))}
+                          <option value="source:">{t('finance.projects.sourceNew')}</option>
+                        </optgroup>
                       </select>
                     </td>
                   </tr>
@@ -985,14 +1098,27 @@ function BankCredits({
                           className="flex flex-wrap items-center gap-2 rounded-xl bg-brand-bg/70 p-2.5"
                           onSubmit={(e) => {
                             e.preventDefault()
-                            if (editing.words.trim().length < 3) return
-                            onSave(editing.project, editing.words.trim())
+                            const words = editing.words.trim()
+                            if (words.length < 3) return
+                            if (isSource) {
+                              if (!editing.name.trim()) return
+                              onSource(editing.name.trim(), words)
+                            } else onSave(editing.target, words)
                             setEditing(null)
                           }}
                         >
-                          <span className="text-[12px] text-brand-ink/60">{t('finance.projects.bankWords', { project: editing.project })}</span>
+                          {editing.target === 'source:' ? (
+                            <input
+                              aria-label={t('finance.projects.sourceName')}
+                              placeholder={t('finance.projects.sourceName')}
+                              value={editing.name}
+                              onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                              className="w-44 rounded-lg border border-brand-ink/10 bg-white px-2 py-1.5 text-[13px]"
+                            />
+                          ) : null}
+                          <span className="text-[12px] text-brand-ink/60">{t('finance.projects.bankWords', { project: isSource ? editing.name || '…' : editing.target })}</span>
                           <input
-                            aria-label={t('finance.projects.bankWords', { project: editing.project })}
+                            aria-label={t('finance.projects.bankWords', { project: isSource ? editing.name : editing.target })}
                             value={editing.words}
                             onChange={(e) => setEditing({ ...editing, words: e.target.value })}
                             className="min-w-[220px] flex-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1.5 text-[13px]"
@@ -1001,6 +1127,7 @@ function BankCredits({
                           <Button type="button" variant="ghost" onClick={() => setEditing(null)}>
                             {t('finance.projects.bankCancel')}
                           </Button>
+                          <p className="w-full text-[11px] text-brand-ink/50">{t('finance.projects.wordsHint')}</p>
                         </form>
                       </td>
                     </tr>
