@@ -101,7 +101,7 @@ const sq = {
 		fees: "Komisione",
 		other: "Tjera"
 	},
-	missingReading: "Ende po lexohen {count} dokumente; disa nga këto mund të jenë mes tyre.",
+	missingWait: "Po lexohen {count} dokumente. Pasi të lexohen, del nëse mungon diçka për {period}.",
 	missingHint: "Kontabilisti zakonisht i dërgon deri më 20 të muajit pasues.",
 	taxesFromBank: "Pagesat në ATK dhe kontributet, sipas bankës",
 	spendTitle: "Shpenzimet · {year}",
@@ -352,7 +352,7 @@ const en = {
 		fees: "Fees",
 		other: "Other"
 	},
-	missingReading: "{count} documents are still being read; some of these may be among them.",
+	missingWait: "{count} documents are being read. Once they are, you will see whether anything is missing for {period}.",
 	missingHint: "The accountant usually sends them by the 20th of the following month.",
 	taxesFromBank: "Paid to the tax office and pension fund, from the bank",
 	spendTitle: "Spending · {year}",
@@ -607,7 +607,7 @@ const financeTexts = {
 			fees: "Commissioni",
 			other: "Altro"
 		},
-		missingReading: "{count} documenti sono ancora in lettura; alcuni di questi potrebbero essere tra loro.",
+		missingWait: "{count} documenti in lettura. Al termine si vedrà se manca qualcosa per {period}.",
 		missingHint: "Il commercialista di solito li invia entro il 20 del mese successivo.",
 		taxesFromBank: "Pagato al fisco e ai fondi pensione, dalla banca",
 		spendTitle: "Spese · {year}",
