@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, CalendarClock, Download, FileText, Inbox, Landmark, Loader2, Mail, RefreshCw, RotateCcw, Settings2, Trash2, Undo2, Upload } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -97,16 +97,32 @@ const WITH_CENTS = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, ma
 const WHOLE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
 /** A figure: the headline numbers above, then the details under it. `trend` is the change in percent. */
-function Tile({ label, value, lines, primary, trend }: { label: string; value: ReactNode; lines?: string[]; primary?: boolean; trend?: number | null }) {
+function Tile({ label, value, lines, primary, trend, trendNote }: { label: string; value: ReactNode; lines?: string[]; primary?: boolean; trend?: number | null; trendNote?: string }) {
   const shown = (lines || []).filter(Boolean)
+  const tipId = useId()
   return (
     <div className={cn('flex h-full flex-col rounded-2xl border bg-white p-4 sm:p-5', primary ? 'border-brand/20 shadow-[0_1px_2px_rgba(29,43,46,0.05)]' : 'border-brand-ink/8')}>
       <p className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', primary ? 'text-brand' : 'text-brand-ink/45')}>{label}</p>
       <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <p className={cn('font-display font-medium leading-none tabular-nums', primary ? 'text-2xl sm:text-[28px]' : 'text-xl sm:text-2xl')}>{value}</p>
         {typeof trend === 'number' ? (
-          <span className={cn('rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums', trend >= 0 ? 'bg-[#2E8B57]/10 text-[#2E8B57]' : 'bg-[#C0503A]/10 text-[#C0503A]')}>
-            {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
+          <span className="group relative">
+            <span
+              tabIndex={0}
+              aria-describedby={trendNote ? tipId : undefined}
+              className={cn('cursor-help rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-brand/30', trend >= 0 ? 'bg-[#2E8B57]/10 text-[#2E8B57]' : 'bg-[#C0503A]/10 text-[#C0503A]')}
+            >
+              {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
+            </span>
+            {trendNote ? (
+              <span
+                id={tipId}
+                role="tooltip"
+                className="pointer-events-none absolute right-0 top-full z-20 mt-2 w-64 rounded-lg bg-brand-ink px-3 py-2 text-xs font-normal leading-[1.1rem] text-white opacity-0 shadow-lg transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2"
+              >
+                {trendNote}
+              </span>
+            ) : null}
           </span>
         ) : null}
       </div>
@@ -385,6 +401,17 @@ export function FinancePage() {
             label={t(isThisYear ? 'finance.revenueYtd' : 'finance.revenueYear', { year })}
             value={money(summary.revenue)}
             trend={change}
+            trendNote={
+              change === null
+                ? undefined
+                : t(change >= 0 ? 'finance.trendUp' : 'finance.trendDown', {
+                    percent: Math.abs(change),
+                    lastYear: year - 1,
+                    from: '1.1',
+                    to: isThisYear ? `${new Date().getDate()}.${new Date().getMonth() + 1}` : '31.12',
+                    amount: money(summary.revenueLastYear),
+                  })
+            }
             lines={[t('finance.collectedHint', { amount: money(summary.collected) })]}
           />
           <Tile
