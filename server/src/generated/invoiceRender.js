@@ -20,6 +20,7 @@ const sq = {
 	progressReading: "{count} dokumente po lexohen",
 	lastCheck: "Kontrolli i fundit: {date} · {count} email-a gjithsej",
 	lastCheckFailed: "Kontrolli i fundit dështoi",
+	nextCheck: "kontrolli tjetër automatik rreth {time}",
 	signalsTitle: "Gjendja",
 	signal: {
 		collection: {
@@ -220,7 +221,7 @@ const sq = {
 	deleteConfirm: "Po, fshije",
 	inboxIntro: "Next Invoice lexon mailbox-in me të njëjtin fjalëkalim aplikacioni që përdor për dërgimin e faturave, dhe merr vetëm email-at ku janë adresat më poshtë: dërgues, marrës ose në CC. Asgjë nuk ndryshohet në mailbox.",
 	noMailbox: "Së pari lidhe një mailbox te",
-	enabled: "Lexo email-at automatikisht (çdo 15 minuta)",
+	enabled: "Lexo email-at automatikisht (çdo 2 orë)",
 	mailbox: "Mailbox-i",
 	mailboxCompany: "Email-i i kompanisë",
 	mailboxPersonal: "Email-i im",
@@ -269,6 +270,7 @@ const en = {
 	progressReading: "{count} documents being read",
 	lastCheck: "Last check: {date} · {count} emails in all",
 	lastCheckFailed: "The last check failed",
+	nextCheck: "next automatic check around {time}",
 	signalsTitle: "At a glance",
 	signal: {
 		collection: {
@@ -469,7 +471,7 @@ const en = {
 	deleteConfirm: "Yes, delete",
 	inboxIntro: "Next Invoice reads the mailbox with the same app password it sends invoices with, and takes only the emails that involve the addresses below: as sender, recipient or in copy. Nothing in the mailbox is changed.",
 	noMailbox: "First connect a mailbox in",
-	enabled: "Read emails automatically (every 15 minutes)",
+	enabled: "Read emails automatically (every 2 hours)",
 	mailbox: "Mailbox",
 	mailboxCompany: "Company email",
 	mailboxPersonal: "My email",
@@ -522,6 +524,7 @@ const financeTexts = {
 		progressReading: "{count} documenti in lettura",
 		lastCheck: "Ultimo controllo: {date} · {count} email in tutto",
 		lastCheckFailed: "L’ultimo controllo non è riuscito",
+		nextCheck: "prossimo controllo automatico verso le {time}",
 		signalsTitle: "In sintesi",
 		signal: {
 			collection: {
@@ -722,7 +725,7 @@ const financeTexts = {
 		deleteConfirm: "Sì, elimina",
 		inboxIntro: "Next Invoice legge la casella con la stessa password per app con cui invia le fatture, e prende solo le email che coinvolgono gli indirizzi qui sotto: mittente, destinatario o in copia. Nella casella non cambia nulla.",
 		noMailbox: "Prima collega una casella in",
-		enabled: "Leggi le email automaticamente (ogni 15 minuti)",
+		enabled: "Leggi le email automaticamente (ogni 2 ore)",
 		mailbox: "Casella",
 		mailboxCompany: "Email aziendale",
 		mailboxPersonal: "La mia email",
