@@ -1,5 +1,7 @@
 # NextInvoice API + its database, as run on the production server (/opt/nextinvoice).
-# Secrets come from /opt/nextinvoice/.env on the server; that file is never in git.
+# Secrets come from /opt/nextinvoice/.env on the server; that file is never in git. The database
+# password is not among them: it is the file secrets/db_password (see deploy/rotate-db-password.sh),
+# readable by root and the api container only, and appears in no container setting.
 name: nextinvoice
 
 services:
@@ -10,7 +12,9 @@ services:
     environment:
       POSTGRES_DB: nextinvoice
       POSTGRES_USER: nextinvoice
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # The password was given when the database was first created and is not needed to run it.
+      # A brand-new database: add POSTGRES_PASSWORD_FILE: /run/secrets/db_password and
+      # "secrets: [db_password]" here for its first start.
     volumes:
       - ./pgdata:/var/lib/postgresql/data
     # No published port: only the api container can reach the database.
@@ -29,7 +33,12 @@ services:
       PORT: '4000'
       PROXY_TO: 'off'
       # Same private Docker network, so no TLS between the two containers.
-      DATABASE_URL: postgres://nextinvoice:${POSTGRES_PASSWORD}@db:5432/nextinvoice?sslmode=disable
+      DATABASE_URL: postgres://nextinvoice@db:5432/nextinvoice?sslmode=disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    # The app runs as "node", which is uid 1000 and so the same as a login user of the server.
+    # Group 4100 belongs to no one on the server; the password file is root's and this group's.
+    group_add: ['4100']
     depends_on:
       db:
         condition: service_healthy
@@ -37,3 +46,7 @@ services:
     ports:
       - '127.0.0.1:4100:4000'
     stop_grace_period: 20s
+
+secrets:
+  db_password:
+    file: ./secrets/db_password

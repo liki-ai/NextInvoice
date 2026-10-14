@@ -37,6 +37,20 @@ function sslFor(url) {
   return { rejectUnauthorized: false };
 }
 
+/**
+ * The database's address. Its password can sit in a file of its own (DATABASE_PASSWORD_FILE, a
+ * Docker secret) instead of in the address, so it shows in no setting of the running container.
+ */
+function databaseUrl() {
+  const url = String(process.env.DATABASE_URL || '').trim();
+  const file = String(process.env.DATABASE_PASSWORD_FILE || '').trim();
+  if (!url || !file) return url;
+  const address = new URL(url);
+  // Encoded here: the URL setter leaves a "%" as it is, and the driver decodes what it reads.
+  address.password = encodeURIComponent(fs.readFileSync(file, 'utf8').trim());
+  return address.toString();
+}
+
 function hasPostgres() {
   return Boolean(process.env.DATABASE_URL && String(process.env.DATABASE_URL).trim());
 }
@@ -54,9 +68,10 @@ async function initPersist() {
   }
 
   const { Pool } = require('pg');
+  const url = databaseUrl();
   pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: sslFor(process.env.DATABASE_URL),
+    connectionString: url,
+    ssl: sslFor(url),
     max: 2,
   });
   // A dropped idle connection must not crash the process; the next query opens a new one.
@@ -207,6 +222,7 @@ module.exports = {
   serialize,
   saveSerialized,
   hasPostgres,
+  databaseUrl,
   pgPool,
   DATA_DIR,
   DB_PATH,
