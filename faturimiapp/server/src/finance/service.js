@@ -84,9 +84,11 @@ function progress(ownerId) {
 
 const readingFor = new Map();
 
-function enqueue(ownerId, docId) {
+/** Queues a document to be read; `first` puts it ahead of the rest (one the user just uploaded). */
+function enqueue(ownerId, docId, first = false) {
   if (queue.some((item) => item.ownerId === ownerId && item.docId === docId)) return;
-  queue.push({ ownerId, docId });
+  if (first) queue.unshift({ ownerId, docId });
+  else queue.push({ ownerId, docId });
   pump();
 }
 
@@ -140,7 +142,7 @@ async function addFile(ownerId, { name, mime, data, source, email }) {
     finance.documents.push(doc);
     return doc;
   });
-  if (saved.id === doc.id) enqueue(ownerId, doc.id);
+  if (saved.id === doc.id) enqueue(ownerId, doc.id, source === 'upload');
   else await removeFile(ownerId, fileId);
   return { doc: saved, duplicate: saved.id !== doc.id };
 }
@@ -220,7 +222,7 @@ async function processDocument(ownerId, docId) {
     if (!data) throw new Error('FILE_MISSING');
     const profile = getProfile(ownerId) || {};
     const email = doc.email ? `Subject: ${doc.email.subject}\nFrom: ${doc.email.fromName || ''} <${doc.email.from}>\nDate: ${doc.email.date || ''}` : '';
-    const { result, statement } = await extractDocument({ name: doc.name, mime: doc.mime, data, companyName: profile.companyName, email });
+    const { result, statement, months } = await extractDocument({ name: doc.name, mime: doc.mime, data, companyName: profile.companyName, email });
     const figures = {};
     for (const key of FIGURE_KEYS) figures[key] = result[key];
     if (figures.bank) {
@@ -254,6 +256,14 @@ async function processDocument(ownerId, docId) {
         const dates = lines.map((line) => line.date).sort();
         const read = fromSheet ? statement : { lines, from: result.bank && result.bank.from ? result.bank.from : dates[0], to: result.bank && result.bank.to ? result.bank.to : dates[dates.length - 1] };
         settleInvoices(ownerId, docId, read, { auto: fromSheet && load(ownerId).settings.autoBank !== false });
+      }
+      // Money in and out month by month, and what it went out for.
+      if (months) {
+        mutate(ownerId, (finance) => {
+          const current = findDoc(finance, docId);
+          if (!current) return;
+          current.statement = { ...(current.statement || { from: statement.from, to: statement.to, credits: 0, totalIn: 0, loose: 0, looseTotal: 0, auto: false, applied: [], review: [] }), iban: months.iban || (result.bank && result.bank.iban) || '', months: months.months };
+        });
       }
     }
   } catch (err) {
@@ -426,8 +436,12 @@ function startFinanceChecks() {
     }
   };
   // Documents left half-read by a restart are read again.
+  // Spreadsheet statements read before money in and out was counted month by month are read again.
   for (const ownerId of financeOwners()) {
-    for (const doc of load(ownerId).documents) if (doc.status === 'pending') enqueue(ownerId, doc.id);
+    for (const doc of load(ownerId).documents) {
+      const unsplit = doc.status === 'done' && doc.kind === 'bank_statement' && /\.(xlsx|xls|csv)$/i.test(doc.name) && !(doc.statement && doc.statement.months);
+      if (doc.status === 'pending' || unsplit) enqueue(ownerId, doc.id);
+    }
   }
   setTimeout(() => round().catch(() => {}), 60 * 1000).unref();
   timer = setInterval(() => round().catch(() => {}), CHECK_EVERY_MS);
@@ -545,12 +559,13 @@ function editDocument(ownerId, docId, body) {
 }
 
 function retryDocument(ownerId, docId) {
+  // Read again on request: ahead of the documents still waiting.
   const doc = mutate(ownerId, (finance) => {
     const current = findDoc(finance, docId);
     if (current) Object.assign(current, { status: 'pending', error: null });
     return current;
   });
-  if (doc) enqueue(ownerId, docId);
+  if (doc) enqueue(ownerId, docId, true);
   return doc;
 }
 

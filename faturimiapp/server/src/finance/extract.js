@@ -206,6 +206,7 @@ async function extractDocument({ name, mime, data, companyName, email }) {
   const parts = [];
   let statement = null;
   let sheetBank = null;
+  let sheetMonths = null;
   let hint = HINT_TEXT[guess] || '';
 
   if (type === 'pdf') {
@@ -221,6 +222,7 @@ async function extractDocument({ name, mime, data, companyName, email }) {
     // bank statement is treated as one.
     statement = lib.readStatement(workbook);
     if (statement && lib.statementFigures) sheetBank = lib.statementFigures(workbook);
+    if (statement && lib.statementMonths) sheetMonths = lib.statementMonths(workbook);
     if (statement && (!guess || guess === 'bank_statement')) hint = 'This spreadsheet may be a bank statement. If it is, fill "bank" and leave "credits" empty: the movements are read separately.';
     parts.push({ type: 'input_text', text: `Spreadsheet contents:\n${lib.workbookText(workbook)}` });
   } else if (type === 'docx') {
@@ -231,7 +233,7 @@ async function extractDocument({ name, mime, data, companyName, email }) {
   parts.push({ type: 'input_text', text: instructions({ companyName, hint, fileName: name, email }) });
 
   const result = await extractStructured(parts, SCHEMA, 'finance_document');
-  if (result.kind !== 'bank_statement') return { result, statement: null };
+  if (result.kind !== 'bank_statement') return { result, statement: null, months: null };
   // The balances and totals the sheet prints are taken as they are; the model's reading fills the rest.
   if (sheetBank && statement) {
     const bank = { ...(result.bank || {}) };
@@ -240,7 +242,7 @@ async function extractDocument({ name, mime, data, companyName, email }) {
     bank.to = statement.to;
     result.bank = bank;
   }
-  return { result, statement };
+  return { result, statement, months: sheetMonths };
 }
 
 /** The tables of an email written in HTML, as text, or '' when it has none worth reading. */

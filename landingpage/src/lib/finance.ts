@@ -24,6 +24,11 @@ export const FINANCE_KINDS = [
 ] as const
 export type FinanceKind = (typeof FINANCE_KINDS)[number]
 
+/** What money leaving the bank went to, as the server sorts a statement's outgoing payments. */
+export const SPEND_CATEGORIES = ['payroll', 'taxes', 'rent', 'suppliers', 'card', 'cash', 'fees', 'dividends', 'other'] as const
+export type SpendCategory = (typeof SPEND_CATEGORIES)[number]
+export type BankMonth = { in: number; out: number; spend: Partial<Record<SpendCategory, number>> }
+
 type N = number | null
 
 export type FinanceFigures = {
@@ -97,6 +102,8 @@ export type FinanceDoc = {
     matchedAt: string
     applied: SettledInvoice[]
     review: ReviewInvoice[]
+    iban?: string
+    months?: Record<string, BankMonth>
   } | null
   excluded?: boolean
   hasFile: boolean
@@ -169,6 +176,8 @@ export type MonthFigures = {
   payrollCost: N
   employees: N
   kinds: Set<FinanceKind>
+  /** Money in and out of the bank this month, and what it went out for; null without a statement. */
+  bank: BankMonth | null
 }
 
 function taxAmount(doc: FinanceDoc): N {
@@ -209,6 +218,7 @@ function emptyMonth(period: string): MonthFigures {
     payrollCost: null,
     employees: null,
     kinds: new Set(),
+    bank: null,
   }
 }
 
@@ -217,6 +227,46 @@ function monthOf(period: string) {
   const quarter = /^(\d{4})-Q([1-4])$/.exec(period)
   if (quarter) return `${quarter[1]}-${String(Number(quarter[2]) * 3).padStart(2, '0')}`
   return /^\d{4}-\d{2}$/.test(period) ? period : ''
+}
+
+const monthEndDay = (period: string) => {
+  const [year, month] = period.split('-').map(Number)
+  return `${period}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Each month's bank figures. Statements overlap (one for the year, one per month sent by email);
+ * for each account and month the statement that covers the whole month, and of those the newest,
+ * is the one counted.
+ */
+export function bankMonths(docs: FinanceDoc[]) {
+  const best = new Map<string, { doc: FinanceDoc; full: boolean; month: BankMonth }>()
+  for (const doc of docs) {
+    const statement = doc.statement
+    if (doc.kind !== 'bank_statement' || !statement?.months) continue
+    for (const [period, month] of Object.entries(statement.months)) {
+      const full = Boolean(statement.from && statement.to && statement.from <= `${period}-01` && statement.to >= monthEndDay(period))
+      const key = `${statement.iban || doc.figures?.bank?.iban || ''}|${period}`
+      const seen = best.get(key)
+      const newer = !seen || String(statement.to) > String(seen.doc.statement?.to) || (String(statement.to) === String(seen.doc.statement?.to) && doc.receivedAt > seen.doc.receivedAt)
+      if (!seen || (full && !seen.full) || (full === seen.full && newer)) best.set(key, { doc, full, month })
+    }
+  }
+  const byMonth = new Map<string, BankMonth>()
+  for (const [key, { month }] of best) {
+    const period = key.split('|')[1]
+    const total = byMonth.get(period) || { in: 0, out: 0, spend: {} }
+    total.in = round(total.in + month.in)
+    total.out = round(total.out + month.out)
+    for (const item of SPEND_CATEGORIES) if (month.spend[item]) total.spend[item] = round((total.spend[item] ?? 0) + (month.spend[item] as number))
+    byMonth.set(period, total)
+  }
+  return byMonth
+}
+
+/** What a month cost to run by the bank: everything that went out except what the owners took. */
+export function operatingOut(month: BankMonth) {
+  return round(month.out - (month.spend.dividends ?? 0))
 }
 
 /** Month by month for one year: what was invoiced and collected here, and what the accountant's documents say. */
@@ -229,6 +279,12 @@ export function monthlyFigures(docs: FinanceDoc[], invoices: Invoice[], year: nu
     month.invoiced = report.invoiced
     month.collected = report.paymentsReceived
   })
+
+  const bank = bankMonths(docs)
+  for (const month of months) {
+    month.bank = bank.get(month.period) ?? null
+    if (month.bank) month.kinds.add('bank_statement')
+  }
 
   const covered = new Set<string>()
   for (const doc of docs) {
@@ -301,7 +357,9 @@ export type FinanceSummary = {
   overdue: number
   taxesPaid: number
   taxesByKind: Record<'vat' | 'payroll' | 'rent' | 'profit' | 'other', number>
-  payroll: { period: string; cost: N; net: N; employees: N } | null
+  payroll: { period: string; cost: N; net: N; employees: N; fromBank: boolean } | null
+  /** The year's spending as the bank shows it, by what it went to; dividends are kept apart. */
+  spending: { total: number; average: number; months: number; dividends: number; byCategory: { category: SpendCategory; amount: number }[]; taxesFromBank: number } | null
   annual: { year: string; revenue: N; netProfit: N; profitBeforeTax: N; margin: N; docId: string } | null
   estimate: { result: number; months: number } | null
   burn: N
@@ -363,8 +421,35 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
   for (const doc of docs) if (doc.kind === 'profit_tax' && doc.period === String(year)) taxesByKind.profit = round(taxesByKind.profit + (taxAmount(doc) ?? 0))
   const taxesPaid = round(Object.values(taxesByKind).reduce((total, value) => total + value, 0))
 
-  const payrollMonth = [...months].reverse().find((month) => has(month.payrollCost) || has(month.payrollNet))
-  const payroll = payrollMonth ? { period: payrollMonth.period, cost: payrollMonth.payrollCost, net: payrollMonth.payrollNet, employees: payrollMonth.employees } : null
+  // A month is complete once it is over; the current one would pull every average down.
+  const thisMonth = isoDay(now).slice(0, 7)
+  const complete = (month: MonthFigures) => month.period < thisMonth
+
+  const payrollMonth = [...months].reverse().find((month) => complete(month) && (has(month.payrollCost) || has(month.payrollNet)))
+  // Without a payroll list the bank still shows what was paid out as pay and contributions.
+  const bankPayMonth = [...months].reverse().find((month) => complete(month) && (month.bank?.spend.payroll ?? 0) > 0)
+  const payroll = payrollMonth
+    ? { period: payrollMonth.period, cost: payrollMonth.payrollCost, net: payrollMonth.payrollNet, employees: payrollMonth.employees, fromBank: false }
+    : bankPayMonth
+      ? { period: bankPayMonth.period, cost: null, net: bankPayMonth.bank!.spend.payroll as number, employees: null, fromBank: true }
+      : null
+
+  const spentMonths = months.filter((month) => month.bank)
+  const fullMonths = spentMonths.filter(complete)
+  const byCategory = SPEND_CATEGORIES.filter((item) => item !== 'dividends')
+    .map((category) => ({ category, amount: round(spentMonths.reduce((total, month) => total + (month.bank!.spend[category] ?? 0), 0)) }))
+    .filter((item) => item.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+  const spending = spentMonths.length
+    ? {
+        total: round(spentMonths.reduce((total, month) => total + operatingOut(month.bank!), 0)),
+        average: fullMonths.length ? round(fullMonths.reduce((total, month) => total + operatingOut(month.bank!), 0) / fullMonths.length) : 0,
+        months: fullMonths.length,
+        dividends: round(spentMonths.reduce((total, month) => total + (month.bank!.spend.dividends ?? 0), 0)),
+        byCategory,
+        taxesFromBank: round(spentMonths.reduce((total, month) => total + (month.bank!.spend.taxes ?? 0), 0)),
+      }
+    : null
 
   const annualDoc = docs
     .filter((doc) => doc.kind === 'financial_statements' && /^\d{4}$/.test(doc.period || '') && doc.figures?.statements)
@@ -411,7 +496,14 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
     (month.purchasesVat ?? 0) +
     (month.vat ?? 0) +
     (month.rentTax ?? 0)
-  const burn = outflows.length
+  // Best of all: the last three complete months the bank shows, without dividends.
+  const bankRecent = [...bankMonths(docs).entries()]
+    .filter(([period]) => period < thisMonth)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 3)
+  const burn = bankRecent.length
+    ? round(bankRecent.reduce((total, [, month]) => total + operatingOut(month), 0) / bankRecent.length)
+    : outflows.length
     ? round(outflows.reduce((total, item) => total + item.perMonth, 0) / outflows.length)
     : recent.length
       ? round(recent.reduce((total, month) => total + monthCost(month), 0) / recent.length)
@@ -467,6 +559,7 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
     annual,
     estimate,
     burn,
+    spending,
     missing,
     upcoming,
     signals,

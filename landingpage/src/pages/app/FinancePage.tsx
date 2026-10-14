@@ -17,6 +17,7 @@ import {
   financeYears,
   headlineAmount,
   monthlyFigures,
+  operatingOut,
   type FinanceDoc,
   type FinanceKind,
   type FinanceView,
@@ -343,16 +344,18 @@ export function FinancePage() {
           />
           <Tile
             label={t('finance.taxesPaid', { year })}
-            value={money(summary.taxesPaid)}
+            value={money(summary.taxesPaid || summary.spending?.taxesFromBank || 0)}
             hint={
-              [
+              !summary.taxesPaid && summary.spending?.taxesFromBank
+                ? t('finance.taxesFromBank')
+                : [
                 summary.taxesByKind.vat ? `${t('finance.short.vat')} ${money(summary.taxesByKind.vat)}` : '',
                 summary.taxesByKind.payroll ? `${t('finance.short.payroll')} ${money(summary.taxesByKind.payroll)}` : '',
                 summary.taxesByKind.rent ? `${t('finance.short.rent')} ${money(summary.taxesByKind.rent)}` : '',
                 summary.taxesByKind.profit ? `${t('finance.short.profit')} ${money(summary.taxesByKind.profit)}` : '',
               ]
-                .filter(Boolean)
-                .join(' · ') || t('finance.noTaxDocs')
+                    .filter(Boolean)
+                    .join(' · ') || t('finance.noTaxDocs')
             }
           />
           <Tile
@@ -360,7 +363,7 @@ export function FinancePage() {
             value={summary.payroll ? money(summary.payroll.cost ?? summary.payroll.net) : '—'}
             hint={
               summary.payroll
-                ? [periodText(summary.payroll.period, lang), summary.payroll.employees ? t('finance.employees', { count: summary.payroll.employees }) : '', summary.payroll.cost === null ? t('finance.onlyNet') : summary.payroll.net !== null ? t('finance.netHint', { amount: money(summary.payroll.net) }) : '']
+                ? [periodText(summary.payroll.period, lang), summary.payroll.employees ? t('finance.employees', { count: summary.payroll.employees }) : '', summary.payroll.fromBank ? t('finance.payrollFromBank') : summary.payroll.cost === null ? t('finance.onlyNet') : summary.payroll.net !== null ? t('finance.netHint', { amount: money(summary.payroll.net) }) : '']
                     .filter(Boolean)
                     .join(' · ')
                 : t('finance.noPayroll')
@@ -381,6 +384,38 @@ export function FinancePage() {
           />
         </div>
       </section>
+
+      {summary.spending ? (
+        <section className="mt-6" aria-labelledby="finance-spending">
+          <SectionTitle>
+            <span id="finance-spending">{t('finance.spendTitle', { year })}</span>
+          </SectionTitle>
+          <Card className="p-5">
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+              <p className="font-display text-2xl font-medium tabular-nums">{money(summary.spending.total)}</p>
+              {summary.spending.months > 0 ? <p className="text-sm text-brand-ink/60">{t('finance.spendAverage', { amount: money(summary.spending.average), count: summary.spending.months })}</p> : null}
+              {summary.spending.dividends > 0 ? <p className="text-sm text-brand-ink/60">{t('finance.spendDividends', { amount: money(summary.spending.dividends) })}</p> : null}
+            </div>
+            <ul className="mt-4 space-y-2.5">
+              {summary.spending.byCategory.map((item) => {
+                const share = summary.spending!.total > 0 ? item.amount / summary.spending!.total : 0
+                return (
+                  <li key={item.category} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-3 text-sm sm:grid-cols-[12rem_1fr_9rem]">
+                    <span className="truncate">{t(`finance.spend.${item.category}`)}</span>
+                    <span className="h-2 overflow-hidden rounded-full bg-brand-ink/[0.06]">
+                      <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.max(1, Math.round(share * 100))}%` }} />
+                    </span>
+                    <span className="text-right font-semibold tabular-nums">
+                      {money(item.amount)} <span className="font-normal text-brand-ink/45">{Math.round(share * 100)}%</span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="mt-4 text-[11px] text-brand-ink/45">{t('finance.spendNote')}</p>
+          </Card>
+        </section>
+      ) : null}
 
       {summary.upcoming.length > 0 || (summary.missing && summary.missing.kinds.length > 0) ? (
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
@@ -421,12 +456,14 @@ export function FinancePage() {
         <SectionTitle>{t('finance.monthlyTitle', { year })}</SectionTitle>
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-right text-sm tabular-nums">
+            <table className="w-full min-w-[1120px] text-right text-sm tabular-nums">
               <thead>
                 <tr className="border-b border-brand-ink/8 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-brand-ink/45">
                   <th className="px-4 py-3 text-left">{t('finance.col.month')}</th>
                   <th className="px-3 py-3">{t('finance.col.invoiced')}</th>
                   <th className="px-3 py-3">{t('finance.col.collected')}</th>
+                  <th className="px-3 py-3">{t('finance.col.bankIn')}</th>
+                  <th className="px-3 py-3">{t('finance.col.bankOut')}</th>
                   <th className="px-3 py-3">{t('finance.col.sales')}</th>
                   <th className="px-3 py-3">{t('finance.col.purchases')}</th>
                   <th className="px-3 py-3">{t('finance.col.payroll')}</th>
@@ -447,9 +484,11 @@ export function FinancePage() {
                       <td className="px-4 py-2.5 text-left font-semibold capitalize">{monthName(month.period, lang)}</td>
                       <td className="px-3 py-2.5">{month.invoiced ? money(month.invoiced) : '—'}</td>
                       <td className="px-3 py-2.5">{month.collected ? money(month.collected) : '—'}</td>
+                      <td className="px-3 py-2.5">{month.bank ? money(month.bank.in) : '—'}</td>
+                      <td className="px-3 py-2.5">{month.bank ? money(operatingOut(month.bank)) : '—'}</td>
                       <td className="px-3 py-2.5">{money(month.salesNet)}</td>
                       <td className="px-3 py-2.5">{money(month.purchasesNet)}</td>
-                      <td className="px-3 py-2.5">{money(month.payrollCost ?? month.payrollNet)}</td>
+                      <td className="px-3 py-2.5">{money(month.payrollCost ?? month.payrollNet ?? (month.bank?.spend.payroll || null))}</td>
                       <td className="px-3 py-2.5">{money(month.vat)}</td>
                       <td className="px-3 py-2.5">{money(month.payrollTax)}</td>
                       <td className="px-3 py-2.5">{money(other)}</td>
@@ -476,12 +515,19 @@ export function FinancePage() {
               <tfoot>
                 <tr className="border-t border-brand-ink/10 font-semibold">
                   <td className="px-4 py-3 text-left">{t('finance.col.total')}</td>
-                  {(['invoiced', 'collected', 'salesNet', 'purchasesNet'] as const).map((key) => (
+                  {(['invoiced', 'collected'] as const).map((key) => (
+                    <td key={key} className="px-3 py-3">
+                      {money(months.reduce((total, month) => total + month[key], 0))}
+                    </td>
+                  ))}
+                  <td className="px-3 py-3">{money(months.reduce((total, month) => total + (month.bank?.in ?? 0), 0))}</td>
+                  <td className="px-3 py-3">{money(months.reduce((total, month) => total + (month.bank ? operatingOut(month.bank) : 0), 0))}</td>
+                  {(['salesNet', 'purchasesNet'] as const).map((key) => (
                     <td key={key} className="px-3 py-3">
                       {money(months.reduce((total, month) => total + (month[key] ?? 0), 0))}
                     </td>
                   ))}
-                  <td className="px-3 py-3">{money(months.reduce((total, month) => total + (month.payrollCost ?? month.payrollNet ?? 0), 0))}</td>
+                  <td className="px-3 py-3">{money(months.reduce((total, month) => total + (month.payrollCost ?? month.payrollNet ?? month.bank?.spend.payroll ?? 0), 0))}</td>
                   <td className="px-3 py-3">{money(summary.taxesByKind.vat)}</td>
                   <td className="px-3 py-3">{money(summary.taxesByKind.payroll)}</td>
                   <td className="px-3 py-3">{money(summary.taxesByKind.rent + summary.taxesByKind.profit + summary.taxesByKind.other)}</td>

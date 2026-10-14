@@ -4,11 +4,12 @@
 // invoices it pays without anyone opening it. Nothing here may depend on React or on the browser.
 
 import { matchStatement, readStatement, reconcilePayload, type BankStatement } from './bankMatch'
+import { SPEND_CATEGORIES, type SpendCategory } from './finance'
 import type { Invoice } from './invoice'
 import { isLegacyWorkbook, readLegacyWorkbook } from './xls'
 import { readWorkbook, type CellValue, type Workbook } from './xlsx'
 
-export { matchStatement, readStatement, reconcilePayload }
+export { matchStatement, readStatement, reconcilePayload, SPEND_CATEGORIES }
 export type { BankStatement, Invoice, Workbook }
 
 /** Splits comma-, semicolon- or tab-separated text into rows, honouring quoted cells. */
@@ -173,6 +174,82 @@ export function statementFigures(workbook: Workbook) {
     break
   }
   return result
+}
+
+
+/** What an outgoing payment was for, from the words the bank wrote on it. */
+export function spendCategory(text: string): SpendCategory {
+  const words = plainText(text)
+  if (/pagese e komisionit|komisioni mujor|commission|provizion/.test(words)) return 'fees'
+  // What the owners take out is not a cost of running the company.
+  if (/\bdividen(t|d)/.test(words)) return 'dividends'
+  if (/administraten tatimore|administrata tatimore|\batk\b|fiscal no|kontribut\w* pensional|mfakp|\btrust\b/.test(words)) return 'taxes'
+  if (/\bpag(a|at|en)\b|\brrog|salary|salaries|pune praktike/.test(words)) return 'payroll'
+  if (/\bqira|\brent\b/.test(words)) return 'rent'
+  if (/terheqje|bankomat|\batm\b|cash withdrawal/.test(words)) return 'cash'
+  if (/blerje me kartel|\bpos\b|card purchase/.test(words)) return 'card'
+  if (/fatur|invoice|proforma|pagese|payment|transfert/.test(words)) return 'suppliers'
+  return 'other'
+}
+
+function excelDay(value: CellValue): string {
+  const iso = (date: Date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? '' : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  if (typeof value === 'number') return value > 20000 && value < 80000 ? iso(new Date(Math.round((value - 25569) * 86400000))) : ''
+  const text = String(value ?? '').trim()
+  if (/^\d{5}(\.\d+)?$/.test(text)) return excelDay(Number(text))
+  const ymd = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text)
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`
+  const dmy = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/.exec(text)
+  return dmy ? `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}` : ''
+}
+
+export type StatementMonth = { in: number; out: number; spend: Record<SpendCategory, number> }
+
+/**
+ * Money in and out of the account month by month, and what went out for: pay, taxes and
+ * contributions, rent, suppliers, card purchases, cash, bank fees. Null when the sheet has no
+ * debit and credit columns with dates.
+ */
+export function statementMonths(workbook: Workbook): { iban: string; months: Record<string, StatementMonth> } | null {
+  for (const sheet of workbook.sheets) {
+    const head = sheet.rows.findIndex((row) => {
+      const names = row.map(plainText)
+      return names.some((name) => /debit/.test(name)) && names.some((name) => /kredit|credit/.test(name)) && names.some((name) => /data|date|datum/.test(name))
+    })
+    if (head === -1) continue
+    const names = sheet.rows[head].map(plainText)
+    const debit = names.findIndex((name) => /debit/.test(name) && !/kredit|credit/.test(name))
+    const credit = names.findIndex((name) => /kredit|credit/.test(name) && !/debit/.test(name))
+    const date = names.findIndex((name) => /data|date|datum/.test(name) && !/debit|kredit|credit/.test(name))
+    const months: Record<string, StatementMonth> = {}
+    for (const row of sheet.rows.slice(head + 1)) {
+      const day = excelDay(row[date] ?? null)
+      if (!day) continue
+      const inAmount = Math.max(amountOf(row[credit] ?? null) ?? 0, 0)
+      const outAmount = Math.max(amountOf(row[debit] ?? null) ?? 0, 0)
+      if (!inAmount && !outAmount) continue
+      const key = day.slice(0, 7)
+      const month = (months[key] ||= { in: 0, out: 0, spend: Object.fromEntries(SPEND_CATEGORIES.map((item) => [item, 0])) as Record<SpendCategory, number> })
+      month.in += inAmount
+      if (outAmount) {
+        month.out += outAmount
+        const text = row
+          .filter((cell, index) => typeof cell === 'string' && index !== date)
+          .join(' ')
+        month.spend[spendCategory(text)] += outAmount
+      }
+    }
+    for (const month of Object.values(months)) {
+      month.in = Math.round(month.in * 100) / 100
+      month.out = Math.round(month.out * 100) / 100
+      for (const item of SPEND_CATEGORIES) month.spend[item] = Math.round(month.spend[item] * 100) / 100
+    }
+    let iban = ''
+    for (const row of sheet.rows.slice(0, head)) for (const cell of row) iban ||= /\bXK\d{18}\b/.exec(String(cell ?? '').replace(/\s+/g, ''))?.[0] || ''
+    return Object.keys(months).length ? { iban, months } : null
+  }
+  return null
 }
 
 /** The incoming payments of a statement file, or null when the file holds no statement. */
