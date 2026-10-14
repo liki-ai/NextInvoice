@@ -23,7 +23,9 @@ const { fetchBatch, testInbox, imapHostFor } = require('./inbox');
 const WATCH_MAX = 10;
 const MESSAGES_KEPT = 3000;
 const DOCUMENTS_MAX = 3000;
-const CHECK_EVERY_MS = 15 * 60 * 1000;
+// The accountant writes a few times a week; every two hours is plenty, and the page has a button
+// for checking at once.
+const CHECK_EVERY_MS = 2 * 60 * 60 * 1000;
 
 function nowIso() {
   return new Date().toISOString();
@@ -389,12 +391,15 @@ function readyToCheck(settings) {
   return Boolean(settings.enabled && settings.watch.length > 0);
 }
 
-/** Looks for new messages from or to the watched addresses and brings in what they carry. */
-async function checkMail(ownerId) {
+/**
+ * Looks for new messages from or to the watched addresses and brings in what they carry.
+ * Asked for from the page (`manual`), it runs even with automatic reading switched off.
+ */
+async function checkMail(ownerId, { manual = false } = {}) {
   if (checking.has(ownerId)) return;
   const finance = load(ownerId);
   const settings = finance.settings;
-  if (!readyToCheck(settings)) return;
+  if (manual ? settings.watch.length === 0 : !readyToCheck(settings)) return;
   const box = mailboxFor(ownerId, settings);
   const run = { fetched: 0, remaining: 0 };
   checking.set(ownerId, run);
@@ -428,11 +433,14 @@ async function checkMail(ownerId) {
 }
 
 let timer = null;
+/** When the next automatic round is due, for the page to show. */
+let nextRoundAt = null;
 
 /** Checks every company's mailbox now and then, one company at a time. */
 function startFinanceChecks() {
   if (timer || process.env.FINANCE_MAIL === 'off') return;
   const round = async () => {
+    nextRoundAt = Date.now() + CHECK_EVERY_MS;
     for (const ownerId of financeOwners()) {
       if (readyToCheck(load(ownerId).settings)) await checkMail(ownerId).catch(() => {});
     }
@@ -447,6 +455,7 @@ function startFinanceChecks() {
       if (doc.status === 'pending' || unsplit) enqueue(ownerId, doc.id);
     }
   }
+  nextRoundAt = Date.now() + 60 * 1000;
   setTimeout(() => round().catch(() => {}), 60 * 1000).unref();
   timer = setInterval(() => round().catch(() => {}), CHECK_EVERY_MS);
   timer.unref();
@@ -481,7 +490,7 @@ function describe(ownerId, account) {
       autoBank: settings.autoBank !== false,
     },
     mailboxes: { company: mailboxSummary(company), personal: mailboxSummary(personal) },
-    check: finance.check,
+    check: { ...finance.check, nextAt: settings.enabled && nextRoundAt ? new Date(nextRoundAt).toISOString() : null },
     progress: progress(ownerId),
     messages: finance.messages.length,
     documents: finance.documents.map(publicDoc).sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt))),

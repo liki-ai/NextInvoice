@@ -263,7 +263,7 @@ export function FinancePage() {
               e.target.value = ''
             }}
           />
-          {settings?.enabled ? (
+          {settings?.watch.length ? (
             <Button type="button" variant="secondary" disabled={view?.progress.checking} onClick={() => void act('/api/finance/check')}>
               <RefreshCw className={cn('h-4 w-4', view?.progress.checking && 'animate-spin')} />
               {view?.progress.checking ? t('finance.checking') : t('finance.checkNow')}
@@ -302,6 +302,21 @@ export function FinancePage() {
               : view.check.lastAt
                 ? t('finance.lastCheck', { date: new Date(view.check.lastAt).toLocaleString(lang), count: view.messages })
                 : ''}
+          {!view.progress.checking && view.check.nextAt ? (
+            <span>· {t('finance.nextCheck', { time: new Date(view.check.nextAt).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) })}</span>
+          ) : null}
+          {settings?.watch.length ? (
+            <button
+              type="button"
+              disabled={view.progress.checking}
+              onClick={() => void act('/api/finance/check')}
+              title={t('finance.checkNow')}
+              aria-label={t('finance.checkNow')}
+              className="rounded-md p-1 text-brand transition hover:bg-brand/10 disabled:opacity-50"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', view.progress.checking && 'animate-spin')} />
+            </button>
+          ) : null}
           {view.progress.reading > 0 ? <span className="font-semibold text-brand">· {t('finance.progressReading', { count: view.progress.reading })}</span> : null}
         </p>
       ) : null}

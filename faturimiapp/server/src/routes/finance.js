@@ -58,7 +58,7 @@ router.post('/test', async (req, res, next) => {
 
 /** Starts a mail check now; the page follows its progress. */
 router.post('/check', (req, res) => {
-  finance.checkMail(req.user.id).catch(() => {});
+  finance.checkMail(req.user.id, { manual: true }).catch(() => {});
   setTimeout(() => res.json(finance.describe(req.user.id, req.user)), 300);
 });
 

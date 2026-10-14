@@ -123,7 +123,8 @@ export type FinanceView = {
     autoBank: boolean
   }
   mailboxes: { company: MailboxSummary; personal: MailboxSummary }
-  check: { lastAt: string | null; lastError: string | null; lastDetail: string | null; found: number }
+  /** `nextAt`: when the next automatic check is due, while automatic reading is on. */
+  check: { lastAt: string | null; lastError: string | null; lastDetail: string | null; found: number; nextAt?: string | null }
   progress: { checking: boolean; fetched: number; remaining: number; reading: number }
   messages: number
   documents: FinanceDoc[]
