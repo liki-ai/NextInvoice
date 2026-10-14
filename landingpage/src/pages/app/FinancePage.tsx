@@ -88,12 +88,17 @@ const DOT: Record<HealthStatus, string> = {
   unknown: 'bg-brand-ink/20',
 }
 
-function Tile({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: 'brand' | 'plain' }) {
+function Tile({ label, value, lines, tone }: { label: string; value: ReactNode; lines?: string[]; tone?: 'brand' | 'plain' }) {
+  const shown = (lines || []).filter(Boolean)
   return (
-    <div className={cn('h-full rounded-2xl border p-3.5 sm:p-4', tone === 'brand' ? 'border-brand/15 bg-brand/5' : 'border-brand-ink/8 bg-white')}>
-      <p className={cn('text-[10.5px] font-semibold uppercase tracking-[0.08em]', tone === 'brand' ? 'text-brand/80' : 'text-brand-ink/40')}>{label}</p>
-      <p className="mt-1.5 font-display text-lg font-medium tabular-nums sm:text-xl">{value}</p>
-      {hint ? <p className="mt-1 text-[11px] leading-4 text-brand-ink/50">{hint}</p> : null}
+    <div className={cn('h-full rounded-2xl border p-4 sm:p-5', tone === 'brand' ? 'border-brand/15 bg-brand/5' : 'border-brand-ink/8 bg-white')}>
+      <p className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', tone === 'brand' ? 'text-brand/80' : 'text-brand-ink/45')}>{label}</p>
+      <p className="mt-2 font-display text-xl font-medium tabular-nums sm:text-2xl">{value}</p>
+      {shown.map((line) => (
+        <p key={line} className="mt-1 text-xs leading-[1.1rem] text-brand-ink/55">
+          {line}
+        </p>
+      ))}
     </div>
   )
 }
@@ -326,68 +331,82 @@ export function FinancePage() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile
             tone="brand"
-            label={t('finance.cash')}
-            value={summary.cash ? money(summary.cash.amount) : '—'}
-            hint={summary.cash ? t('finance.cashHint', { date: shortDate(summary.cash.date) }) : t('finance.cashMissing')}
-          />
-          <Tile
-            tone="brand"
             label={t(isThisYear ? 'finance.revenueYtd' : 'finance.revenueYear', { year })}
             value={money(summary.revenue)}
-            hint={change === null ? t('finance.collectedHint', { amount: money(summary.collected) }) : `${change >= 0 ? '+' : ''}${change}% ${t('finance.vsLastYear')} · ${t('finance.collectedHint', { amount: money(summary.collected) })}`}
+            lines={[change === null ? '' : `${change >= 0 ? '+' : ''}${change}% ${t('finance.vsLastYear')}`, t('finance.collectedHint', { amount: money(summary.collected) })]}
           />
           <Tile
             tone="brand"
             label={t('finance.receivables')}
             value={money(summary.receivables)}
-            hint={summary.overdue > 0 ? t('finance.overdueHint', { amount: money(summary.overdue) }) : t('finance.noOverdue')}
+            lines={[summary.overdue > 0 ? t('finance.overdueHint', { amount: money(summary.overdue) }) : t('finance.noOverdue')]}
+          />
+          <Tile
+            tone="brand"
+            label={t('finance.cash')}
+            value={summary.cash ? money(summary.cash.amount) : '—'}
+            lines={[summary.cash ? t('finance.cashHint', { date: shortDate(summary.cash.date) }) : t('finance.cashMissing')]}
           />
           <Tile
             tone="brand"
             label={t(isThisYear ? 'finance.profitYtd' : 'finance.profitYear', { year })}
             value={summary.estimate ? <span className={summary.estimate.result < 0 ? 'text-[#C0503A]' : undefined}>{money(summary.estimate.result)}</span> : '—'}
-            hint={
-              [
-                summary.estimate ? t('finance.profitHint', { from: monthName(summary.estimate.from, lang), to: monthName(summary.estimate.to, lang) }) : t('finance.noEstimate'),
-                summary.annual && summary.annual.netProfit !== null ? t('finance.lastYearProfit', { year: summary.annual.year, amount: money(summary.annual.netProfit) }) : '',
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            }
-          />
-          <Tile
-            label={t('finance.spendTile', { year })}
-            value={summary.spending ? money(summary.spending.total) : '—'}
-            hint={summary.spending ? (summary.burn ? t('finance.burnHint', { amount: money(summary.burn) }) : '') : t('finance.cashMissing')}
+            lines={[
+              summary.estimate ? t('finance.profitHint', { from: monthName(summary.estimate.from, lang), to: monthName(summary.estimate.to, lang) }) : t('finance.noEstimate'),
+              summary.annual && summary.annual.netProfit !== null ? t('finance.lastYearProfit', { year: summary.annual.year, amount: money(summary.annual.netProfit) }) : '',
+            ]}
           />
           <Tile
             label={t('finance.payroll')}
             value={summary.payroll ? money(summary.payroll.cost ?? summary.payroll.net) : '—'}
-            hint={
+            lines={
               summary.payroll
-                ? [periodText(summary.payroll.period, lang), summary.payroll.employees ? t('finance.employees', { count: summary.payroll.employees }) : '', summary.payroll.fromBank ? t('finance.payrollFromBank') : summary.payroll.cost === null ? t('finance.onlyNet') : summary.payroll.net !== null ? t('finance.netHint', { amount: money(summary.payroll.net) }) : '']
-                    .filter(Boolean)
-                    .join(' · ')
-                : t('finance.noPayroll')
+                ? [
+                    [periodText(summary.payroll.period, lang), summary.payroll.employees ? t('finance.employees', { count: summary.payroll.employees }) : ''].filter(Boolean).join(' · '),
+                    summary.payroll.taxes !== null && summary.payroll.net !== null
+                      ? t('finance.payrollBreakdown', { net: money(summary.payroll.net), taxes: money(summary.payroll.taxes) })
+                      : summary.payroll.cost !== null && summary.payroll.net !== null
+                        ? t('finance.netHint', { amount: money(summary.payroll.net) })
+                        : summary.payroll.fromBank
+                          ? t('finance.payrollFromBank')
+                          : t('finance.onlyNet'),
+                  ]
+                : [t('finance.noPayroll')]
             }
           />
           <Tile
             label={t('finance.vatTile', { year })}
             value={summary.taxesByKind.vat ? money(summary.taxesByKind.vat) : '—'}
-            hint={summary.taxesByKind.vat ? t('finance.vatHint') : t('finance.noTaxDocs')}
+            lines={[summary.taxesByKind.vat ? t('finance.vatHint') : t('finance.noTaxDocs')]}
           />
           <Tile
             label={t('finance.otherTaxTile', { year })}
             value={money(summary.taxesByKind.payroll + summary.taxesByKind.rent + summary.taxesByKind.profit + summary.taxesByKind.other)}
-            hint={
-              [
-                summary.taxesByKind.payroll ? `${t('finance.short.payroll')} ${money(summary.taxesByKind.payroll)}` : '',
-                summary.taxesByKind.rent ? `${t('finance.short.rent')} ${money(summary.taxesByKind.rent)}` : '',
-                summary.taxesByKind.profit ? `${t('finance.short.profit')} ${money(summary.taxesByKind.profit)}` : '',
-                summary.taxesByKind.other ? `${t('finance.short.other')} ${money(summary.taxesByKind.other)}` : '',
-              ]
-                .filter(Boolean)
-                .join(' · ') || t('finance.noTaxDocs')
+            lines={
+              summary.taxesByKind.payroll + summary.taxesByKind.rent + summary.taxesByKind.profit + summary.taxesByKind.other > 0
+                ? [
+                    summary.taxesByKind.payroll ? `${t('finance.short.payroll')} ${money(summary.taxesByKind.payroll)}` : '',
+                    [
+                      summary.taxesByKind.rent ? `${t('finance.short.rent')} ${money(summary.taxesByKind.rent)}` : '',
+                      summary.taxesByKind.profit ? `${t('finance.short.profit')} ${money(summary.taxesByKind.profit)}` : '',
+                      summary.taxesByKind.other ? `${t('finance.short.other')} ${money(summary.taxesByKind.other)}` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                  ]
+                : [t('finance.noTaxDocs')]
+            }
+          />
+          <Tile
+            label={t('finance.otherSpendTile', { year })}
+            value={summary.otherSpending ? money(summary.otherSpending.total) : '—'}
+            lines={
+              summary.otherSpending
+                ? [
+                    summary.otherSpending.average ? t('finance.perMonth', { amount: money(summary.otherSpending.average) }) : '',
+                    summary.otherSpending.top.map((item) => `${t(`finance.spendShort.${item.category}`)} ${money(item.amount)}`).join(' · '),
+                  ]
+                : [t('finance.cashMissing')]
             }
           />
         </div>
@@ -448,19 +467,21 @@ export function FinancePage() {
             </Card>
           ) : null}
           {summary.missing && summary.missing.kinds.length > 0 ? (
-            <Card className="border-2 border-[#C9A227]/50 bg-[#FFF9E8] p-5 sm:p-6 lg:col-span-2">
-              <p className="flex items-center gap-2.5 font-display text-xl font-medium">
-                <AlertTriangle className="h-6 w-6 shrink-0 text-[#C9A227]" />
-                {t('finance.missingTitle', { period: periodText(summary.missing.period, lang) })}
-              </p>
-              <ul className="mt-4 flex flex-wrap gap-2">
-                {summary.missing.kinds.map((kind) => (
-                  <li key={kind} className="rounded-xl border border-[#C9A227]/40 bg-white px-3.5 py-2 text-base font-semibold">
-                    {t(`finance.kinds.${kind}`)}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 text-sm text-brand-ink/60">{view && view.progress.reading > 0 ? t('finance.missingReading', { count: view.progress.reading }) : t('finance.missingHint')}</p>
+            <Card className="border border-[#C9A227]/50 bg-[#FFF9E8] px-4 py-3 lg:col-span-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-[#C9A227]" />
+                  {t('finance.missingTitle', { period: periodText(summary.missing.period, lang) })}
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {summary.missing.kinds.map((kind) => (
+                    <li key={kind} className="rounded-lg border border-[#C9A227]/40 bg-white px-2 py-0.5 text-xs font-semibold">
+                      {t(`finance.kinds.${kind}`)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="mt-1.5 text-xs text-brand-ink/55">{view && view.progress.reading > 0 ? t('finance.missingReading', { count: view.progress.reading }) : t('finance.missingHint')}</p>
             </Card>
           ) : null}
         </div>

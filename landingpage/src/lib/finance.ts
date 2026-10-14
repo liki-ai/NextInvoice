@@ -364,7 +364,9 @@ export type FinanceSummary = {
   overdue: number
   taxesPaid: number
   taxesByKind: Record<'vat' | 'payroll' | 'rent' | 'profit' | 'other', number>
-  payroll: { period: string; cost: N; net: N; employees: N; fromBank: boolean } | null
+  payroll: { period: string; cost: N; net: N; taxes: N; employees: N; fromBank: boolean } | null
+  /** Running costs other than pay and taxes, from the bank. */
+  otherSpending: { total: number; average: number; top: { category: SpendCategory; amount: number }[] } | null
   /** The year's spending as the bank shows it, by what it went to; dividends are kept apart. */
   spending: { total: number; average: number; months: number; dividends: number; byCategory: { category: SpendCategory; amount: number }[]; taxesFromBank: number } | null
   annual: { year: string; revenue: N; netProfit: N; profitBeforeTax: N; margin: N; docId: string } | null
@@ -435,11 +437,45 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
   const payrollMonth = [...months].reverse().find((month) => complete(month) && (has(month.payrollCost) || has(month.payrollNet)))
   // Without a payroll list the bank still shows what was paid out as pay and contributions.
   const bankPayMonth = [...months].reverse().find((month) => complete(month) && (month.bank?.spend.payroll ?? 0) > 0)
+  // The full cost of a month's pay: the payroll list's gross with the employer's share, or else the
+  // net pay with the wage tax and contributions on top (from the WM-CM slip, or what the bank paid
+  // the pension fund).
+  const fullCost = (month: MonthFigures, net: number) => {
+    const taxes = has(month.payrollTax) ? month.payrollTax : month.bank?.spend.pension ? month.bank.spend.pension : null
+    return { cost: has(taxes) ? round(net + taxes) : null, taxes }
+  }
   const payroll = payrollMonth
-    ? { period: payrollMonth.period, cost: payrollMonth.payrollCost, net: payrollMonth.payrollNet, employees: payrollMonth.employees, fromBank: false }
+    ? {
+        period: payrollMonth.period,
+        net: payrollMonth.payrollNet,
+        employees: payrollMonth.employees,
+        fromBank: false,
+        ...(has(payrollMonth.payrollCost)
+          ? { cost: payrollMonth.payrollCost, taxes: null }
+          : has(payrollMonth.payrollNet)
+            ? fullCost(payrollMonth, payrollMonth.payrollNet)
+            : { cost: null, taxes: null }),
+      }
     : bankPayMonth
-      ? { period: bankPayMonth.period, cost: null, net: bankPayMonth.bank!.spend.payroll as number, employees: null, fromBank: true }
+      ? { period: bankPayMonth.period, net: bankPayMonth.bank!.spend.payroll as number, employees: null, fromBank: true, ...fullCost(bankPayMonth, bankPayMonth.bank!.spend.payroll as number) }
       : null
+
+  // Everything else it takes to run the company: suppliers, rent, power, internet, card purchases,
+  // cash and bank fees; not pay, taxes or what the owners took out.
+  const OTHER_SPEND: SpendCategory[] = ['suppliers', 'rent', 'card', 'cash', 'fees', 'other']
+  const otherMonths = months.filter((month) => month.bank)
+  const otherFull = otherMonths.filter(complete)
+  const otherOf = (month: MonthFigures) => OTHER_SPEND.reduce((total, item) => total + (month.bank!.spend[item] ?? 0), 0)
+  const otherSpending = otherMonths.length
+    ? {
+        total: round(otherMonths.reduce((total, month) => total + otherOf(month), 0)),
+        average: otherFull.length ? round(otherFull.reduce((total, month) => total + otherOf(month), 0) / otherFull.length) : 0,
+        top: OTHER_SPEND.map((category) => ({ category, amount: round(otherMonths.reduce((total, month) => total + (month.bank!.spend[category] ?? 0), 0)) }))
+          .filter((item) => item.amount > 0)
+          .sort((a, b) => b.amount - a.amount)
+          .slice(0, 3),
+      }
+    : null
 
   const spentMonths = months.filter((month) => month.bank)
   const fullMonths = spentMonths.filter(complete)
@@ -587,6 +623,7 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
     estimate,
     burn,
     spending,
+    otherSpending,
     missing,
     upcoming,
     signals,
