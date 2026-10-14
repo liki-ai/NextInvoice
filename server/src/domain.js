@@ -185,6 +185,8 @@ function clientSnapshot(client) {
     businessId: String(client.businessId || client.nui || '').trim(),
     vatNumber: String(client.vatNumber || '').trim(),
     fiscalNumber: String(client.fiscalNumber || '').trim(),
+    // The language emails to this client are written in; empty means the company's default (Albanian).
+    language: ['sq', 'en', 'it'].includes(client.language) ? client.language : '',
     // VAT rate new invoices for this client start with; null follows the company default.
     taxRate: client.taxRate === undefined || client.taxRate === null || client.taxRate === '' ? null : normalizeTaxRate(client.taxRate),
     notes: String(client.notes || '').trim(),

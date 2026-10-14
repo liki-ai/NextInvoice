@@ -18,6 +18,25 @@ const {
 } = require('../store');
 
 const { sendInvoiceEmail, sendPaymentReminder, sendMailError } = require('./mail');
+const automation = require('../automation/service');
+
+const DELIVERY_ERRORS = {
+  SENDING: [409, 'This invoice is being sent right now.'],
+  CANCELLED: [409, 'Cancelled invoices are not sent.'],
+  NO_RECIPIENT: [400, 'The client has no email address. Add one to the client, or enter a recipient.'],
+  DATE_INVALID: [400, 'Enter a valid date.'],
+};
+
+/** Answers with a delivery error (or a mail one); false when the error is neither. */
+function sendDeliveryError(res, err) {
+  const code = err && (err.mailCode || err.message);
+  const mapped = DELIVERY_ERRORS[code];
+  if (mapped) {
+    res.status(mapped[0]).json({ error: mapped[1], code });
+    return true;
+  }
+  return sendMailError(res, err);
+}
 
 const router = express.Router();
 router.use(authRequired);
@@ -120,6 +139,43 @@ router.post('/:id/share', (req, res) => {
     res.json({ token });
   } catch (err) {
     sendError(res, err);
+  }
+});
+
+/** "Send now": the scheduled email (or the standard one) goes out at once, through the company mailbox. */
+router.post('/:id/deliver', async (req, res, next) => {
+  try {
+    const invoice = await automation.deliverInvoice(req.user.id, req.params.id, { manual: true, by: req.user.email });
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
+    res.json({ invoice });
+  } catch (err) {
+    // The failure is noted on the invoice; the page gets the invoice back to show it.
+    const invoice = getInvoice(req.user.id, req.params.id);
+    if (sendDeliveryError(res, err)) return;
+    if (invoice) return res.status(502).json({ error: 'The email could not be sent.', code: 'MAIL_FAILED', invoice });
+    next(err);
+  }
+});
+
+/** Schedules the email for a day, or moves the day ("Change date"); recipients may be set too. */
+router.put('/:id/schedule', (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const invoice = automation.scheduleInvoice(req.user.id, req.params.id, { date: body.date, to: body.to, cc: body.cc, lang: body.lang });
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
+    res.json({ invoice });
+  } catch (err) {
+    if (!sendDeliveryError(res, err)) next(err);
+  }
+});
+
+router.delete('/:id/schedule', (req, res, next) => {
+  try {
+    const invoice = automation.unscheduleInvoice(req.user.id, req.params.id);
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
+    res.json({ invoice });
+  } catch (err) {
+    if (!sendDeliveryError(res, err)) next(err);
   }
 });
 

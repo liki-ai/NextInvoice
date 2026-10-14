@@ -10,6 +10,7 @@ import { companyForPdf } from '../../lib/companySamples'
 import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
 import { TemplateSwitch } from '../../components/TemplateSwitch'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
+import { DeliveryHistory } from '../../components/DeliveryHistory'
 import { PaymentModal } from '../../components/PaymentModal'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 import { ProofField } from '../../components/ProofField'
@@ -321,6 +322,8 @@ export function InvoiceDetailPage() {
               </div>
             </Card>
           ) : null}
+
+          <DeliveryHistory invoice={current} />
         </div>
 
         <Card className="h-fit lg:sticky lg:top-8">

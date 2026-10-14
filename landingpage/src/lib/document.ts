@@ -23,6 +23,8 @@ export type ClientRecord = {
   businessId?: string
   vatNumber?: string
   fiscalNumber?: string
+  /** The language emails to this client are written in; empty means Albanian. */
+  language?: '' | 'sq' | 'en' | 'it'
   /** VAT rate new invoices for this client start with. null = the company default. */
   taxRate?: number | null
   notes?: string

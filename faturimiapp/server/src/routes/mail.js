@@ -110,6 +110,8 @@ async function sendInvoiceEmail(user, invoiceId, body) {
   const button = { url: link, label: render ? render.translate(lang, 'send.viewInvoice') : 'View invoice' };
   await deliver(settings, { sender, to, cc, subject, text, html: messageHtml(text, { button, accent: profile.accentColor }), attachments });
   const saved = recordInvoiceEmail(user.id, invoiceId, { from: sender.email, to, cc, subject, attached: attachments.length > 0 });
+  // The company hears that it went out, as it does for scheduled sends.
+  require('../automation/service').notifySent(user.id, saved, to).catch(() => {});
   return { invoice: saved, attached: attachments.length > 0 };
 }
 

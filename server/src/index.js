@@ -25,10 +25,13 @@ const publicRouter = require('./routes/public');
 const mailRouter = require('./routes/mail');
 const teamRouter = require('./routes/team');
 const financeRouter = require('./routes/finance');
+const recurringRouter = require('./routes/recurring');
 const { handleStripeWebhook } = require('./routes/billing');
 const { initStore, flushStore, storeHealth } = require('./store');
 const { billingHealth } = require('./billing/stripe');
 const { startFinanceChecks } = require('./finance/service');
+const { startAutomation } = require('./automation/service');
+const { handleCompanyWebhook } = require('./automation/companyStripe');
 
 const app = express();
 
@@ -36,6 +39,8 @@ app.use(cors({ origin: true }));
 
 // Stripe needs the raw body for signature verification.
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+// Each company's own Stripe, for card payments of its invoices; verified with that company's secret.
+app.post('/api/public/stripe/:ownerId/webhook', express.raw({ type: 'application/json' }), handleCompanyWebhook);
 
 app.use(express.json({ limit: '20mb' }));
 
@@ -68,6 +73,7 @@ app.use('/api/public', publicRouter);
 app.use('/api/mail', mailRouter);
 app.use('/api/team', teamRouter);
 app.use('/api/finance', financeRouter);
+app.use('/api/recurring', recurringRouter);
 app.use('/api', extractClientRouter);
 app.use('/api', extractCompanyRouter);
 
@@ -85,6 +91,8 @@ initStore()
     });
     // Documents from the accountant arrive by email; each company's mailbox is checked now and then.
     startFinanceChecks();
+    // Recurring invoices are made, scheduled emails go out, payments are announced.
+    startAutomation();
     // A deploy stops the old process with SIGTERM. Finish the writes in flight before going.
     let stopping = false;
     const stop = (signal) => {

@@ -52,6 +52,11 @@ type DataValue = {
   testMail: (message: { box: MailBox; subject: string; body: string }) => Promise<{ to: string }>
   /** Emails the invoice from the company mailbox and marks it sent. */
   sendInvoiceEmail: (id: string, message: InvoiceEmailInput) => Promise<{ invoice: Invoice; attached: boolean }>
+  /** "Send now": emails the invoice at once with the standard (or renewal) message. */
+  deliverInvoice: (id: string) => Promise<Invoice>
+  /** Schedules the email for a day (YYYY-MM-DD), optionally to other recipients. */
+  scheduleInvoice: (id: string, body: { date: string; to?: string; cc?: string }) => Promise<Invoice>
+  unscheduleInvoice: (id: string) => Promise<Invoice>
   /** Brings recorded payments in line with a bank statement: per invoice, the payments it replaces and the transfers it shows. */
   reconcileInvoices: (changes: { id: string; void: string[]; add: { amount: number; date: string }[] }[]) => Promise<{ invoices: Invoice[]; skipped: number }>
   /** Emails one client a payment reminder for the given invoices (or just notes one) and marks them reminded. */
@@ -281,6 +286,36 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return res
   }, [])
 
+  const replaceInvoice = useCallback((invoice: Invoice) => {
+    setInvoices((prev) => prev.map((item) => (item.id === invoice.id ? invoice : item)))
+    return invoice
+  }, [])
+
+  const deliverInvoice = useCallback(
+    async (id: string) => {
+      try {
+        const res = await api<{ invoice: Invoice }>(`/api/invoices/${id}/deliver`, { method: 'POST', body: {} })
+        return replaceInvoice(res.invoice)
+      } catch (err) {
+        // The failure is noted on the invoice; show it as it now is.
+        await api<{ invoice: Invoice }>(`/api/invoices/${id}`).then((res) => replaceInvoice(res.invoice), () => undefined)
+        throw err
+      }
+    },
+    [replaceInvoice],
+  )
+
+  const scheduleInvoice = useCallback(
+    async (id: string, body: { date: string; to?: string; cc?: string }) =>
+      replaceInvoice((await api<{ invoice: Invoice }>(`/api/invoices/${id}/schedule`, { method: 'PUT', body })).invoice),
+    [replaceInvoice],
+  )
+
+  const unscheduleInvoice = useCallback(
+    async (id: string) => replaceInvoice((await api<{ invoice: Invoice }>(`/api/invoices/${id}/schedule`, { method: 'DELETE' })).invoice),
+    [replaceInvoice],
+  )
+
   const reconcileInvoices = useCallback(async (changes: { id: string; void: string[]; add: { amount: number; date: string }[] }[]) => {
     const res = await api<{ invoices: Invoice[]; skipped: number }>('/api/invoices/reconcile', { method: 'POST', body: { changes } })
     const updated = new Map(res.invoices.map((item) => [item.id, item]))
@@ -349,6 +384,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       removeMail,
       testMail,
       sendInvoiceEmail,
+      deliverInvoice,
+      scheduleInvoice,
+      unscheduleInvoice,
       remindInvoices,
       reconcileInvoices,
       downloadBackup,
@@ -390,6 +428,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       removeMail,
       testMail,
       sendInvoiceEmail,
+      deliverInvoice,
+      scheduleInvoice,
+      unscheduleInvoice,
       remindInvoices,
       reconcileInvoices,
       downloadBackup,

@@ -62,6 +62,12 @@ export type Invoice = {
   emails?: { at: string; from: string; to: string[]; cc?: string[]; subject: string; attached?: boolean }[]
   /** Each payment reminder that covered this invoice, oldest first; `invoices` names all it covered. */
   reminders?: { at: string; from?: string; to?: string[]; cc?: string[]; subject?: string; emailed?: boolean; invoices?: string[] }[]
+  /** Sending by email: scheduled, sent, failed …, apart from payment. */
+  delivery?: import('./delivery').InvoiceDelivery | null
+  /** What happened to the invoice on its way out and after (made, scheduled, sent, paid …), oldest first. */
+  events?: import('./delivery').InvoiceEvent[]
+  /** Set when a recurring plan made the invoice. */
+  recurring?: import('./delivery').InvoiceRecurring
   /** What happened to the invoice after it was first saved (imported, corrected …), oldest first. */
   revisions?: { type?: string; at?: string }[]
   createdAt?: string

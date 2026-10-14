@@ -41,6 +41,9 @@ Accounts, profiles, invoices, clients, items and obligations are stored in Postg
 | `profiles/<userId>`, `invoices/<userId>`, `clients/<userId>`, `items/<userId>`, `obligations/<userId>`, `syncOps/<userId>`, `migrations/<userId>` | one document per user |
 | `mail/<userId>` | the company's mailbox connection for sending invoices; its password is encrypted with a key derived from `MAIL_SECRET` (or `JWT_SECRET`), so changing that secret means entering the mailbox password again |
 | `invites/<userId>` | open invitations to join that company; only a hash of each invitation link is kept |
+| `recurring/<userId>` | the company's recurring-invoice plans (with the periods already invoiced, so none is billed twice), its notification settings, and its own Stripe keys for card payments (encrypted like the mailbox password) |
+
+Invoices may carry `recurring` (the plan and period that made them), `delivery` (scheduled day, recipients, sent / failed and every attempt), `events` (their history: made, scheduled, sent, failed, paid, notified) and `notified`. They are new optional fields; nothing older needs changing. Clients may carry `language` (sq, en, it) for the emails they get.
 
 A company can have several users. The one who signed up owns the data: everything above is stored under their id. A user they add or invite is another entry in `users` with `companyId` (that owner) and `role` (`admin` or `member`), and works in the owner's documents. Removing a user deletes only their entry in `users`.
 

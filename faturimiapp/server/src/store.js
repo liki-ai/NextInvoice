@@ -61,6 +61,7 @@ async function initStore() {
   if (!cache.migrations) cache.migrations = {};
   if (!cache.mail) cache.mail = {};
   if (!cache.invites) cache.invites = {};
+  if (!cache.recurring) cache.recurring = {};
   if (!cache.finance) cache.finance = {};
   if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
   return cache;
@@ -720,6 +721,11 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
     throw err;
   }
   const next = { ...current, ...partial, id: invoiceId, updatedAt: nowIso() };
+  // Marked as sent by hand: a send that was scheduled for it is done, and must not go out again.
+  if (partial.sent === true && next.delivery && ['scheduled', 'failed'].includes(next.delivery.status)) {
+    next.delivery = { ...next.delivery, status: 'sent', sentAt: partial.sentAt || nowIso(), nextRetryAt: null };
+    next.events = [...(Array.isArray(next.events) ? next.events : []), { at: nowIso(), type: 'marked_sent' }].slice(-INVOICE_EVENTS_MAX);
+  }
   if (lifecycle === 'draft') Object.assign(next, totalFields(next.items, next.discount, next.taxRate));
   if (lifecycle === 'draft' && partial.client) {
     next.client = clientSnapshot(partial.client);
@@ -1128,7 +1134,8 @@ function recordInvoiceEmail(userId, invoiceId, { from, to, cc, subject, attached
   if (idx === -1) return null;
   const at = nowIso();
   const emails = [...(Array.isArray(list[idx].emails) ? list[idx].emails : []), { at, from, to, cc: cc || [], subject, attached: Boolean(attached) }];
-  list[idx] = { ...list[idx], sent: true, sentAt: at, emails: emails.slice(-EMAIL_LOG_MAX), updatedAt: at };
+  const delivery = list[idx].delivery ? { ...list[idx].delivery, status: 'sent', sentAt: at, nextRetryAt: null, lastError: null } : list[idx].delivery;
+  list[idx] = { ...list[idx], sent: true, sentAt: at, delivery, emails: emails.slice(-EMAIL_LOG_MAX), updatedAt: at };
   db.invoices[userId] = list;
   writeDb(db);
   return hydrateFor(db, userId, list[idx]);
@@ -1201,6 +1208,72 @@ function recordInvoiceReminder(userId, invoiceIds, { from, to, cc, subject, emai
   });
   if (touched.length > 0) writeDb(db);
   return touched.map((item) => hydrateFor(db, userId, item));
+}
+
+// ---- recurring invoices and automatic delivery --------------------------------------------------
+// One document per company ('recurring/<ownerId>'): its plans and its notification settings. What
+// happens to each invoice (scheduled, sent, failed, paid) is kept on the invoice itself.
+
+const INVOICE_EVENTS_MAX = 60;
+const RECURRING_SETTINGS = { notifyEmails: [], notifySent: true, notifyPaid: true, notifySince: null, stripe: null };
+
+function getRecurring(userId) {
+  const db = readDb();
+  const value = (db.recurring && db.recurring[userId]) || {};
+  return { plans: Array.isArray(value.plans) ? value.plans : [], settings: { ...RECURRING_SETTINGS, ...(value.settings || {}) } };
+}
+
+function saveRecurring(userId, value) {
+  const db = readDb();
+  if (!db.recurring) db.recurring = {};
+  db.recurring[userId] = { plans: value.plans || [], settings: value.settings || { ...RECURRING_SETTINGS } };
+  writeDb(db);
+  return db.recurring[userId];
+}
+
+/** Companies whose invoices the scheduler looks after: every account that owns data. */
+function automationOwners() {
+  const db = readDb();
+  const owners = new Set(db.users.filter((user) => !user.companyId).map((user) => user.id));
+  return Object.keys(db.invoices || {}).filter((id) => owners.has(id));
+}
+
+/**
+ * Changes an invoice's delivery state and history, nothing printed on it. `change` receives a copy
+ * with `delivery` and `events` ready to edit and returns it (or nothing to leave the invoice as it is).
+ */
+function mutateInvoiceDelivery(userId, invoiceId, change) {
+  const db = readDb();
+  const list = db.invoices[userId] || [];
+  const idx = list.findIndex((item) => item.id === invoiceId);
+  if (idx === -1) return null;
+  const current = list[idx];
+  const draft = { ...current, delivery: current.delivery ? { ...current.delivery } : null, events: Array.isArray(current.events) ? [...current.events] : [] };
+  const next = change(draft);
+  if (!next) return hydrateFor(db, userId, current);
+  next.events = (next.events || []).slice(-INVOICE_EVENTS_MAX);
+  next.updatedAt = nowIso();
+  list[idx] = next;
+  db.invoices[userId] = list;
+  writeDb(db);
+  return hydrateFor(db, userId, next);
+}
+
+/** The invoice a plan already made for a period, if any: the second guard against duplicates. */
+function findRecurringInvoice(userId, planId, period) {
+  return (readDb().invoices[userId] || []).find((inv) => inv.recurring && inv.recurring.planId === planId && inv.recurring.period === period) || null;
+}
+
+/** The company and invoice behind a share link, for paying it online. */
+function sharedInvoiceOwner(token) {
+  const code = String(token || '');
+  if (code.length < 16) return null;
+  const db = readDb();
+  for (const [userId, list] of Object.entries(db.invoices || {})) {
+    const raw = (list || []).find((item) => item.shareToken === code);
+    if (raw) return { ownerId: userId, invoice: hydrateFor(db, userId, raw) };
+  }
+  return null;
 }
 
 /** What a recipient may see through a share link: the invoice as printed, nothing internal. */
@@ -1806,6 +1879,13 @@ module.exports = {
   markInvoicesPaid,
   shareInvoice,
   sharedInvoice,
+  sharedInvoiceOwner,
+  getRecurring,
+  saveRecurring,
+  automationOwners,
+  mutateInvoiceDelivery,
+  findRecurringInvoice,
+  INVOICE_EVENTS_MAX,
   personalMailKey,
   getMailSettings,
   saveMailSettings,

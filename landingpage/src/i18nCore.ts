@@ -2,6 +2,7 @@
 // print invoices and write emails from the very same words.
 
 import { financeNav, financeTexts } from './i18nFinance'
+import { recurringNav, recurringTexts } from './i18nRecurring'
 
 export const LANGS = [
   { code: 'sq', short: 'SQ', name: 'Shqip' },
@@ -18,8 +19,10 @@ export function isLang(value: unknown): value is Lang {
 export const translations = {
   sq: {
     finance: financeTexts.sq,
+    recurring: recurringTexts.sq,
     nav: {
       finance: financeNav.sq,
+      recurring: recurringNav.sq,
       invoices: 'Faturat',
       obligations: 'Detyrimet',
       overview: 'Pasqyra',
@@ -899,8 +902,10 @@ export const translations = {
   },
   en: {
     finance: financeTexts.en,
+    recurring: recurringTexts.en,
     nav: {
       finance: financeNav.en,
+      recurring: recurringNav.en,
       invoices: 'Invoices',
       obligations: 'Obligations',
       overview: 'Overview',
@@ -1780,8 +1785,10 @@ export const translations = {
   },
   it: {
     finance: financeTexts.it,
+    recurring: recurringTexts.it,
     nav: {
       finance: financeNav.it,
+      recurring: recurringNav.it,
       invoices: 'Fatture',
       obligations: 'Obblighi',
       overview: 'Panoramica',

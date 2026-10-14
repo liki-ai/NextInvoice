@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Camera } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { Button, Card, Field } from '../../components/ui'
+import { Button, Card, Field, Select } from '../../components/ui'
 import { MEASUREMENT_FIELDS, clientDisplayName, composeClient, isFashionIndustry } from '../../lib/client'
 import { normalizeTaxRate } from '../../lib/invoice'
 import { fileToProof, isImageProof, proofSource } from '../../lib/proof'
@@ -24,6 +24,7 @@ export function ClientFormPage() {
   const [businessId, setBusinessId] = useState(existing?.businessId || '')
   const [vatNumber, setVatNumber] = useState(existing?.vatNumber || '')
   const [fiscalNumber, setFiscalNumber] = useState(existing?.fiscalNumber || '')
+  const [language, setLanguage] = useState(existing?.language || '')
   const companyRate = normalizeTaxRate(profile?.defaultTaxRate)
   // 'company' follows the default in Settings, 'none' is an export customer, 'custom' a rate of its own.
   const [taxMode, setTaxMode] = useState<'company' | 'none' | 'custom'>(() =>
@@ -47,12 +48,13 @@ export function ClientFormPage() {
         businessId,
         vatNumber,
         fiscalNumber,
+        language,
         taxRate,
         notes: existing?.notes || '',
         measurements: fashion ? measurements : existing?.measurements || {},
         photos: fashion ? photos : existing?.photos || [],
       }),
-    [fullName, phone, email, address, businessId, vatNumber, fiscalNumber, taxRate, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
+    [fullName, phone, email, address, businessId, vatNumber, fiscalNumber, language, taxRate, measurements, photos, fashion, existing?.notes, existing?.measurements, existing?.photos],
   )
 
   async function persist(thenInvoice: boolean) {
@@ -104,6 +106,11 @@ export function ClientFormPage() {
           <Field label={`${t('clients.vatNumber')} (${t('common.optional')})`} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
           <Field label={t('newInvoice.phone')} value={phone} placeholder={t('newInvoice.phPhone')} onChange={(e) => setPhone(e.target.value)} />
           <Field label={`${t('docs.email')} (${t('common.optional')})`} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Select label={t('recurring.clientLanguage')} value={language} onChange={(e) => setLanguage(e.target.value as typeof language)}>
+            <option value="">{t('recurring.clientLanguageDefault')}</option>
+            <option value="en">English</option>
+            <option value="it">Italiano</option>
+          </Select>
         </div>
 
         <div className="mt-6 border-t border-brand-ink/8 pt-5">

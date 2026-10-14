@@ -3,11 +3,17 @@
 // email is the page the user previewed. Nothing here may depend on React or on the browser.
 
 import { isLang, pdfLabelsIn, translateIn, type Lang } from '../i18nCore'
-import { companyForPdf } from './companySamples'
+import { companyForPdf, stripSampleCompanyFields } from './companySamples'
 import { type Client, type CompanyProfile, type Invoice } from './invoice'
 import { buildInvoiceHtml } from './invoiceTemplates'
 
 export { isLang }
+export { formatMoney } from './invoice'
+
+/** The company's details without the sample values a new account starts with. */
+export function realCompany(profile: CompanyProfile) {
+  return stripSampleCompanyFields(profile)
+}
 
 export function translate(lang: Lang, key: string, params?: Record<string, string | number>) {
   return translateIn(lang, key, params)

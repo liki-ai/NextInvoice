@@ -9,6 +9,8 @@ import { RemindPaymentModal } from '../../components/RemindPaymentModal'
 import { ImportInvoicesModal } from '../../components/ImportInvoicesModal'
 import { BankMatchModal } from '../../components/BankMatchModal'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
+import { DeliveryQueue } from '../../components/DeliveryQueue'
+import { awaitsDelivery } from '../../lib/delivery'
 import {
   buildInvoiceListHtml,
   downloadHtmlAsPdf,
@@ -39,7 +41,7 @@ export function InvoiceListPage() {
   const { invoices, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue' | 'toSend'>('all')
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
@@ -57,7 +59,9 @@ export function InvoiceListPage() {
   const [pulseId, setPulseId] = useState<string | null>(null)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
-  const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter, t)
+  const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter === 'toSend' ? 'all' : statusFilter, t)
+  // Invoices waiting for their email, from every year: the number on the "To send" filter.
+  const toSendCount = useMemo(() => invoices.filter((item) => awaitsDelivery(item)).length, [invoices])
   const addedId = searchParams.get('added')
 
   // The list is split by year. The current year shows unless another is picked; the choice lives in the URL.
@@ -437,7 +441,20 @@ export function InvoiceListPage() {
             >
               {t('invoiceList.filterOverdue')}
             </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('toSend')}
+              aria-pressed={statusFilter === 'toSend'}
+              className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${statusFilter === 'toSend' ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink'}`}
+            >
+              {t('recurring.delivery.filter')} · {toSendCount}
+            </button>
           </div>
+
+          {statusFilter === 'toSend' ? (
+            <DeliveryQueue invoices={invoices} />
+          ) : (
+          <>
 
           {chosen.length > 0 ? (
             <div className="flex flex-wrap items-center gap-3 border-t border-brand-ink/8 bg-[#EEF5F7] px-4 py-3" role="status">
@@ -653,6 +670,8 @@ export function InvoiceListPage() {
           {filtered.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-brand-ink/50">{t('invoiceList.emptyTitle')}</p>
           ) : null}
+          </>
+          )}
         </div>
       ) : null}
 
