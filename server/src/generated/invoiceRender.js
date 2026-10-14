@@ -1292,7 +1292,18 @@ const recurringTexts = {
 			failed: "Pagesa me kartë nuk hapet tani. Provo përsëri pas pak."
 		},
 		clientLanguage: "Gjuha e email-eve",
-		clientLanguageDefault: "Shqip (parazgjedhje)"
+		clientLanguageDefault: "Shqip (parazgjedhje)",
+		settings: {
+			title: "Cilësimet e faturave",
+			subtitle: "Si duket fatura, me çfarë fillon dhe faturat që krijohen e dërgohen vetë.",
+			open: "Cilësimet e faturave",
+			tabTemplates: "Shabllonet e faturave",
+			tabDefaults: "Të dhënat në faturë",
+			tabRecurring: "Faturat periodike",
+			defaultsTitle: "Vlerat e paracaktuara",
+			defaultsHint: "Çdo faturë e re fillon me këtë monedhë dhe këtë normë TVSH-je; mund t’i ndryshoni te fatura.",
+			movedHint: "Shablloni, ngjyra, monedha, TVSH-ja, nënshkrimi dhe vula e faturës janë te cilësimet e faturave."
+		}
 	},
 	en: {
 		title: "Recurring invoices",
@@ -1496,7 +1507,18 @@ const recurringTexts = {
 			failed: "Card payment cannot open right now. Try again shortly."
 		},
 		clientLanguage: "Email language",
-		clientLanguageDefault: "Albanian (default)"
+		clientLanguageDefault: "Albanian (default)",
+		settings: {
+			title: "Invoice settings",
+			subtitle: "How the invoice looks, what it starts with, and the invoices that are made and sent on their own.",
+			open: "Invoice settings",
+			tabTemplates: "Invoice templates",
+			tabDefaults: "Invoice details",
+			tabRecurring: "Recurring invoices",
+			defaultsTitle: "Defaults",
+			defaultsHint: "Every new invoice starts with this currency and this VAT rate; you can change them on the invoice.",
+			movedHint: "The invoice template, colour, currency, VAT, signature and stamp are in the invoice settings."
+		}
 	},
 	it: {
 		title: "Fatture ricorrenti",
@@ -1700,7 +1722,18 @@ const recurringTexts = {
 			failed: "Il pagamento con carta non si apre ora. Riprova tra poco."
 		},
 		clientLanguage: "Lingua delle email",
-		clientLanguageDefault: "Albanese (predefinita)"
+		clientLanguageDefault: "Albanese (predefinita)",
+		settings: {
+			title: "Impostazioni fatture",
+			subtitle: "L’aspetto della fattura, i valori con cui inizia e le fatture create e inviate da sole.",
+			open: "Impostazioni fatture",
+			tabTemplates: "Modelli di fattura",
+			tabDefaults: "Dati in fattura",
+			tabRecurring: "Fatture ricorrenti",
+			defaultsTitle: "Valori predefiniti",
+			defaultsHint: "Ogni nuova fattura inizia con questa valuta e questa aliquota IVA; si possono cambiare nella fattura.",
+			movedHint: "Modello, colore, valuta, IVA, firma e timbro della fattura sono nelle impostazioni fatture."
+		}
 	}
 };
 const recurringNav = {
