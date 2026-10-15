@@ -229,7 +229,7 @@ export function buildMercuryReport(accounts: MercuryAccount[], transactions: Mer
 export function ipacientiCredits(transactions: MercuryTransaction[]) {
   return transactions
     .filter((tx) => tx.amount > 0 && !isInternal(tx) && tx.eur !== null)
-    .map((tx) => ({ date: tx.date, amount: tx.eur as number, text: `iPacienti Mercury ${tx.counterparty} ${tx.note}`.trim() }))
+    .map((tx) => ({ date: tx.date, amount: tx.eur as number, text: `iPacienti Mercury ${tx.counterparty} ${tx.note}`.trim(), origin: 'llc' as const }))
 }
 
 export function mercuryYears(transactions: MercuryTransaction[], now = new Date()) {

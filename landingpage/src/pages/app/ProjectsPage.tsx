@@ -1,10 +1,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ChevronDown, ChevronRight, FolderKanban, Info, Landmark, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card } from '../../components/ui'
+import { ProjectDetail } from '../../components/ProjectDetail'
 import { api, apiBase, getToken } from '../../lib/api'
 import { matchStatement, readStatementFile, type BankLine } from '../../lib/bankMatch'
 import { cn } from '../../lib/cn'
@@ -175,6 +176,9 @@ export function ProjectsPage() {
   const [correct, setCorrect] = useState(true)
   const [open, setOpen] = useState<string | null>(null)
   const [bank, setBank] = useState<{ statements: number; lines: (BankLine & { rest: number })[] } | null>(null)
+  // One project's own view: /app/projects?project=iPacienti
+  const [searchParams] = useSearchParams()
+  const selected = searchParams.get('project')
   const fileInput = useRef<HTMLInputElement>(null)
   const manager = user?.role !== 'member'
   const currency = profile?.currency || 'EUR'
@@ -320,6 +324,24 @@ export function ProjectsPage() {
       <input ref={fileInput} type="file" accept={ACCEPT} className="hidden" onChange={(e) => void upload(e.target.files)} />
     </>
   )
+
+  const detail = selected && report ? report.projects.find((project) => project.name === selected) : null
+  if (detail && report) {
+    return (
+      <ProjectDetail
+        project={detail}
+        report={report}
+        clientName={detail.clientId ? String(clientName.get(detail.clientId) || '') : ''}
+        money={money}
+        hourly={hourly}
+        hoursText={hoursText}
+        monthName={(item) => monthLabel(item, t, 'long')}
+        backTo="/app/projects"
+        t={t}
+      />
+    )
+  }
+  const detailLink = (name: string) => `/app/projects?project=${encodeURIComponent(name)}`
 
   const suggestions = report?.projects.filter((project) => project.suggestion) || []
   // What money can be given to: any project that is not shared work.
@@ -482,7 +504,16 @@ export function ProjectsPage() {
                     <div className="mt-3 space-y-0.5 border-t border-brand-ink/6 pt-2 text-xs text-brand-ink/50">
                       <p>{product.invoices ? `${t('finance.projects.productRevenue', { product: product.name })}: ${product.invoices}` : t('finance.projects.productNone', { product: product.name })}</p>
                       {product.bankPayments ? <p>{t('finance.projects.productBank', { amount: money(product.bankRevenue), count: product.bankPayments })}</p> : null}
+                      {product.llcRevenue > 0 ? (
+                        <>
+                          <p>{t('projectDetail.fromShpk', { amount: money(Math.max(0, (product.revenue ?? 0) - product.llcRevenue)) })}</p>
+                          <p>{t('projectDetail.fromLlc', { amount: money(product.llcRevenue), count: product.llcPayments })}</p>
+                        </>
+                      ) : null}
                     </div>
+                    <Link to={detailLink(product.name)} className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+                      {t('projectDetail.details')} →
+                    </Link>
                   </Card>
                 ))}
               </div>
@@ -527,10 +558,10 @@ export function ProjectsPage() {
                       return (
                         <tr key={project.name} className={cn('border-t border-brand-ink/6 align-top', shared && 'bg-brand-accent/[0.04]')}>
                           <td className="px-4 py-2.5 text-left font-semibold">
-                            <span className="inline-flex items-center gap-2">
+                            <Link to={detailLink(project.name)} className="inline-flex items-center gap-2 hover:text-brand hover:underline">
                               <span className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', KIND_BAR[project.kind])} />
                               {project.name}
-                            </span>
+                            </Link>
                             {project.kind === 'product' ? <span className="ml-[18px] block text-[11px] font-normal text-brand-ink/45">{t('finance.projects.ownProduct')}</span> : null}
                           </td>
                           <td className="px-3 py-1.5 text-left">
@@ -588,7 +619,10 @@ export function ProjectsPage() {
                           <td className={TD}>{shared ? muted : money(project.overhead)}</td>
                           <td className={cn(TD, 'font-semibold')}>{money(project.cost)}</td>
                           <td className={TD}>{hourly(project.costPerHour)}</td>
-                          <td className={TD}>{project.revenue === null ? muted : money(project.revenue)}</td>
+                          <td className={TD}>
+                            {project.revenue === null ? muted : money(project.revenue)}
+                            {project.llcRevenue > 0 ? <span className="block text-[11px] text-brand-ink/45">LLC {money(project.llcRevenue)}</span> : null}
+                          </td>
                           <td className={cn(TD, 'font-semibold', project.profit !== null && project.profit < 0 && 'text-[#C0503A]')}>{project.profit === null ? muted : money(project.profit)}</td>
                           <td className={TD}>{project.revenuePerHour === null ? muted : hourly(project.revenuePerHour)}</td>
                           <td className="px-4 py-2.5 text-left text-brand-ink/65">

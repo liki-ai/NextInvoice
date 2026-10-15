@@ -11,7 +11,15 @@ export type TimesheetEntry = { month: string; project: string; person: string; h
 export type ProjectMeta = { clientId?: string | null; internal?: boolean; bank?: string[]; clients?: string[] }
 
 /** A bank payment no invoice accounts for: `amount` is what is left of it after any invoices. */
-export type BankCredit = { date: string; amount: number; text: string; /** A client the payment names, when no project is linked to it. */ client?: string }
+export type BankCredit = {
+  date: string
+  amount: number
+  text: string
+  /** A client the payment names, when no project is linked to it. */
+  client?: string
+  /** Money into the US company's Mercury account (Tretek LLC) rather than Tretek SHPK's bank. */
+  origin?: 'llc'
+}
 
 /** Lower case words only, so "WISE PAYMENTS LIMITED, Lirim" and "wise payments limited lirim" compare equal. */
 function looseText(text: unknown) {
@@ -196,9 +204,15 @@ export type ProjectFigures = {
   /** Of the revenue, what came into the bank without an invoice, and in how many payments. */
   bankRevenue: number
   bankPayments: number
-  people: { person: string; hours: number }[]
+  /** Each person's hours on the project and what they cost it (pay with taxes, and the shared costs by their hours). */
+  people: { person: string; hours: number; cost: number }[]
   lead: { person: string; share: number } | null
   byMonth: Record<string, number>
+  /** Of the revenue, what came through the US company (Tretek LLC, Mercury), and in how many payments. */
+  llcRevenue: number
+  llcPayments: number
+  revenueByMonth: Record<string, number>
+  costByMonth: Record<string, number>
   suggestion: Suggestion | null
 }
 
@@ -394,7 +408,7 @@ export function suggestClient(project: string, clients: ClientRef[], invoices: I
   return null
 }
 
-type Acc = { hours: number; raw: number; net: number; direct: number; overhead: number; unpaid: number; people: Map<string, number>; byMonth: Record<string, number> }
+type Acc = { hours: number; raw: number; net: number; direct: number; overhead: number; unpaid: number; people: Map<string, number>; peopleCost: Map<string, number>; byMonth: Record<string, number>; costByMonth: Record<string, number> }
 type PersonAcc = { paid: boolean; projects: Set<string>; byProject: Map<string, number>; months: Map<string, { hours: number; raw: number; net: number; taxed: number; projects: Set<string> }> }
 
 export function buildProjectsReport({
@@ -504,7 +518,7 @@ export function buildProjectsReport({
   for (const entry of entries) {
     const kind = kindOf(entry.project)
     const taxed = (entry.pay ?? 0) * factor(entry.month)
-    const project = projects.get(entry.project) ?? { hours: 0, raw: 0, net: 0, direct: 0, overhead: 0, unpaid: 0, people: new Map<string, number>(), byMonth: {} as Record<string, number> }
+    const project = projects.get(entry.project) ?? { hours: 0, raw: 0, net: 0, direct: 0, overhead: 0, unpaid: 0, people: new Map<string, number>(), peopleCost: new Map<string, number>(), byMonth: {} as Record<string, number>, costByMonth: {} as Record<string, number> }
     project.hours += entry.hours
     project.raw += entry.raw
     project.net += entry.pay ?? 0
@@ -513,6 +527,9 @@ export function buildProjectsReport({
     if (entry.pay === null) project.unpaid += entry.hours
     project.people.set(entry.person, (project.people.get(entry.person) ?? 0) + entry.hours)
     project.byMonth[entry.month] = (project.byMonth[entry.month] ?? 0) + entry.hours
+    const entryCost = taxed + (kind !== 'shared' ? entry.hours * rate(entry.month) : 0)
+    project.costByMonth[entry.month] = (project.costByMonth[entry.month] ?? 0) + entryCost
+    project.peopleCost.set(entry.person, (project.peopleCost.get(entry.person) ?? 0) + entryCost)
     projects.set(entry.project, project)
 
     const person: PersonAcc = people.get(entry.person) ?? { paid: false, projects: new Set<string>(), byProject: new Map<string, number>(), months: new Map() }
@@ -547,9 +564,16 @@ export function buildProjectsReport({
   const revenue = new Map<string, number>()
   const invoiceCount = new Map<string, number>()
   const others = new Map<string, OtherRevenue>()
-  const credit = (name: string, amount: number) => {
+  const revenueByMonth = new Map<string, Record<string, number>>()
+  const byMonthCredit = (name: string, month: string, amount: number) => {
+    const months = revenueByMonth.get(name) ?? {}
+    months[month] = (months[month] ?? 0) + amount
+    revenueByMonth.set(name, months)
+  }
+  const credit = (name: string, amount: number, month: string) => {
     revenue.set(name, (revenue.get(name) ?? 0) + amount)
     invoiceCount.set(name, (invoiceCount.get(name) ?? 0) + 1)
+    byMonthCredit(name, month, amount)
   }
   const otherGroup = (id: string, fallbackName: string) => {
     const key = id || `name:${fallbackName.trim().toLowerCase()}`
@@ -557,18 +581,18 @@ export function buildProjectsReport({
     others.set(key, group)
     return group
   }
-  for (const { invoice, net } of issuedInMonths(invoices, months, currency)) {
+  for (const { invoice, month, net } of issuedInMonths(invoices, months, currency)) {
     const id = invoiceClientId(invoice, idByName)
     const text = invoiceText(invoice)
     const named = linked.find((name) => mentions(text, name) && (kindOf(name) === 'product' || meta(name).clientId === id || (meta(name).clients || []).includes(id)))
     if (named) {
-      credit(named, net)
+      credit(named, net, month)
       continue
     }
     const own = byClient.get(id)
     if (own && own.length) {
       const total = own.reduce((sum, name) => sum + (projects.get(name)?.hours ?? 0), 0)
-      for (const name of own) credit(name, total ? net * ((projects.get(name)?.hours ?? 0) / total) : net / own.length)
+      for (const name of own) credit(name, total ? net * ((projects.get(name)?.hours ?? 0) / total) : net / own.length, month)
       continue
     }
     if (ownClients.has(id)) continue
@@ -592,10 +616,17 @@ export function buildProjectsReport({
   const projectNames = [...projects.keys()].filter((name) => kindOf(name) !== 'shared').sort((a, b) => b.length - a.length)
   const nameWords = (name: unknown) => looseText(words(name).filter((word) => !COMPANY_WORDS.has(word)).join(' '))
   const clientWords = [...byClient.keys()].map((id) => ({ id, words: nameWords(clientName.get(id)) })).filter((item) => item.words.replace(/ /g, '').length >= 3)
-  const bankCredit = (name: string, amount: number) => {
+  const llcRevenue = new Map<string, number>()
+  const llcCount = new Map<string, number>()
+  const bankCredit = (name: string, amount: number, line: BankCredit) => {
     revenue.set(name, (revenue.get(name) ?? 0) + amount)
     bankRevenue.set(name, (bankRevenue.get(name) ?? 0) + amount)
     bankCount.set(name, (bankCount.get(name) ?? 0) + 1)
+    byMonthCredit(name, line.date.slice(0, 7), amount)
+    if (line.origin === 'llc') {
+      llcRevenue.set(name, (llcRevenue.get(name) ?? 0) + amount)
+      llcCount.set(name, (llcCount.get(name) ?? 0) + 1)
+    }
   }
   for (const line of bankCredits) {
     if (!wanted.has(line.date.slice(0, 7))) continue
@@ -604,13 +635,13 @@ export function buildProjectsReport({
     if (counted.some((number) => digits.includes(` ${number} `))) continue
     const saved = bankProject(line.text, timesheet.projects)
     if (saved && projects.has(saved) && kindOf(saved) !== 'shared') {
-      bankCredit(saved, line.amount)
+      bankCredit(saved, line.amount, line)
       continue
     }
     const text = plain(line.text)
     const named = projectNames.find((name) => mentions(text, name))
     if (named) {
-      bankCredit(named, line.amount)
+      bankCredit(named, line.amount, line)
       continue
     }
     const loose = ` ${looseText(line.text)} `
@@ -618,7 +649,7 @@ export function buildProjectsReport({
     if (client) {
       const own = byClient.get(client.id)!
       const total = own.reduce((sum, name) => sum + (projects.get(name)?.hours ?? 0), 0)
-      for (const name of own) bankCredit(name, total ? line.amount * ((projects.get(name)?.hours ?? 0) / total) : line.amount / own.length)
+      for (const name of own) bankCredit(name, total ? line.amount * ((projects.get(name)?.hours ?? 0) / total) : line.amount / own.length, line)
       continue
     }
     const source = Object.entries(timesheet.sources || {}).find(([, list]) => list.some((item) => looseText(item) && loose.includes(` ${looseText(item)} `)))
@@ -642,7 +673,7 @@ export function buildProjectsReport({
 
   const projectRows: ProjectFigures[] = [...projects.entries()].map(([name, project]) => {
     const kind = kindOf(name)
-    const team = [...project.people.entries()].map(([person, value]) => ({ person, hours: round(value) })).sort((a, b) => b.hours - a.hours)
+    const team = [...project.people.entries()].map(([person, value]) => ({ person, hours: round(value), cost: round(project.peopleCost.get(person) ?? 0) })).sort((a, b) => b.hours - a.hours)
     const cost = kind === 'shared' ? project.direct : project.direct + project.overhead
     const linkedProject = kind === 'client' || kind === 'product'
     // A project with no client yet still shows money that came for it by name.
@@ -669,6 +700,10 @@ export function buildProjectsReport({
       people: team,
       lead: team.length ? { person: team[0].person, share: team[0].hours / project.hours } : null,
       byMonth: project.byMonth,
+      llcRevenue: round(llcRevenue.get(name) ?? 0),
+      llcPayments: llcCount.get(name) ?? 0,
+      revenueByMonth: Object.fromEntries(Object.entries(revenueByMonth.get(name) ?? {}).map(([month, value]) => [month, round(value)])),
+      costByMonth: Object.fromEntries(Object.entries(project.costByMonth).map(([month, value]) => [month, round(value)])),
       suggestion: kind === 'unset' ? suggestClient(name, clients, invoices, ownClients) : null,
     }
   })

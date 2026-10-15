@@ -3,6 +3,7 @@
 
 import { financeNav, financeTexts } from './i18nFinance'
 import { mercuryTexts } from './i18nMercury'
+import { projectDetailTexts } from './i18nProjectDetail'
 import { recurringNav, recurringTexts } from './i18nRecurring'
 
 export const LANGS = [
@@ -21,6 +22,7 @@ export const translations = {
   sq: {
     finance: financeTexts.sq,
     mercury: mercuryTexts.sq,
+    projectDetail: projectDetailTexts.sq,
     recurring: recurringTexts.sq,
     nav: {
       finance: financeNav.sq,
@@ -905,6 +907,7 @@ export const translations = {
   en: {
     finance: financeTexts.en,
     mercury: mercuryTexts.en,
+    projectDetail: projectDetailTexts.en,
     recurring: recurringTexts.en,
     nav: {
       finance: financeNav.en,
@@ -1789,6 +1792,7 @@ export const translations = {
   it: {
     finance: financeTexts.it,
     mercury: mercuryTexts.it,
+    projectDetail: projectDetailTexts.it,
     recurring: recurringTexts.it,
     nav: {
       finance: financeNav.it,
