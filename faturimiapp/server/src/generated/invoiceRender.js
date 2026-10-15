@@ -469,7 +469,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$1 = {
+const sq$2 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -733,7 +733,7 @@ const sq$1 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$1 = {
+const en$2 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -997,8 +997,8 @@ const en$1 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$1 = {
-	...en$1,
+const it$2 = {
+	...en$2,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1264,17 +1264,17 @@ const it$1 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$1,
+		...sq$2,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$1,
+		...en$2,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$1,
+		...it$2,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1283,6 +1283,245 @@ const financeNav = {
 	sq: "Shëndeti financiar",
 	en: "Financial health",
 	it: "Salute finanziaria"
+};
+//#endregion
+//#region src/i18nMercury.ts
+const sq$1 = {
+	tab: "Mercury",
+	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
+	settings: "Lidhja me Mercury",
+	syncNow: "Rifresko",
+	firstSync: "Po lexohen transaksionet nga Mercury…",
+	lastSync: "Lexuar së fundi: {date} · {count} transaksione",
+	syncFailed: "Leximi i fundit dështoi",
+	liveOn: "në kohë reale (webhook)",
+	liveOff: "kontroll çdo 10 minuta",
+	connectTitle: "Lidhe llogarinë në Mercury",
+	connectBody: "Me një token vetëm për lexim, Next Invoice i merr të gjitha transaksionet dhe gjendjet. Me këtë token nuk mund të lëvizen para.",
+	step1: "Në Mercury hap Settings → API Tokens dhe kliko \"Create an API token\".",
+	step2: "Zgjidh \"Read Only\" (nuk kërkon IP whitelist) dhe kopjo token-in.",
+	step3: "Ngjite këtu te \"Lidhja me Mercury\". Pas lidhjes do të marrësh edhe adresën për webhook.",
+	connect: "Lidhe Mercury",
+	insightsTitle: "Çka duhet ditur",
+	insight: {
+		incomeUp: "Të hyrat u rritën {change}% në 3 muajt e fundit: {recent} në muaj, nga {before} më parë.",
+		incomeDown: "Të hyrat ranë {change}% në 3 muajt e fundit: {recent} në muaj, nga {before} më parë.",
+		spendUp: "Shpenzimet u rritën {change}%: {recent} në muaj, nga {before}. Shiko cilat zëra u rritën më poshtë.",
+		spendDown: "Shpenzimet ranë {change}%: {recent} në muaj, nga {before}.",
+		concentration: "{share}% e të hyrave vijnë nga {name}. Varësia nga një burim i vetëm është rrezik; ia vlen të shtohen burime të tjera.",
+		vendorUp: "{name} u rrit nga {before} në {recent} në muaj (+{change}%). Kontrollo nëse rritja ka arsye.",
+		recurring: "{count} pagesa të përsëritura kushtojnë {monthly} në muaj, {share}% e shpenzimeve. Rishiko ato që nuk përdoren më.",
+		marginPositive: "Këtë vit mbeten {margin}% e të hyrave pas të gjitha shpenzimeve.",
+		marginNegative: "Këtë vit shpenzimet i kalojnë të hyrat ({margin}%).",
+		runway: "Me ritmin e 3 muajve të fundit, paraja mjafton për rreth {months} muaj.",
+		selfFunded: "Të hyrat i mbulojnë shpenzimet: mbeten rreth {surplus} në muaj."
+	},
+	figuresTitle: "Shifrat kryesore · {year}",
+	balance: "Paraja në Mercury",
+	incomeYtd: "Të hyrat këtë vit",
+	incomeYear: "Të hyrat {year}",
+	spendYtd: "Shpenzimet këtë vit",
+	spendYear: "Shpenzimet {year}",
+	net: "Neto {year}",
+	avgRecent: "mesatarisht {amount} në muaj (3 muajt e fundit)",
+	margin: "marzha {margin}%",
+	runway: "mjafton për ~{months} muaj",
+	selfFunded: "të hyrat mbulojnë shpenzimet",
+	monthlyTitle: "Muaj pas muaji · {year}",
+	in: "Hyrje",
+	out: "Dalje",
+	netShort: "neto",
+	sourcesTitle: "Nga vijnë paratë",
+	spendTitle: "Ku shkojnë paratë",
+	by: {
+		groups: "Sipas kategorisë",
+		vendors: "Sipas furnitorit"
+	},
+	group: {
+		card: "Blerje me kartelë",
+		transfers: "Transferta",
+		fees: "Komisione"
+	},
+	perMonthRecent: "{amount} / muaj tani",
+	vsBefore: "krahasuar me 3 muajt para",
+	ipacientiNote: "Të gjitha hyrjet në Mercury llogariten si të hyra të iPacienti (te Projektet, në euro me kursin e ditës). Transferet mes llogarive tuaja nuk llogariten.",
+	recurringTitle: "Pagesat e përsëritura",
+	recurringTotal: "gjithsej {amount} / muaj",
+	perMonth: "{amount} / muaj",
+	transactionsTitle: "Transaksionet ({count})",
+	filter: {
+		all: "Të gjitha",
+		in: "Hyrje",
+		out: "Dalje"
+	},
+	search: "Kërko pagues, furnitor, shënim…",
+	none: "Asgjë për të shfaqur.",
+	more: "Shfaq edhe ({count})",
+	internal: "transfer mes llogarive",
+	ipacienti: "iPacienti",
+	pending: "në pritje",
+	openInMercury: "Hape në Mercury",
+	token: "API token (Read Only)",
+	tokenKept: "i ruajtur; lëre bosh për ta mbajtur",
+	tokenHint: "Mercury → Settings → API Tokens → Create an API token → Read Only. Token-i ruhet i enkriptuar dhe nuk shfaqet më.",
+	since: "Merr transaksionet nga data",
+	webhookTitle: "Kohë reale (webhook)",
+	webhookHint: "Në Mercury → Settings → Webhooks shto këtë adresë (ngjarjet transaction.created dhe transaction.updated), pastaj ngjit këtu \"signing secret\" që të jep Mercury.",
+	secret: "Signing secret i webhook-ut",
+	checking: "Po kontrollohet…",
+	disconnect: "Shkëput",
+	disconnectConfirm: "Po, shkëpute",
+	err: {
+		MERCURY_TOKEN: "Ngjit token-in nga Mercury.",
+		MERCURY_AUTH: "Mercury nuk e pranoi këtë token. Kontrollo që është i plotë dhe \"Read Only\".",
+		MERCURY_CONNECT: "Mercury nuk u arrit. Provo përsëri.",
+		MERCURY_FAILED: "Mercury ktheu gabim.",
+		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
+	}
+};
+const en$1 = {
+	tab: "Mercury",
+	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
+	settings: "Mercury connection",
+	syncNow: "Refresh",
+	firstSync: "Reading the transactions from Mercury…",
+	lastSync: "Last read: {date} · {count} transactions",
+	syncFailed: "The last read failed",
+	liveOn: "real time (webhook)",
+	liveOff: "checked every 10 minutes",
+	connectTitle: "Connect your Mercury account",
+	connectBody: "With a read-only token, Next Invoice reads every transaction and balance. The token cannot move money.",
+	step1: "In Mercury open Settings → API Tokens and click \"Create an API token\".",
+	step2: "Choose \"Read Only\" (no IP whitelist needed) and copy the token.",
+	step3: "Paste it here under \"Mercury connection\". Once connected you also get the webhook address.",
+	connect: "Connect Mercury",
+	insightsTitle: "Worth knowing",
+	insight: {
+		incomeUp: "Income rose {change}% over the last 3 months: {recent} a month, up from {before}.",
+		incomeDown: "Income fell {change}% over the last 3 months: {recent} a month, down from {before}.",
+		spendUp: "Spending rose {change}%: {recent} a month, up from {before}. See below which items grew.",
+		spendDown: "Spending fell {change}%: {recent} a month, down from {before}.",
+		concentration: "{share}% of income comes from {name}. Depending on one source is a risk; other sources are worth building.",
+		vendorUp: "{name} grew from {before} to {recent} a month (+{change}%). Check whether the increase is justified.",
+		recurring: "{count} recurring payments cost {monthly} a month, {share}% of spending. Review the ones no longer used.",
+		marginPositive: "This year {margin}% of income is left after all spending.",
+		marginNegative: "This year spending exceeds income ({margin}%).",
+		runway: "At the pace of the last 3 months, the cash lasts about {months} months.",
+		selfFunded: "Income covers spending: about {surplus} a month is left over."
+	},
+	figuresTitle: "Key figures · {year}",
+	balance: "Cash at Mercury",
+	incomeYtd: "Income this year",
+	incomeYear: "Income {year}",
+	spendYtd: "Spending this year",
+	spendYear: "Spending {year}",
+	net: "Net {year}",
+	avgRecent: "{amount} a month on average (last 3 months)",
+	margin: "margin {margin}%",
+	runway: "lasts ~{months} months",
+	selfFunded: "income covers spending",
+	monthlyTitle: "Month by month · {year}",
+	in: "In",
+	out: "Out",
+	netShort: "net",
+	sourcesTitle: "Where the money comes from",
+	spendTitle: "Where the money goes",
+	by: {
+		groups: "By category",
+		vendors: "By vendor"
+	},
+	group: {
+		card: "Card purchases",
+		transfers: "Transfers",
+		fees: "Fees"
+	},
+	perMonthRecent: "{amount} / month now",
+	vsBefore: "vs the 3 months before",
+	ipacientiNote: "All money coming into Mercury counts as iPacienti income (on Projects, in euros at the day’s rate). Transfers between your own accounts are left out.",
+	recurringTitle: "Recurring payments",
+	recurringTotal: "{amount} / month in all",
+	perMonth: "{amount} / month",
+	transactionsTitle: "Transactions ({count})",
+	filter: {
+		all: "All",
+		in: "In",
+		out: "Out"
+	},
+	search: "Search payer, vendor, note…",
+	none: "Nothing to show.",
+	more: "Show more ({count})",
+	internal: "between your accounts",
+	ipacienti: "iPacienti",
+	pending: "pending",
+	openInMercury: "Open in Mercury",
+	token: "API token (Read Only)",
+	tokenKept: "saved; leave empty to keep it",
+	tokenHint: "Mercury → Settings → API Tokens → Create an API token → Read Only. The token is stored encrypted and never shown again.",
+	since: "Read transactions from",
+	webhookTitle: "Real time (webhook)",
+	webhookHint: "In Mercury → Settings → Webhooks add this address (events transaction.created and transaction.updated), then paste the signing secret Mercury gives you here.",
+	secret: "Webhook signing secret",
+	checking: "Checking…",
+	disconnect: "Disconnect",
+	disconnectConfirm: "Yes, disconnect",
+	err: {
+		MERCURY_TOKEN: "Paste the token from Mercury.",
+		MERCURY_AUTH: "Mercury did not accept this token. Check it is complete and \"Read Only\".",
+		MERCURY_CONNECT: "Could not reach Mercury. Try again.",
+		MERCURY_FAILED: "Mercury answered with an error.",
+		MERCURY_SINCE: "Enter a valid date."
+	}
+};
+const mercuryTexts = {
+	sq: sq$1,
+	en: en$1,
+	it: {
+		...en$1,
+		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
+		settings: "Collegamento Mercury",
+		syncNow: "Aggiorna",
+		firstSync: "Lettura delle transazioni da Mercury…",
+		lastSync: "Ultima lettura: {date} · {count} transazioni",
+		syncFailed: "L’ultima lettura non è riuscita",
+		liveOn: "in tempo reale (webhook)",
+		liveOff: "controllo ogni 10 minuti",
+		connectTitle: "Collega il conto Mercury",
+		connect: "Collega Mercury",
+		insightsTitle: "Da sapere",
+		figuresTitle: "Cifre principali · {year}",
+		balance: "Liquidità su Mercury",
+		incomeYtd: "Entrate quest’anno",
+		incomeYear: "Entrate {year}",
+		spendYtd: "Spese quest’anno",
+		spendYear: "Spese {year}",
+		net: "Netto {year}",
+		monthlyTitle: "Mese per mese · {year}",
+		in: "Entrate",
+		out: "Uscite",
+		netShort: "netto",
+		sourcesTitle: "Da dove arrivano i soldi",
+		spendTitle: "Dove vanno i soldi",
+		by: {
+			groups: "Per categoria",
+			vendors: "Per fornitore"
+		},
+		group: {
+			card: "Acquisti con carta",
+			transfers: "Bonifici",
+			fees: "Commissioni"
+		},
+		recurringTitle: "Pagamenti ricorrenti",
+		transactionsTitle: "Transazioni ({count})",
+		filter: {
+			all: "Tutte",
+			in: "Entrate",
+			out: "Uscite"
+		},
+		search: "Cerca pagatore, fornitore, nota…",
+		none: "Niente da mostrare.",
+		disconnect: "Scollega",
+		disconnectConfirm: "Sì, scollega"
+	}
 };
 const recurringTexts = {
 	sq: {
@@ -1961,6 +2200,7 @@ function isLang(value) {
 const translations = {
 	sq: {
 		finance: financeTexts.sq,
+		mercury: mercuryTexts.sq,
 		recurring: recurringTexts.sq,
 		nav: {
 			finance: financeNav.sq,
@@ -2898,6 +3138,7 @@ const translations = {
 	},
 	en: {
 		finance: financeTexts.en,
+		mercury: mercuryTexts.en,
 		recurring: recurringTexts.en,
 		nav: {
 			finance: financeNav.en,
@@ -3835,6 +4076,7 @@ const translations = {
 	},
 	it: {
 		finance: financeTexts.it,
+		mercury: mercuryTexts.it,
 		recurring: recurringTexts.it,
 		nav: {
 			finance: financeNav.it,
