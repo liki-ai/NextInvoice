@@ -284,6 +284,49 @@ function readLegacyWorkbook(bytes) {
 	})) };
 }
 //#endregion
+//#region src/lib/csv.ts
+/** Splits comma-, semicolon- or tab-separated text into rows, honouring quoted cells. */
+function readCsv(text) {
+	const source = text.replace(/^﻿/, "");
+	const firstLine = source.split(/\r?\n/, 1)[0] || "";
+	const separator = [
+		";",
+		",",
+		"	"
+	].map((mark) => [mark, firstLine.split(mark).length]).sort((a, b) => b[1] - a[1])[0][0];
+	const rows = [];
+	let row = [];
+	let cell = "";
+	let quoted = false;
+	for (let i = 0; i < source.length; i += 1) {
+		const char = source[i];
+		if (quoted) if (char === "\"" && source[i + 1] === "\"") {
+			cell += "\"";
+			i += 1;
+		} else if (char === "\"") quoted = false;
+		else cell += char;
+		else if (char === "\"" && cell === "") quoted = true;
+		else if (char === separator) {
+			row.push(cell);
+			cell = "";
+		} else if (char === "\n" || char === "\r") {
+			if (char === "\r" && source[i + 1] === "\n") i += 1;
+			row.push(cell);
+			rows.push(row);
+			row = [];
+			cell = "";
+		} else cell += char;
+	}
+	if (cell !== "" || row.length > 0) {
+		row.push(cell);
+		rows.push(row);
+	}
+	return { sheets: [{
+		name: "CSV",
+		rows
+	}] };
+}
+//#endregion
 //#region src/lib/xlsx.ts
 function readEntries(bytes) {
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -524,7 +567,8 @@ const HEADERS = {
 		"amount",
 		"shuma",
 		"vlera",
-		"importo"
+		"importo",
+		"value"
 	],
 	text: [
 		"koment",
@@ -541,19 +585,26 @@ const HEADERS = {
 		"reference"
 	]
 };
+/** A heading naming the direction of the amount beside it: "BasicEntryType", "D/C", "Debit/Credit". */
+function isDirection(name) {
+	return name === "dc" || name === "cd" || name === "dk" || name.includes("entrytype") || name.includes("debitcredit") || name.includes("creditdebit");
+}
 function findColumns(row) {
 	const columns = {
 		date: -1,
 		credit: -1,
 		debit: -1,
 		amount: -1,
+		direction: -1,
 		text: []
 	};
 	row.forEach((cell, index) => {
 		const name = plain(cell).replace(/[^a-z]/g, "");
 		if (!name) return;
 		const has = (words) => words.some((word) => name.includes(word));
-		if (has(HEADERS.credit) && !has(HEADERS.debit)) {
+		if (isDirection(name)) {
+			if (columns.direction === -1) columns.direction = index;
+		} else if (has(HEADERS.credit) && !has(HEADERS.debit)) {
 			if (columns.credit === -1) columns.credit = index;
 		} else if (has(HEADERS.debit)) {
 			if (columns.debit === -1) columns.debit = index;
@@ -566,6 +617,32 @@ function findColumns(row) {
 	});
 	if (columns.date === -1 || columns.credit === -1 && columns.amount === -1) return null;
 	return columns;
+}
+/**
+* Money in and out on one row: from separate credit and debit columns, or from one amount column
+* whose sign says the direction, or whose direction stands beside it ("C" in, "D" out).
+*/
+function movement(row, columns) {
+	if (columns.credit !== -1 || columns.debit !== -1) return {
+		credit: columns.credit !== -1 ? cellAmount(row[columns.credit] ?? null) : 0,
+		debit: columns.debit !== -1 ? cellAmount(row[columns.debit] ?? null) : 0
+	};
+	const amount = cellAmount(row[columns.amount] ?? null);
+	if (columns.direction !== -1) {
+		const way = String(row[columns.direction] ?? "").trim().toUpperCase();
+		if (/^(C|K|CR|CREDIT|KREDI)/.test(way)) return {
+			credit: Math.abs(amount),
+			debit: 0
+		};
+		if (/^(D|DR|DEBIT|DEBI)/.test(way)) return {
+			credit: 0,
+			debit: Math.abs(amount)
+		};
+	}
+	return {
+		credit: Math.max(amount, 0),
+		debit: Math.max(-amount, 0)
+	};
 }
 /** Dates written out in the lines above the table, where a statement prints the period it covers. */
 function statedDates(rows) {
@@ -588,8 +665,7 @@ function readStatement(workbook) {
 		for (const row of sheet.rows.slice(head + 1)) {
 			const date = cellDate(row[columns.date] ?? null);
 			if (!date) continue;
-			const credit = columns.credit !== -1 ? cellAmount(row[columns.credit] ?? null) : Math.max(cellAmount(row[columns.amount] ?? null), 0);
-			const debit = columns.debit !== -1 ? cellAmount(row[columns.debit] ?? null) : Math.max(-cellAmount(row[columns.amount] ?? null), 0);
+			const { credit, debit } = movement(row, columns);
 			if (credit <= 0 && debit <= 0) continue;
 			if (!from || date < from) from = date;
 			if (!to || date > to) to = date;
@@ -940,47 +1016,6 @@ const SPEND_CATEGORIES = [
 ];
 //#endregion
 //#region src/lib/serverFinance.ts
-/** Splits comma-, semicolon- or tab-separated text into rows, honouring quoted cells. */
-function readCsv(text) {
-	const source = text.replace(/^﻿/, "");
-	const firstLine = source.split(/\r?\n/, 1)[0] || "";
-	const separator = [
-		";",
-		",",
-		"	"
-	].map((mark) => [mark, firstLine.split(mark).length]).sort((a, b) => b[1] - a[1])[0][0];
-	const rows = [];
-	let row = [];
-	let cell = "";
-	let quoted = false;
-	for (let i = 0; i < source.length; i += 1) {
-		const char = source[i];
-		if (quoted) if (char === "\"" && source[i + 1] === "\"") {
-			cell += "\"";
-			i += 1;
-		} else if (char === "\"") quoted = false;
-		else cell += char;
-		else if (char === "\"" && cell === "") quoted = true;
-		else if (char === separator) {
-			row.push(cell);
-			cell = "";
-		} else if (char === "\n" || char === "\r") {
-			if (char === "\r" && source[i + 1] === "\n") i += 1;
-			row.push(cell);
-			rows.push(row);
-			row = [];
-			cell = "";
-		} else cell += char;
-	}
-	if (cell !== "" || row.length > 0) {
-		row.push(cell);
-		rows.push(row);
-	}
-	return { sheets: [{
-		name: "CSV",
-		rows
-	}] };
-}
 /** Reads a spreadsheet in whichever form it came: .xlsx, the older .xls, or CSV text. */
 async function readAnyWorkbook(bytes, name = "") {
 	if (isLegacyWorkbook(bytes)) return readLegacyWorkbook(bytes);
@@ -1063,38 +1098,53 @@ function statementFigures(workbook) {
 			const final = /(final balance|closing balance|gjendja e fundit|saldo perfundimtare|saldo e fundit)[^\d-]*(-?[\d.,]+\d)/.exec(text);
 			if (final && result.closingBalance === null) result.closingBalance = amountOf(final[2]);
 		}
-		const head = sheet.rows.findIndex((row) => {
-			const names = row.map(plainText);
-			return names.some((name) => /debit/.test(name)) && names.some((name) => /kredit|credit/.test(name));
-		});
-		if (head === -1) continue;
-		const names = sheet.rows[head].map(plainText);
-		const debit = names.findIndex((name) => /debit/.test(name) && !/kredit|credit/.test(name));
-		const credit = names.findIndex((name) => /kredit|credit/.test(name) && !/debit/.test(name));
-		const balance = names.findIndex((name) => /bilanc|balance|saldo|gjendja/.test(name));
+		const table = statementTable(sheet.rows);
+		if (!table) continue;
+		const { head, columns, balance } = table;
 		let totalIn = 0;
 		let totalOut = 0;
-		const balances = [];
+		const rows = [];
 		for (const row of sheet.rows.slice(head + 1)) {
-			if (row.some((cell) => /permbledhje|summary|total/.test(plainText(cell)))) continue;
-			const inAmount = credit !== -1 ? amountOf(row[credit] ?? null) : null;
-			const outAmount = debit !== -1 ? amountOf(row[debit] ?? null) : null;
-			if (inAmount === null && outAmount === null) continue;
-			totalIn += Math.max(inAmount ?? 0, 0);
-			totalOut += Math.max(outAmount ?? 0, 0);
-			const left = balance !== -1 ? amountOf(row[balance] ?? null) : null;
-			if (left !== null) balances.push(left);
+			const day = excelDay(row[columns.date] ?? null);
+			if (!day) continue;
+			const { credit, debit } = movement(row, columns);
+			if (credit <= 0 && debit <= 0) continue;
+			totalIn += credit;
+			totalOut += debit;
+			rows.push({
+				day,
+				credit,
+				debit,
+				left: balance !== -1 ? amountOf(row[balance] ?? null) : null
+			});
 		}
 		result.totalIn = Math.round(totalIn * 100) / 100;
 		result.totalOut = Math.round(totalOut * 100) / 100;
-		if (result.closingBalance === null && balances.length > 0 && result.openingBalance !== null) {
-			const first = balances[0];
-			const last = balances[balances.length - 1];
-			result.closingBalance = Math.abs(last - result.openingBalance) < Math.abs(first - result.openingBalance) ? first : last;
+		const known = rows.filter((row) => row.left !== null);
+		if (known.length) {
+			const newestFirst = known[0].day > known[known.length - 1].day;
+			const newest = newestFirst ? known[0] : known[known.length - 1];
+			const oldest = newestFirst ? known[known.length - 1] : known[0];
+			if (result.closingBalance === null) result.closingBalance = newest.left;
+			if (result.openingBalance === null && oldest.left !== null) result.openingBalance = Math.round((oldest.left - oldest.credit + oldest.debit) * 100) / 100;
 		}
 		break;
 	}
 	return result;
+}
+/** The table of movements in a sheet: its heading row, its columns, and the running balance column. */
+function statementTable(rows) {
+	for (let head = 0; head < Math.min(rows.length, 60); head += 1) {
+		const columns = findColumns(rows[head] || []);
+		if (!columns) continue;
+		const names = (rows[head] || []).map(plainText);
+		return {
+			head,
+			columns,
+			balance: names.findIndex((name) => /bilanc|balance|saldo|gjendja/.test(name))
+		};
+	}
+	return null;
 }
 /** What an outgoing payment was for, from the words the bank wrote on it. */
 function spendCategory(text) {
@@ -1122,7 +1172,7 @@ function excelDay(value) {
 	return dmy ? `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}` : "";
 }
 /** Raised whenever the sorting of outgoing payments changes, so statements read before are read again. */
-const STATEMENT_MONTHS_VERSION = 2;
+const STATEMENT_MONTHS_VERSION = 3;
 /**
 * Money in and out of the account month by month, and what went out for: pay, taxes and
 * contributions, rent, suppliers, card purchases, cash, bank fees. Null when the sheet has no
@@ -1130,45 +1180,47 @@ const STATEMENT_MONTHS_VERSION = 2;
 */
 function statementMonths(workbook) {
 	for (const sheet of workbook.sheets) {
-		const head = sheet.rows.findIndex((row) => {
-			const names = row.map(plainText);
-			return names.some((name) => /debit/.test(name)) && names.some((name) => /kredit|credit/.test(name)) && names.some((name) => /data|date|datum/.test(name));
-		});
-		if (head === -1) continue;
-		const names = sheet.rows[head].map(plainText);
-		const debit = names.findIndex((name) => /debit/.test(name) && !/kredit|credit/.test(name));
-		const credit = names.findIndex((name) => /kredit|credit/.test(name) && !/debit/.test(name));
-		const date = names.findIndex((name) => /data|date|datum/.test(name) && !/debit|kredit|credit/.test(name));
+		const table = statementTable(sheet.rows);
+		if (!table) continue;
+		const { head, columns } = table;
+		const date = columns.date;
 		const months = {};
+		const days = {};
+		const blankMonth = () => ({
+			in: 0,
+			out: 0,
+			spend: Object.fromEntries(SPEND_CATEGORIES.map((item) => [item, 0]))
+		});
 		for (const row of sheet.rows.slice(head + 1)) {
 			const day = excelDay(row[date] ?? null);
 			if (!day) continue;
-			const inAmount = Math.max(amountOf(row[credit] ?? null) ?? 0, 0);
-			const outAmount = Math.max(amountOf(row[debit] ?? null) ?? 0, 0);
+			const { credit: inAmount, debit: outAmount } = movement(row, columns);
 			if (!inAmount && !outAmount) continue;
 			const key = day.slice(0, 7);
-			const month = months[key] ||= {
-				in: 0,
-				out: 0,
-				spend: Object.fromEntries(SPEND_CATEGORIES.map((item) => [item, 0]))
-			};
+			const month = months[key] ||= blankMonth();
+			const today = days[day] ||= blankMonth();
 			month.in += inAmount;
+			today.in += inAmount;
 			if (outAmount) {
 				month.out += outAmount;
-				const text = row.filter((cell, index) => typeof cell === "string" && index !== date).join(" ");
-				month.spend[spendCategory(text)] += outAmount;
+				today.out += outAmount;
+				const category = spendCategory(row.filter((cell, index) => typeof cell === "string" && index !== date).join(" "));
+				month.spend[category] += outAmount;
+				today.spend[category] += outAmount;
 			}
 		}
-		for (const month of Object.values(months)) {
+		for (const month of [...Object.values(months), ...Object.values(days)]) {
 			month.in = Math.round(month.in * 100) / 100;
 			month.out = Math.round(month.out * 100) / 100;
 			for (const item of SPEND_CATEGORIES) month.spend[item] = Math.round(month.spend[item] * 100) / 100;
 		}
+		for (const day of Object.values(days)) for (const item of SPEND_CATEGORIES) if (!day.spend[item]) delete day.spend[item];
 		let iban = "";
 		for (const row of sheet.rows.slice(0, head)) for (const cell of row) iban ||= /\bXK\d{18}\b/.exec(String(cell ?? "").replace(/\s+/g, ""))?.[0] || "";
 		return Object.keys(months).length ? {
 			iban,
-			months
+			months,
+			days
 		} : null;
 	}
 	return null;
