@@ -77,10 +77,12 @@ export function companyForPdf(
   const live = localizeCompanyProfile(profile, t)
   const snapshot = invoice?.companySnapshot
   if (!snapshot) return live
-  // Details that were still blank when the invoice was issued (the NUI, the bank) come from the profile.
+  // Details that were still blank when the invoice was issued (the NUI, the bank), or still the
+  // samples a new account starts with ("Kompania juaj (shembull)"), come from the profile.
   const filled: Record<string, unknown> = {}
   for (const key of ['companyName', 'contactPerson', 'nui', 'vatNumber', 'streetAddress', 'state', 'zipCode', 'email', 'phone', 'website', 'bankName', 'iban', 'swift'] as const) {
-    if (!String(snapshot[key] ?? '').trim() && String(live[key] ?? '').trim()) filled[key] = live[key]
+    const sample = (SAMPLE_FIELDS as string[]).includes(key) && isSampleCompanyValue(key as CompanySampleField, snapshot[key] as string | undefined)
+    if ((sample || !String(snapshot[key] ?? '').trim()) && String(live[key] ?? '').trim()) filled[key] = live[key]
   }
   return {
     ...snapshot,

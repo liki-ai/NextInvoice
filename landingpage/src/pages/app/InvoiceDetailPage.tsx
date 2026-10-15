@@ -7,8 +7,8 @@ import { Button, Card, Field, Modal } from '../../components/ui'
 import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, invoiceStatus } from '../../lib/invoice'
 import { activePayments, daysOverdue, isInvoiceSent, remainingOf, reminderText, visiblePaymentStatus } from '../../lib/document'
 import { companyForPdf } from '../../lib/companySamples'
-import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
-import { TemplateSwitch } from '../../components/TemplateSwitch'
+import { normalizeTemplate } from '../../lib/invoiceTemplates'
+import { InvoicePreviewModal } from '../../components/InvoicePreviewModal'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
 import { DeliveryHistory } from '../../components/DeliveryHistory'
 import { PaymentModal } from '../../components/PaymentModal'
@@ -27,10 +27,9 @@ export function InvoiceDetailPage() {
   const [copied, setCopied] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
-  const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
   const invoice = invoices.find((item) => item.id === invoiceId)
   const company = useMemo(() => (profile ? companyForPdf(invoice, profile, t) : invoice?.companySnapshot || null), [invoice, profile, t])
-  const template = templateChoice || normalizeTemplate(company?.invoiceTemplate)
+  const template = normalizeTemplate(company?.invoiceTemplate)
   const client = invoice?.clientSnapshot || invoice?.client
   const currency = invoice?.currency || company?.currency || 'EUR'
   const status = invoice ? invoiceStatus(invoice) : 'unpaid'
@@ -38,17 +37,6 @@ export function InvoiceDetailPage() {
   const sent = invoice ? isInvoiceSent(invoice) : false
   const late = invoice ? daysOverdue(invoice) : 0
   const due = invoice ? remainingOf(invoice) : 0
-
-  const html = useMemo(() => {
-    if (!invoice || !company || !client || !preview) return ''
-    return buildInvoiceHtml({
-      company,
-      client,
-      invoice,
-      pdfLabels: { ...dict.pdf, amountDue: t('docs.amountDue'), amountPaid: t('docs.amountPaid') },
-      template,
-    })
-  }, [invoice, company, client, preview, template, dict.pdf, t])
 
   if (!invoice) {
     return <p className="text-brand-ink/60">{loading ? t('common.loading') : t('invoiceList.empty')}</p>
@@ -399,25 +387,7 @@ export function InvoiceDetailPage() {
 
       {payOpen ? <PaymentModal doc={current} currency={currency} onClose={() => setPayOpen(false)} onSave={(payment) => addInvoicePayment(current.id, payment)} /> : null}
 
-      {preview ? (
-        <Modal
-          title={t('newInvoice.previewTitle')}
-          onClose={() => setPreview(false)}
-          footer={
-            <>
-              <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
-                {t('common.close')}
-              </Button>
-              <Button type="button" onClick={onDownload}>
-                {t('invoiceDetail.downloadPdf')}
-              </Button>
-            </>
-          }
-        >
-          <TemplateSwitch value={template} onChange={setTemplateChoice} />
-          <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={html} />
-        </Modal>
-      ) : null}
+      {preview ? <InvoicePreviewModal invoice={current} onClose={() => setPreview(false)} /> : null}
 
       {sendOpen ? <SendInvoiceModal invoice={current} onClose={() => setSendOpen(false)} /> : null}
 

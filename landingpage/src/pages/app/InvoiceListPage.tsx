@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Bell, BellRing, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Bell, BellRing, Eye, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -9,6 +9,7 @@ import { RemindPaymentModal } from '../../components/RemindPaymentModal'
 import { ImportInvoicesModal } from '../../components/ImportInvoicesModal'
 import { BankMatchModal } from '../../components/BankMatchModal'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
+import { InvoicePreviewModal } from '../../components/InvoicePreviewModal'
 import { DeliveryQueue } from '../../components/DeliveryQueue'
 import { awaitsDelivery } from '../../lib/delivery'
 import {
@@ -55,6 +56,7 @@ export function InvoiceListPage() {
   const [remindId, setRemindId] = useState<string | null>(null)
   const [bankOpen, setBankOpen] = useState(false)
   const [sendId, setSendId] = useState<string | null>(null)
+  const [previewId, setPreviewId] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [pulseId, setPulseId] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -197,6 +199,7 @@ export function InvoiceListPage() {
   }
 
   const sendTarget = sendId ? invoices.find((item) => item.id === sendId) : undefined
+  const previewTarget = previewId ? invoices.find((item) => item.id === previewId) : undefined
   const remindTarget = remindId ? invoices.find((item) => item.id === remindId) : undefined
   const unpaidInvoiceTotal = formatMoneyList(
     totalsByCurrency(yearInvoices, (item) => (invoiceStatus(item) === 'paid' ? 0 : remainingOf(item))),
@@ -660,12 +663,14 @@ export function InvoiceListPage() {
                             </button>
                           </>
                         ) : (
-                          <Link
-                            to={`/app/invoices/${item.id}`}
+                          <button
+                            type="button"
+                            onClick={() => setPreviewId(item.id)}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
                           >
-                            {t('invoiceList.view')}
-                          </Link>
+                            <Eye className="h-3.5 w-3.5" />
+                            {t('newInvoice.preview')}
+                          </button>
                         )}
                       </div>
                     </td>
@@ -709,6 +714,7 @@ export function InvoiceListPage() {
       {bankOpen ? <BankMatchModal onClose={() => setBankOpen(false)} /> : null}
 
       {sendTarget ? <SendInvoiceModal invoice={sendTarget} onClose={() => setSendId(null)} /> : null}
+      {previewTarget ? <InvoicePreviewModal invoice={previewTarget} onClose={() => setPreviewId(null)} /> : null}
 
       {bulkOpen && chosen.length > 0 ? (
         <Modal
