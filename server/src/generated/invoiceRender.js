@@ -484,7 +484,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$2 = {
+const sq$3 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -748,7 +748,7 @@ const sq$2 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$2 = {
+const en$3 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -1012,8 +1012,8 @@ const en$2 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$2 = {
-	...en$2,
+const it$3 = {
+	...en$3,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1279,17 +1279,17 @@ const it$2 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$2,
+		...sq$3,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$2,
+		...en$3,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$2,
+		...it$3,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1301,7 +1301,7 @@ const financeNav = {
 };
 //#endregion
 //#region src/i18nMercury.ts
-const sq$1 = {
+const sq$2 = {
 	tab: "Mercury",
 	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
 	settings: "Lidhja me Mercury",
@@ -1394,7 +1394,7 @@ const sq$1 = {
 		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
 	}
 };
-const en$1 = {
+const en$2 = {
 	tab: "Mercury",
 	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
 	settings: "Mercury connection",
@@ -1488,10 +1488,10 @@ const en$1 = {
 	}
 };
 const mercuryTexts = {
-	sq: sq$1,
-	en: en$1,
+	sq: sq$2,
+	en: en$2,
 	it: {
-		...en$1,
+		...en$2,
 		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
 		settings: "Collegamento Mercury",
 		syncNow: "Aggiorna",
@@ -1536,6 +1536,159 @@ const mercuryTexts = {
 		none: "Niente da mostrare.",
 		disconnect: "Scollega",
 		disconnectConfirm: "Sì, scollega"
+	}
+};
+//#endregion
+//#region src/i18nProjectDetail.ts
+const sq$1 = {
+	back: "Të gjitha projektet",
+	details: "Detajet",
+	kind: {
+		client: "Projekt për klient",
+		product: "Produkt i Tretek",
+		shared: "Punë e përbashkët",
+		unset: "Pa klient"
+	},
+	fromShpk: "Tretek SHPK: {amount}",
+	fromLlc: "Tretek LLC (Mercury): {amount} · {count} pagesa",
+	revenue: "Të hyrat",
+	cost: "Kosto e plotë",
+	profit: "Fitimi",
+	hours: "Orë",
+	invoices: "{count} fatura",
+	bankPayments: "{count} pagesa në bankë pa faturë",
+	direct: "paga me tatime: {amount}",
+	overhead: "shpenzime të përbashkëta: {amount}",
+	margin: "marzha {margin}%",
+	perHour: "një orë sjell {revenue}, kushton {cost}",
+	people: "{count} persona",
+	rawHours: "{hours} orë të regjistruara",
+	shareOfHours: "{share}% e orëve të kompanisë",
+	adviceTitle: "Çka mund të përmirësohet",
+	advice: {
+		loss: "Projekti humb {loss} ({perMonth} në muaj). Për t’u mbuluar duhen rreth {revenueNeeded} të hyra në muaj, ose punë rreth {hoursAffordable} orë në muaj në vend të {hoursNow} me të hyrat e tanishme.",
+		healthy: "Projekt i shëndetshëm: marzha {margin}%, fitim {profit}.",
+		thin: "Fitim i vogël: marzha vetëm {margin}%. Një rritje e vogël e kostove e çon në humbje.",
+		priceGap: "Një orë pune kushton {costHour} por sjell vetëm {revenueHour} ({gap} më pak). Çmimi ose orët duhet të rishikohen.",
+		noRevenue: "Nuk ka të hyra të lidhura me këtë projekt, ndërsa kushton {cost}. Lidh faturat ose pagesat që i përkasin, ose shiko nëse projekti duhet të vazhdojë.",
+		shared: "Punë e përbashkët ({share}% e orëve, {cost}): kosto e saj ndahet mbi projektet e tjera. Sa më pak orë këtu, aq më fitimprurëse dalin projektet.",
+		keyPerson: "{person} ka bërë {share}% të punës. Projekti varet nga një person; ndaj njohuritë me të tjerët.",
+		scattered: "{count} persona kanë punuar shumë pak ({hours} orë bashkë). Kalimi mes projekteve humb kohë; përqendro ekipin.",
+		overhead: "{share}% e kostos janë shpenzime të përbashkëta (menaxhim, administratë, zyrë). Uljet atje ndihmojnë të gjitha projektet.",
+		hoursUp: "Orët u rritën {change}% në 3 muajt e fundit ({recent} orë në muaj nga {before}).",
+		hoursDown: "Orët ranë {change}% në 3 muajt e fundit ({recent} orë në muaj nga {before}).",
+		revenueUp: "Të hyrat u rritën {change}% në 3 muajt e fundit ({revenueRecent} në muaj nga {revenueBefore}).",
+		revenueDown: "Të hyrat ranë {change}% në 3 muajt e fundit ({revenueRecent} në muaj nga {revenueBefore}).",
+		llcShare: "{share}% e të hyrave ({amount}) vijnë përmes Tretek LLC në Mercury.",
+		unpaid: "{hours} orë janë pa pagë në fletën e orëve; kosto e tyre mungon dhe fitimi del më i lartë se në të vërtetë."
+	},
+	monthlyTitle: "Muaj pas muaji: të hyrat kundrejt kostos",
+	monthlyNote: "Kosto: paga me tatime dhe pjesa e shpenzimeve të përbashkëta sipas orëve.",
+	teamTitle: "Ekipi ({count})",
+	col: {
+		month: "Muaji",
+		hours: "Orë",
+		cost: "Kosto",
+		revenue: "Të hyrat",
+		chart: "Krahasimi",
+		result: "Rezultati",
+		running: "Gjithsej deri atëherë",
+		person: "Personi",
+		share: "Pjesa e orëve",
+		costPerHour: "Kosto / orë"
+	}
+};
+const en$1 = {
+	back: "All projects",
+	details: "Details",
+	kind: {
+		client: "Client project",
+		product: "Tretek product",
+		shared: "Shared work",
+		unset: "No client"
+	},
+	fromShpk: "Tretek SHPK: {amount}",
+	fromLlc: "Tretek LLC (Mercury): {amount} · {count} payments",
+	revenue: "Revenue",
+	cost: "Full cost",
+	profit: "Profit",
+	hours: "Hours",
+	invoices: "{count} invoices",
+	bankPayments: "{count} bank payments without an invoice",
+	direct: "pay with taxes: {amount}",
+	overhead: "shared costs: {amount}",
+	margin: "margin {margin}%",
+	perHour: "an hour brings in {revenue}, costs {cost}",
+	people: "{count} people",
+	rawHours: "{hours} hours logged",
+	shareOfHours: "{share}% of the company’s hours",
+	adviceTitle: "What can be improved",
+	advice: {
+		loss: "The project loses {loss} ({perMonth} a month). To break even it needs about {revenueNeeded} of revenue a month, or about {hoursAffordable} hours of work a month instead of {hoursNow} at today’s revenue.",
+		healthy: "A healthy project: margin {margin}%, profit {profit}.",
+		thin: "A thin profit: margin only {margin}%. A small rise in costs turns it into a loss.",
+		priceGap: "An hour of work costs {costHour} but brings in only {revenueHour} ({gap} less). The price or the hours need a look.",
+		noRevenue: "No revenue is linked to this project, while it costs {cost}. Link the invoices or payments that belong to it, or consider whether it should continue.",
+		shared: "Shared work ({share}% of the hours, {cost}): its cost is spread over the other projects. The fewer hours here, the more profitable they are.",
+		keyPerson: "{person} did {share}% of the work. The project depends on one person; share the knowledge with others.",
+		scattered: "{count} people worked very little on it ({hours} hours together). Switching between projects loses time; focus the team.",
+		overhead: "{share}% of the cost is shared costs (management, administration, office). Savings there help every project.",
+		hoursUp: "Hours rose {change}% over the last 3 months ({recent} hours a month, up from {before}).",
+		hoursDown: "Hours fell {change}% over the last 3 months ({recent} hours a month, down from {before}).",
+		revenueUp: "Revenue rose {change}% over the last 3 months ({revenueRecent} a month, up from {revenueBefore}).",
+		revenueDown: "Revenue fell {change}% over the last 3 months ({revenueRecent} a month, down from {revenueBefore}).",
+		llcShare: "{share}% of the revenue ({amount}) comes through Tretek LLC at Mercury.",
+		unpaid: "{hours} hours have no pay in the timesheet; their cost is missing and the profit looks higher than it is."
+	},
+	monthlyTitle: "Month by month: revenue against cost",
+	monthlyNote: "Cost: pay with taxes and the share of shared costs by hours.",
+	teamTitle: "Team ({count})",
+	col: {
+		month: "Month",
+		hours: "Hours",
+		cost: "Cost",
+		revenue: "Revenue",
+		chart: "Comparison",
+		result: "Result",
+		running: "Total so far",
+		person: "Person",
+		share: "Share of hours",
+		costPerHour: "Cost / hour"
+	}
+};
+const projectDetailTexts = {
+	sq: sq$1,
+	en: en$1,
+	it: {
+		...en$1,
+		back: "Tutti i progetti",
+		details: "Dettagli",
+		kind: {
+			client: "Progetto per cliente",
+			product: "Prodotto Tretek",
+			shared: "Lavoro condiviso",
+			unset: "Senza cliente"
+		},
+		revenue: "Ricavi",
+		cost: "Costo pieno",
+		profit: "Utile",
+		hours: "Ore",
+		adviceTitle: "Cosa si può migliorare",
+		monthlyTitle: "Mese per mese: ricavi contro costi",
+		teamTitle: "Squadra ({count})",
+		col: {
+			...en$1.col,
+			month: "Mese",
+			hours: "Ore",
+			cost: "Costo",
+			revenue: "Ricavi",
+			chart: "Confronto",
+			result: "Risultato",
+			running: "Totale finora",
+			person: "Persona",
+			share: "Quota di ore",
+			costPerHour: "Costo / ora"
+		}
 	}
 };
 const recurringTexts = {
@@ -2216,6 +2369,7 @@ const translations = {
 	sq: {
 		finance: financeTexts.sq,
 		mercury: mercuryTexts.sq,
+		projectDetail: projectDetailTexts.sq,
 		recurring: recurringTexts.sq,
 		nav: {
 			finance: financeNav.sq,
@@ -3154,6 +3308,7 @@ const translations = {
 	en: {
 		finance: financeTexts.en,
 		mercury: mercuryTexts.en,
+		projectDetail: projectDetailTexts.en,
 		recurring: recurringTexts.en,
 		nav: {
 			finance: financeNav.en,
@@ -4092,6 +4247,7 @@ const translations = {
 	it: {
 		finance: financeTexts.it,
 		mercury: mercuryTexts.it,
+		projectDetail: projectDetailTexts.it,
 		recurring: recurringTexts.it,
 		nav: {
 			finance: financeNav.it,
