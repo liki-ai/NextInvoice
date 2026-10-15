@@ -131,6 +131,11 @@ const projectsTexts = {
 		bankRemove: "Hiqe rregullin",
 		productBank: "Nga banka pa faturë: {amount} ({count} pagesa)",
 		signal: {
+			summaryOver: "Orë të tepërta",
+			summaryLone: "Projekte me një person",
+			summaryNotes: "Shënime",
+			expand: "Shfaq detajet",
+			collapse: "Mbyll",
 			overHoursTitle: "Orë që një person nuk mund t’i punojë (mbi {limit} në muaj). Ndoshta një timer i harruar ose disa njerëz në një llogari:",
 			overHoursFixed: "U korrigjuan në orarin e plotë të muajit. Shifrat më poshtë i përdorin orët e korrigjuara.",
 			overHours: "{person}: {months} muaj, më së shumti {hours} orë në {month} (→ {to})",
@@ -280,6 +285,11 @@ const projectsTexts = {
 		bankRemove: "Remove the rule",
 		productBank: "From the bank without an invoice: {amount} ({count} payments)",
 		signal: {
+			summaryOver: "Excess hours",
+			summaryLone: "One-person projects",
+			summaryNotes: "Notes",
+			expand: "Show details",
+			collapse: "Close",
 			overHoursTitle: "Hours one person cannot work (over {limit} a month). Likely a timer left running or several people on one login:",
 			overHoursFixed: "Corrected to the month's full time. The figures below use the corrected hours.",
 			overHours: "{person}: {months} months, at most {hours} hours in {month} (→ {to})",
@@ -429,6 +439,11 @@ const projectsTexts = {
 		bankRemove: "Togli la regola",
 		productBank: "Dalla banca senza fattura: {amount} ({count} pagamenti)",
 		signal: {
+			summaryOver: "Ore in eccesso",
+			summaryLone: "Progetti di una persona",
+			summaryNotes: "Note",
+			expand: "Mostra dettagli",
+			collapse: "Chiudi",
 			overHoursTitle: "Ore che una persona non può lavorare (oltre {limit} al mese). Forse un timer dimenticato o più persone su un account:",
 			overHoursFixed: "Corrette al tempo pieno del mese. Le cifre sotto usano le ore corrette.",
 			overHours: "{person}: {months} mesi, al massimo {hours} ore a {month} (→ {to})",
@@ -5744,7 +5759,7 @@ function companyForPdf(invoice, profile, t) {
 		"bankName",
 		"iban",
 		"swift"
-	]) if (!String(snapshot[key] ?? "").trim() && String(live[key] ?? "").trim()) filled[key] = live[key];
+	]) if ((SAMPLE_FIELDS.includes(key) && isSampleCompanyValue(key, snapshot[key]) || !String(snapshot[key] ?? "").trim()) && String(live[key] ?? "").trim()) filled[key] = live[key];
 	return {
 		...snapshot,
 		...filled,
