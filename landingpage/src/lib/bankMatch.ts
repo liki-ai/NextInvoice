@@ -4,6 +4,7 @@
 import { activePayments, parseLooseDate } from './document'
 import type { Invoice } from './invoice'
 import { isLegacyWorkbook, readLegacyWorkbook } from './xls'
+import { readCsv } from './csv'
 import { readWorkbook, type CellValue, type Workbook } from './xlsx'
 
 /** One incoming payment on the statement. `date` is YYYY-MM-DD. */
@@ -63,19 +64,27 @@ const HEADERS = {
   date: ['date', 'data', 'datum'],
   credit: ['kredit', 'credit', 'hyrje', 'hyrese', 'incoming', 'deposit', 'paidin', 'avere', 'entrate'],
   debit: ['debit', 'dalje', 'dalese', 'outgoing', 'withdraw', 'paidout', 'dare', 'uscite'],
-  amount: ['amount', 'shuma', 'vlera', 'importo'],
+  amount: ['amount', 'shuma', 'vlera', 'importo', 'value'],
   text: ['koment', 'comment', 'pershkrim', 'description', 'detaj', 'detail', 'narrative', 'qellimi', 'purpose', 'causale', 'descrizione', 'reference'],
 }
 
-type Columns = { date: number; credit: number; debit: number; amount: number; text: number[] }
+/** `direction`: a column saying whether the one amount column is money in or out ("C" / "D"). */
+export type Columns = { date: number; credit: number; debit: number; amount: number; direction: number; text: number[] }
 
-function findColumns(row: CellValue[]): Columns | null {
-  const columns: Columns = { date: -1, credit: -1, debit: -1, amount: -1, text: [] }
+/** A heading naming the direction of the amount beside it: "BasicEntryType", "D/C", "Debit/Credit". */
+function isDirection(name: string) {
+  return name === 'dc' || name === 'cd' || name === 'dk' || name.includes('entrytype') || name.includes('debitcredit') || name.includes('creditdebit')
+}
+
+export function findColumns(row: CellValue[]): Columns | null {
+  const columns: Columns = { date: -1, credit: -1, debit: -1, amount: -1, direction: -1, text: [] }
   row.forEach((cell, index) => {
     const name = plain(cell).replace(/[^a-z]/g, '')
     if (!name) return
     const has = (words: string[]) => words.some((word) => name.includes(word))
-    if (has(HEADERS.credit) && !has(HEADERS.debit)) {
+    if (isDirection(name)) {
+      if (columns.direction === -1) columns.direction = index
+    } else if (has(HEADERS.credit) && !has(HEADERS.debit)) {
       if (columns.credit === -1) columns.credit = index
     } else if (has(HEADERS.debit)) {
       if (columns.debit === -1) columns.debit = index
@@ -88,6 +97,26 @@ function findColumns(row: CellValue[]): Columns | null {
   })
   if (columns.date === -1 || (columns.credit === -1 && columns.amount === -1)) return null
   return columns
+}
+
+/**
+ * Money in and out on one row: from separate credit and debit columns, or from one amount column
+ * whose sign says the direction, or whose direction stands beside it ("C" in, "D" out).
+ */
+export function movement(row: CellValue[], columns: Columns) {
+  if (columns.credit !== -1 || columns.debit !== -1) {
+    return {
+      credit: columns.credit !== -1 ? cellAmount(row[columns.credit] ?? null) : 0,
+      debit: columns.debit !== -1 ? cellAmount(row[columns.debit] ?? null) : 0,
+    }
+  }
+  const amount = cellAmount(row[columns.amount] ?? null)
+  if (columns.direction !== -1) {
+    const way = String(row[columns.direction] ?? '').trim().toUpperCase()
+    if (/^(C|K|CR|CREDIT|KREDI)/.test(way)) return { credit: Math.abs(amount), debit: 0 }
+    if (/^(D|DR|DEBIT|DEBI)/.test(way)) return { credit: 0, debit: Math.abs(amount) }
+  }
+  return { credit: Math.max(amount, 0), debit: Math.max(-amount, 0) }
 }
 
 /** Dates written out in the lines above the table, where a statement prints the period it covers. */
@@ -115,8 +144,7 @@ export function readStatement(workbook: Workbook): BankStatement | null {
       for (const row of sheet.rows.slice(head + 1)) {
         const date = cellDate(row[columns.date] ?? null)
         if (!date) continue
-        const credit = columns.credit !== -1 ? cellAmount(row[columns.credit] ?? null) : Math.max(cellAmount(row[columns.amount] ?? null), 0)
-        const debit = columns.debit !== -1 ? cellAmount(row[columns.debit] ?? null) : Math.max(-cellAmount(row[columns.amount] ?? null), 0)
+        const { credit, debit } = movement(row, columns)
         if (credit <= 0 && debit <= 0) continue
         if (!from || date < from) from = date
         if (!to || date > to) to = date
@@ -140,10 +168,13 @@ export function readStatement(workbook: Workbook): BankStatement | null {
   return null
 }
 
-/** Reads a statement file in either Excel format. */
+/** Reads a statement file in either Excel format, or as CSV. */
 export async function readStatementFile(file: Blob): Promise<BankStatement | null> {
   const bytes = new Uint8Array(await file.arrayBuffer())
-  return readStatement(isLegacyWorkbook(bytes) ? readLegacyWorkbook(bytes) : await readWorkbook(bytes.buffer as ArrayBuffer))
+  if (isLegacyWorkbook(bytes)) return readStatement(readLegacyWorkbook(bytes))
+  // An .xlsx file is a ZIP archive, which starts with "PK"; anything else is read as CSV text.
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) return readStatement(await readWorkbook(bytes.buffer as ArrayBuffer))
+  return readStatement(readCsv(new TextDecoder('utf-8').decode(bytes)))
 }
 
 /** How sure a pairing is: the payment names the invoice number, or only payer and amount fit. */

@@ -638,23 +638,25 @@ export function buildProjectsReport({
       bankCredit(saved, line.amount, line)
       continue
     }
+    // Words the user gave a source of money ("Masa 1.4" → Superpuna) come before the payer's name:
+    // the same payer (the Treasury) also pays invoices of other projects.
+    const loose = ` ${looseText(line.text)} `
+    const ownSource = Object.entries(timesheet.sources || {}).find(([, list]) => list.some((item) => looseText(item) && loose.includes(` ${looseText(item)} `)))
+    if (ownSource) {
+      sourceTotals.set(ownSource[0], [...(sourceTotals.get(ownSource[0]) ?? []), line])
+      continue
+    }
     const text = plain(line.text)
     const named = projectNames.find((name) => mentions(text, name))
     if (named) {
       bankCredit(named, line.amount, line)
       continue
     }
-    const loose = ` ${looseText(line.text)} `
     const client = clientWords.find((item) => loose.includes(` ${item.words} `))
     if (client) {
       const own = byClient.get(client.id)!
       const total = own.reduce((sum, name) => sum + (projects.get(name)?.hours ?? 0), 0)
       for (const name of own) bankCredit(name, total ? line.amount * ((projects.get(name)?.hours ?? 0) / total) : line.amount / own.length, line)
-      continue
-    }
-    const source = Object.entries(timesheet.sources || {}).find(([, list]) => list.some((item) => looseText(item) && loose.includes(` ${looseText(item)} `)))
-    if (source) {
-      sourceTotals.set(source[0], [...(sourceTotals.get(source[0]) ?? []), line])
       continue
     }
     const anyClient = clients.find((item) => item.id && !ownClients.has(item.id) && nameWords(item.fullName).replace(/ /g, '').length >= 3 && loose.includes(` ${nameWords(item.fullName)} `))

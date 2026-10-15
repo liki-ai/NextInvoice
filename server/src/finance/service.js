@@ -282,7 +282,7 @@ async function processDocument(ownerId, docId) {
         mutate(ownerId, (finance) => {
           const current = findDoc(finance, docId);
           if (!current) return;
-          current.statement = { ...(current.statement || { from: statement.from, to: statement.to, credits: 0, totalIn: 0, loose: 0, looseTotal: 0, auto: false, applied: [], review: [] }), iban: months.iban || (result.bank && result.bank.iban) || '', months: months.months, monthsVersion: months.version };
+          current.statement = { ...(current.statement || { from: statement.from, to: statement.to, credits: 0, totalIn: 0, loose: 0, looseTotal: 0, auto: false, applied: [], review: [] }), iban: months.iban || (result.bank && result.bank.iban) || '', months: months.months, days: months.days || null, monthsVersion: months.version };
         });
       }
     }

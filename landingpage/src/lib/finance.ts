@@ -104,6 +104,8 @@ export type FinanceDoc = {
     review: ReviewInvoice[]
     iban?: string
     months?: Record<string, BankMonth>
+    /** The same by day, so overlapping statements can be counted without counting a day twice. */
+    days?: Record<string, BankMonth> | null
   } | null
   excluded?: boolean
   hasFile: boolean
@@ -241,34 +243,54 @@ const monthEndDay = (period: string) => {
 }
 
 /**
- * Each month's bank figures. Statements overlap (one for the year, one per month sent by email);
- * for each account and month the statement that covers the whole month, and of those the newest,
- * is the one counted.
+ * Each month's bank figures. Statements overlap (one for the year, then one for the last few days);
+ * each day is counted once, from the newest statement that covers it.
  */
 export function bankMonths(docs: FinanceDoc[]) {
-  const best = new Map<string, { doc: FinanceDoc; full: boolean; month: BankMonth }>()
-  for (const doc of docs) {
-    const statement = doc.statement
-    if (doc.kind !== 'bank_statement' || !statement?.months) continue
-    for (const [period, month] of Object.entries(statement.months)) {
-      const full = Boolean(statement.from && statement.to && statement.from <= `${period}-01` && statement.to >= monthEndDay(period))
-      // The account: from the sheet, the model's reading, or the file name ("XK05… 09-2026.csv").
-      const iban = (statement.iban || doc.figures?.bank?.iban || /XK\d{18}/i.exec(doc.name.replace(/\s+/g, ''))?.[0] || '').toUpperCase().replace(/\s+/g, '')
-      const key = `${iban}|${period}`
-      const seen = best.get(key)
-      const newer = !seen || String(statement.to) > String(seen.doc.statement?.to) || (String(statement.to) === String(seen.doc.statement?.to) && doc.receivedAt > seen.doc.receivedAt)
-      if (!seen || (full && !seen.full) || (full === seen.full && newer)) best.set(key, { doc, full, month })
-    }
-  }
+  const ibanOf = (doc: FinanceDoc) =>
+    (doc.statement?.iban || doc.figures?.bank?.iban || /XK\d{18}/i.exec(doc.name.replace(/\s+/g, ''))?.[0] || '').toUpperCase().replace(/\s+/g, '')
+  const statements = docs.filter((doc) => doc.kind === 'bank_statement' && doc.statement?.months)
+  // The newest statement first: it decides every day it covers.
+  const newer = (a: FinanceDoc, b: FinanceDoc) => String(b.statement?.to).localeCompare(String(a.statement?.to)) || String(b.receivedAt).localeCompare(String(a.receivedAt))
   const byMonth = new Map<string, BankMonth>()
-  for (const [key, { month }] of best) {
-    const period = key.split('|')[1]
+  const addTo = (period: string, month: BankMonth) => {
     const total = byMonth.get(period) || { in: 0, out: 0, spend: {} }
     total.in = round(total.in + month.in)
     total.out = round(total.out + month.out)
     for (const item of SPEND_CATEGORIES) if (month.spend[item]) total.spend[item] = round((total.spend[item] ?? 0) + (month.spend[item] as number))
     byMonth.set(period, total)
   }
+
+  // Statements read with their days: each day counted once, from the newest statement covering it.
+  const daily = statements.filter((doc) => doc.statement?.days).sort(newer)
+  const claimed = new Map<string, { from: string; to: string }[]>()
+  for (const doc of daily) {
+    const statement = doc.statement!
+    const iban = ibanOf(doc)
+    const taken = claimed.get(iban) ?? []
+    for (const [day, figures] of Object.entries(statement.days || {})) {
+      if (taken.some((range) => day >= range.from && day <= range.to)) continue
+      addTo(day.slice(0, 7), figures)
+    }
+    taken.push({ from: statement.from, to: statement.to })
+    claimed.set(iban, taken)
+  }
+
+  // Older readings have months only: per account and month the statement covering the whole month
+  // (else the newest), where no daily statement already counts that month.
+  const best = new Map<string, { doc: FinanceDoc; full: boolean; month: BankMonth }>()
+  for (const doc of statements.filter((item) => !item.statement?.days)) {
+    const statement = doc.statement!
+    const iban = ibanOf(doc)
+    for (const [period, month] of Object.entries(statement.months || {})) {
+      if ((claimed.get(iban) ?? []).some((range) => range.from.slice(0, 7) <= period && range.to.slice(0, 7) >= period)) continue
+      const full = Boolean(statement.from && statement.to && statement.from <= `${period}-01` && statement.to >= monthEndDay(period))
+      const key = `${iban}|${period}`
+      const seen = best.get(key)
+      if (!seen || (full && !seen.full) || (full === seen.full && newer(doc, seen.doc) < 0)) best.set(key, { doc, full, month })
+    }
+  }
+  for (const [key, { month }] of best) addTo(key.split('|')[1], month)
   return byMonth
 }
 

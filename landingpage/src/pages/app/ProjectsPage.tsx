@@ -98,18 +98,26 @@ async function looseCredits(docs: FinanceDoc[], invoices: Invoice[], months: str
   )
   const seen = new Set<string>()
   const lines: (BankLine & { rest: number })[] = []
-  for (const doc of statements) {
+  // Statements overlap (a year's statement, then one for the last few days, in another layout whose
+  // texts differ): each day is taken from the newest statement that covers it, so none counts twice.
+  const account = (doc: FinanceDoc) => (/XK\d{18}/i.exec(doc.name.replace(/\s+/g, ''))?.[0] || doc.statement?.iban || '').toUpperCase()
+  const claimed = new Map<string, { from: string; to: string }[]>()
+  const ordered = [...statements].sort((a, b) => String(b.statement?.to || '').localeCompare(String(a.statement?.to || '')) || String(b.receivedAt).localeCompare(String(a.receivedAt)))
+  for (const doc of ordered) {
     try {
       const res = await fetch(`${apiBase()}/api/finance/documents/${doc.id}/file`, { headers: { Authorization: `Bearer ${getToken()}` } })
       if (!res.ok) continue
       const statement = await readStatementFile(await res.blob())
       if (!statement) continue
+      const taken = claimed.get(account(doc)) ?? []
       for (const line of matchStatement(statement, invoices).loose) {
         const key = `${line.date}|${line.rest}|${line.text}`
         if (seen.has(key) || !months.includes(line.date.slice(0, 7))) continue
+        if (taken.some((range) => line.date >= range.from && line.date <= range.to)) continue
         seen.add(key)
         lines.push(line)
       }
+      claimed.set(account(doc), [...taken, { from: statement.from, to: statement.to }])
     } catch {
       // A statement that cannot be read is left out; the others still count.
     }
