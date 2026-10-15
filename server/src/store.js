@@ -63,6 +63,7 @@ async function initStore() {
   if (!cache.invites) cache.invites = {};
   if (!cache.recurring) cache.recurring = {};
   if (!cache.finance) cache.finance = {};
+  if (!cache.mercury) cache.mercury = {};
   if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
   return cache;
 }
@@ -1124,6 +1125,27 @@ function saveFinance(userId, finance) {
   return db.finance[userId] || null;
 }
 
+/** The company's Mercury bank connection and the transactions read from it. */
+function getMercury(userId) {
+  const db = readDb();
+  return (db.mercury && db.mercury[userId]) || null;
+}
+
+/** Ids of the companies with a Mercury connection, for the background sync. */
+function mercuryOwners() {
+  const db = readDb();
+  return Object.keys(db.mercury || {});
+}
+
+function saveMercury(userId, mercury) {
+  const db = readDb();
+  if (!db.mercury) db.mercury = {};
+  if (mercury) db.mercury[userId] = { ...mercury, updatedAt: nowIso() };
+  else delete db.mercury[userId];
+  writeDb(db);
+  return db.mercury[userId] || null;
+}
+
 const EMAIL_LOG_MAX = 20;
 
 /** Notes on the invoice that it went out by email, and marks it sent. */
@@ -1891,6 +1913,9 @@ module.exports = {
   saveMailSettings,
   getFinance,
   financeOwners,
+  getMercury,
+  mercuryOwners,
+  saveMercury,
   saveFinance,
   recordInvoiceEmail,
   recordInvoiceReminder,

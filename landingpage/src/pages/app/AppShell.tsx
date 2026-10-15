@@ -30,7 +30,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
         managerTo: '/app/finance',
         icon: LayoutDashboard,
         key: 'nav.overview',
-        active: (pathname, search) => ['/app/overview', '/app/finance', '/app/projects'].some((path) => pathname.startsWith(path)) || search.includes('from=overview'),
+        active: (pathname, search) => ['/app/overview', '/app/finance', '/app/projects', '/app/mercury'].some((path) => pathname.startsWith(path)) || search.includes('from=overview'),
       },
     ],
   },

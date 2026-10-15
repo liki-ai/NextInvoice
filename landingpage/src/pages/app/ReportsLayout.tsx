@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { FolderKanban, HeartPulse, LayoutDashboard } from 'lucide-react'
+import { FolderKanban, HeartPulse, Landmark, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n'
 import { cn } from '../../lib/cn'
@@ -11,6 +11,7 @@ const TABS = [
   { to: '/app/finance', key: 'finance.tabs.health', icon: HeartPulse },
   { to: '/app/overview', key: 'finance.tabs.overview', icon: LayoutDashboard },
   { to: '/app/projects', key: 'finance.tabs.projects', icon: FolderKanban },
+  { to: '/app/mercury', key: 'mercury.tab', icon: Landmark },
 ]
 
 export function ReportsLayout() {

@@ -11,6 +11,7 @@ import { cn } from '../../lib/cn'
 import { currencySymbol, type Invoice } from '../../lib/invoice'
 import { currentDocuments, monthlyFigures, payrollFullCost, runningCosts, type FinanceDoc, type FinanceView } from '../../lib/finance'
 import { readAnyWorkbook } from '../../lib/serverFinance'
+import { ipacientiCredits, type MercuryTransaction, type MercuryView } from '../../lib/mercury'
 import {
   MONTH_HOURS_LIMIT,
   buildProjectsReport,
@@ -166,6 +167,7 @@ export function ProjectsPage() {
   const { t } = useI18n()
   const [view, setView] = useState<TimesheetView | null>(null)
   const [finance, setFinance] = useState<FinanceView | null>(null)
+  const [mercury, setMercury] = useState<MercuryTransaction[]>([])
   const [loadError, setLoadError] = useState('')
   const [notice, setNotice] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -187,6 +189,8 @@ export function ProjectsPage() {
     }
     // The costs come from the finance documents; without them the page still shows the hours.
     setFinance(await api<FinanceView>('/api/finance').catch(() => null))
+    // What comes into the Mercury account (the US company) is iPacienti's revenue, in euros.
+    setMercury(await api<MercuryView>('/api/mercury').then((view) => (view.connected ? view.transactions : [])).catch(() => []))
   }, [t])
 
   useEffect(() => {
@@ -198,7 +202,7 @@ export function ProjectsPage() {
   const docs = useMemo(() => finance?.documents || [], [finance])
   const monthCosts = useMemo(() => (timesheet ? costsByMonth(docs, invoices, timesheet.months, currency) : {}), [docs, invoices, timesheet, currency])
   const ownClients = useMemo(() => ownClientIds(clients, profile?.companyName), [clients, profile?.companyName])
-  const bankCredits = useMemo(() => (bank?.lines || []).map((line) => ({ date: line.date, amount: line.rest, text: line.text })), [bank])
+  const bankCredits = useMemo(() => [...(bank?.lines || []).map((line) => ({ date: line.date, amount: line.rest, text: line.text })), ...ipacientiCredits(mercury)], [bank, mercury])
   const report = useMemo(
     () => (timesheet && timesheet.entries.length ? buildProjectsReport({ timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct, bankCredits }) : null),
     [timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct, bankCredits],

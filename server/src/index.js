@@ -32,6 +32,9 @@ const { billingHealth } = require('./billing/stripe');
 const { startFinanceChecks } = require('./finance/service');
 const { startAutomation } = require('./automation/service');
 const { handleCompanyWebhook } = require('./automation/companyStripe');
+const mercuryRouter = require('./routes/mercury');
+const { handleMercuryWebhook } = require('./routes/mercury');
+const { startMercurySync } = require('./finance/mercury');
 
 const app = express();
 
@@ -41,6 +44,9 @@ app.use(cors({ origin: true }));
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 // Each company's own Stripe, for card payments of its invoices; verified with that company's secret.
 app.post('/api/public/stripe/:ownerId/webhook', express.raw({ type: 'application/json' }), handleCompanyWebhook);
+
+// Mercury, the company's US bank, says a transaction happened; verified with the company's signing secret.
+app.post('/api/mercury/webhook/:key', express.raw({ type: '*/*', limit: '1mb' }), handleMercuryWebhook);
 
 app.use(express.json({ limit: '20mb' }));
 
@@ -73,6 +79,7 @@ app.use('/api/public', publicRouter);
 app.use('/api/mail', mailRouter);
 app.use('/api/team', teamRouter);
 app.use('/api/finance', financeRouter);
+app.use('/api/mercury', mercuryRouter);
 app.use('/api/recurring', recurringRouter);
 app.use('/api', extractClientRouter);
 app.use('/api', extractCompanyRouter);
@@ -91,6 +98,8 @@ initStore()
     });
     // Documents from the accountant arrive by email; each company's mailbox is checked now and then.
     startFinanceChecks();
+    // The Mercury bank accounts are read again every ten minutes.
+    startMercurySync();
     // Recurring invoices are made, scheduled emails go out, payments are announced.
     startAutomation();
     // A deploy stops the old process with SIGTERM. Finish the writes in flight before going.

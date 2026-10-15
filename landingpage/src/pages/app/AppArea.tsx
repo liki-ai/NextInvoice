@@ -12,6 +12,7 @@ import { ProfilePage } from './ProfilePage'
 import { OverviewPage } from './OverviewPage'
 import { FinancePage } from './FinancePage'
 import { ProjectsPage } from './ProjectsPage'
+import { MercuryPage } from './MercuryPage'
 import { ReportsLayout } from './ReportsLayout'
 import { UpgradePage } from './UpgradePage'
 import { ClientListPage } from './ClientListPage'
@@ -44,6 +45,7 @@ export default function AppArea() {
           <Route path="finance" element={<FinancePage />} />
           <Route path="overview" element={<OverviewPage />} />
           <Route path="projects" element={<ProjectsPage />} />
+          <Route path="mercury" element={<MercuryPage />} />
         </Route>
         <Route path="obligations" element={<ObligationListPage />} />
         <Route path="obligations/new" element={<ObligationFormPage />} />

@@ -2,6 +2,7 @@
 // print invoices and write emails from the very same words.
 
 import { financeNav, financeTexts } from './i18nFinance'
+import { mercuryTexts } from './i18nMercury'
 import { recurringNav, recurringTexts } from './i18nRecurring'
 
 export const LANGS = [
@@ -19,6 +20,7 @@ export function isLang(value: unknown): value is Lang {
 export const translations = {
   sq: {
     finance: financeTexts.sq,
+    mercury: mercuryTexts.sq,
     recurring: recurringTexts.sq,
     nav: {
       finance: financeNav.sq,
@@ -902,6 +904,7 @@ export const translations = {
   },
   en: {
     finance: financeTexts.en,
+    mercury: mercuryTexts.en,
     recurring: recurringTexts.en,
     nav: {
       finance: financeNav.en,
@@ -1785,6 +1788,7 @@ export const translations = {
   },
   it: {
     finance: financeTexts.it,
+    mercury: mercuryTexts.it,
     recurring: recurringTexts.it,
     nav: {
       finance: financeNav.it,
