@@ -439,10 +439,7 @@ export function ProjectsPage() {
           ) : null}
 
           <section className="mt-6">
-            <SectionTitle>{t('finance.projects.sections.signals')}</SectionTitle>
-            <Card className="p-5">
-              <SignalList signals={report.signals} t={t} corrected={correct} />
-            </Card>
+            <SignalBar signals={report.signals} t={t} corrected={correct} />
           </section>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -902,6 +899,52 @@ export function ProjectsPage() {
             </Card>
           </section>
         </>
+      ) : null}
+    </div>
+  )
+}
+
+/** The signals folded into one slim bar with a count per kind; the details open on a click. */
+function SignalBar({ signals, t, corrected }: { signals: Signal[]; t: T; corrected: boolean }) {
+  const [open, setOpen] = useState(false)
+  const over = signals.filter((signal) => signal.key === 'overHours').length
+  const lone = signals.filter((signal) => signal.key === 'keyPerson').length
+  const notes = signals.length - over - lone
+  const warn = over + lone > 0
+  const chip = (label: string, count: number, tone: 'warn' | 'note') => (
+    <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-semibold', tone === 'warn' ? 'bg-[#F8E8E4] text-[#C0503A]' : 'bg-brand/8 text-brand')}>
+      {label}
+      <span className="tabular-nums">{count}</span>
+    </span>
+  )
+  return (
+    <div className={cn('overflow-hidden rounded-2xl border bg-white', warn ? 'border-[#C0503A]/25' : 'border-brand-ink/8')}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        disabled={signals.length === 0}
+        className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 text-left transition hover:bg-brand-ink/[0.02] disabled:cursor-default"
+      >
+        {warn ? <AlertTriangle className="h-4 w-4 shrink-0 text-[#C0503A]" /> : <Info className="h-4 w-4 shrink-0 text-brand" />}
+        <span className="text-sm font-semibold text-brand-ink">{t('finance.projects.sections.signals')}</span>
+        {signals.length === 0 ? <span className="text-sm text-brand-ink/55">{t('finance.projects.signal.none')}</span> : null}
+        <span className="flex flex-wrap items-center gap-1.5">
+          {over ? chip(t('finance.projects.signal.summaryOver'), over, 'warn') : null}
+          {lone ? chip(t('finance.projects.signal.summaryLone'), lone, 'warn') : null}
+          {notes ? chip(t('finance.projects.signal.summaryNotes'), notes, 'note') : null}
+        </span>
+        {signals.length ? (
+          <span className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-ink/50">
+            {open ? t('finance.projects.signal.collapse') : t('finance.projects.signal.expand')}
+            <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
+          </span>
+        ) : null}
+      </button>
+      {open && signals.length ? (
+        <div className="border-t border-brand-ink/8 px-4 py-4">
+          <SignalList signals={signals} t={t} corrected={corrected} />
+        </div>
       ) : null}
     </div>
   )
