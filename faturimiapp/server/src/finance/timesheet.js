@@ -96,6 +96,8 @@ function setProject(ownerId, body) {
   const next = { ...(timesheet.projects[name] || {}) };
   if (body.clientId !== undefined) next.clientId = body.clientId ? String(body.clientId).slice(0, 100) : null;
   if (body.internal !== undefined) next.internal = Boolean(body.internal);
+  // A project added by hand, with no hours of its own (a product whose money comes from abroad).
+  if (body.added !== undefined) next.added = Boolean(body.added);
   if (next.internal) next.clientId = null;
   // Words of a bank payment that mark money for this project without an invoice (a transfer from
   // the product's own account abroad, say).
@@ -106,6 +108,8 @@ function setProject(ownerId, body) {
     next.clients = [...new Set(list)].slice(0, CLIENTS_MAX);
   }
   const projects = { ...timesheet.projects, [name]: next };
+  // Only a project added by hand can be taken away; one from the timesheet comes back with its hours.
+  if (body.remove === true && (timesheet.projects[name] || {}).added) delete projects[name];
   if (Object.keys(projects).length > PROJECTS_MAX) throw timesheetError('TIMESHEET_PROJECT');
   save(ownerId, { ...timesheet, projects });
   return describe(ownerId);

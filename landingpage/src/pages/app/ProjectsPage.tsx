@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ChevronDown, ChevronRight, FolderKanban, Info, Landmark, Loader2, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, FolderKanban, Info, Landmark, Loader2, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -16,6 +16,7 @@ import { productCredits, type MercuryTransaction, type MercuryView } from '../..
 import {
   MONTH_HOURS_LIMIT,
   buildProjectsReport,
+  moneyProjects,
   ownClientIds,
   payerWords,
   readTimesheet,
@@ -215,7 +216,7 @@ export function ProjectsPage() {
   const monthCosts = useMemo(() => (timesheet ? costsByMonth(docs, invoices, timesheet.months, currency) : {}), [docs, invoices, timesheet, currency])
   const ownClients = useMemo(() => ownClientIds(clients, profile?.companyName), [clients, profile?.companyName])
   // Every project that can take money, so a Mercury payment naming one goes to it.
-  const projectNames = useMemo(() => [...new Set((timesheet?.entries || []).map((entry) => entry.project))].filter((name) => !timesheet?.projects[name]?.internal), [timesheet])
+  const projectNames = useMemo(() => (timesheet ? moneyProjects(timesheet) : []), [timesheet])
   const bankCredits = useMemo(() => [...(bank?.lines || []).map((line) => ({ date: line.date, amount: line.rest, text: line.text })), ...productCredits(mercury, projectNames)], [bank, mercury, projectNames])
   const report = useMemo(
     () => (timesheet && timesheet.entries.length ? buildProjectsReport({ timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct, bankCredits }) : null),
@@ -276,6 +277,24 @@ export function ProjectsPage() {
     const body = value === 'internal' ? { project, internal: true } : { project, internal: false, clientId: value || null }
     try {
       setView(await api<TimesheetView>('/api/finance/projects/project', { method: 'PATCH', body }))
+    } catch (err) {
+      setNotice(errorText(t, err))
+    }
+  }
+
+  /** A project with no hours (a product sold abroad): it shows on the tab and takes the money naming it. */
+  async function addProject(name: string, clientId: string) {
+    try {
+      setView(await api<TimesheetView>('/api/finance/projects/project', { method: 'PATCH', body: { project: name, clientId: clientId || null, added: true } }))
+      setNotice('')
+    } catch (err) {
+      setNotice(errorText(t, err))
+    }
+  }
+
+  async function removeProject(name: string) {
+    try {
+      setView(await api<TimesheetView>('/api/finance/projects/project', { method: 'PATCH', body: { project: name, remove: true } }))
     } catch (err) {
       setNotice(errorText(t, err))
     }
@@ -533,12 +552,21 @@ export function ProjectsPage() {
           <section className="mt-6">
             <SectionTitle
               action={
-                suggestions.length ? (
-                  <Button type="button" variant="secondary" onClick={() => void acceptAll()}>
-                    <Sparkles className="h-4 w-4" />
-                    {t('finance.projects.acceptAll', { count: suggestions.length })}
-                  </Button>
-                ) : null
+                <span className="flex flex-wrap items-center gap-2">
+                  {suggestions.length ? (
+                    <Button type="button" variant="secondary" onClick={() => void acceptAll()}>
+                      <Sparkles className="h-4 w-4" />
+                      {t('finance.projects.acceptAll', { count: suggestions.length })}
+                    </Button>
+                  ) : null}
+                  <AddProject
+                    clients={sortedClients}
+                    ownClient={sortedClients.find((client) => ownClients.has(client.id as string))?.id as string | undefined}
+                    taken={new Set(report.projects.map((project) => project.name.toLowerCase()))}
+                    t={t}
+                    onAdd={(name, clientId) => void addProject(name, clientId)}
+                  />
+                </span>
               }
             >
               {t('finance.projects.sections.table')}
@@ -573,6 +601,14 @@ export function ProjectsPage() {
                               {project.name}
                             </Link>
                             {project.kind === 'product' ? <span className="ml-[18px] block text-[11px] font-normal text-brand-ink/45">{t('finance.projects.ownProduct')}</span> : null}
+                            {timesheet?.projects[project.name]?.added && !project.hours ? (
+                              <span className="ml-[18px] flex items-center gap-1.5 text-[11px] font-normal text-brand-ink/45">
+                                {t('projectDetail.addedByHand')}
+                                <button type="button" aria-label={t('projectDetail.removeProject')} title={t('projectDetail.removeProject')} className="text-brand-ink/35 hover:text-[#C0503A]" onClick={() => void removeProject(project.name)}>
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ) : null}
                           </td>
                           <td className="px-3 py-1.5 text-left">
                             <select
@@ -1098,6 +1134,58 @@ function MonthColumns({ report, t }: { report: ProjectsReport; t: T }) {
  * Bank money with no invoice: each payment can be given to a project, or to a source of money
  * outside the projects (a subsidy), by the words that name it; later payments with the same words follow.
  */
+/** Adds a project with no hours: its name, and the client it is for (the company itself for a product). */
+function AddProject({ clients, ownClient, taken, t, onAdd }: { clients: { id?: string; fullName?: string }[]; ownClient?: string; taken: Set<string>; t: T; onAdd: (name: string, clientId: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [clientId, setClientId] = useState(ownClient || '')
+  const clean = name.trim()
+  const exists = taken.has(clean.toLowerCase())
+  if (!open) {
+    return (
+      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" />
+        {t('projectDetail.addProject')}
+      </Button>
+    )
+  }
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-ink/10 bg-white p-1.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (clean.length < 2 || exists) return
+        onAdd(clean, clientId)
+        setName('')
+        setOpen(false)
+      }}
+    >
+      <input
+        autoFocus
+        aria-label={t('projectDetail.projectName')}
+        placeholder={t('projectDetail.projectName')}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-40 rounded-lg border border-brand-ink/10 px-2 py-1.5 text-[13px] outline-none focus:border-brand"
+      />
+      <select aria-label={t('finance.projects.cols.client')} value={clientId} onChange={(e) => setClientId(e.target.value)} className="max-w-[200px] rounded-lg border border-brand-ink/10 bg-white px-2 py-1.5 text-[13px]">
+        <option value="">{t('finance.projects.choose')}</option>
+        {clients.map((client) => (
+          <option key={client.id} value={client.id}>
+            {client.fullName}
+          </option>
+        ))}
+      </select>
+      <Button type="submit" disabled={clean.length < 2 || exists}>
+        {exists ? t('projectDetail.projectExists') : t('common.save')}
+      </Button>
+      <button type="button" aria-label={t('common.cancel')} className="rounded-lg p-1.5 text-brand-ink/45 hover:bg-brand-ink/5" onClick={() => setOpen(false)}>
+        <X className="h-4 w-4" />
+      </button>
+    </form>
+  )
+}
+
 function BankCredits({
   left,
   rules,

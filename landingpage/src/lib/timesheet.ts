@@ -8,7 +8,20 @@ import type { CellValue, Workbook } from './xlsx'
 
 export type TimesheetEntry = { month: string; project: string; person: string; hours: number; pay: number | null }
 /** `internal`: work for the whole company, whose cost is spread over the projects. */
-export type ProjectMeta = { clientId?: string | null; internal?: boolean; bank?: string[]; clients?: string[] }
+export type ProjectMeta = {
+  clientId?: string | null
+  internal?: boolean
+  bank?: string[]
+  clients?: string[]
+  /** Added by hand, with no hours in the timesheet: it shows anyway and takes the money that names it. */
+  added?: boolean
+}
+
+/** The projects money can go to: those with hours, and those added by hand; shared work aside. */
+export function moneyProjects(timesheet: Pick<Timesheet, 'entries' | 'projects'>) {
+  const added = Object.entries(timesheet.projects || {}).filter(([, meta]) => meta.added).map(([name]) => name)
+  return [...new Set([...timesheet.entries.map((entry) => entry.project), ...added])].filter((name) => !timesheet.projects[name]?.internal)
+}
 
 /** A bank payment no invoice accounts for: `amount` is what is left of it after any invoices. */
 export type BankCredit = {
@@ -544,6 +557,11 @@ export function buildProjectsReport({
     month.projects.add(entry.project)
     person.months.set(entry.month, month)
     people.set(entry.person, person)
+  }
+
+  // Projects added by hand appear with no hours, so the money that names them has somewhere to go.
+  for (const [name, item] of Object.entries(timesheet.projects || {})) {
+    if (item.added && !projects.has(name)) projects.set(name, { hours: 0, raw: 0, net: 0, direct: 0, overhead: 0, unpaid: 0, people: new Map<string, number>(), peopleCost: new Map<string, number>(), byMonth: {}, costByMonth: {} })
   }
 
   const hours = entries.reduce((sum, entry) => sum + entry.hours, 0)

@@ -2,6 +2,11 @@
 
 const sq = {
   back: 'Të gjitha projektet',
+  addProject: 'Shto projekt',
+  projectName: 'Emri, p.sh. TeamPlaner',
+  projectExists: 'Ekziston',
+  addedByHand: 'shtuar me dorë, pa orë',
+  removeProject: 'Hiqe projektin',
   details: 'Detajet',
   kind: { client: 'Projekt për klient', product: 'Produkt i Tretek', shared: 'Punë e përbashkët', unset: 'Pa klient' },
   fromShpk: 'Tretek SHPK: {amount}',
@@ -56,6 +61,11 @@ const sq = {
 
 const en: typeof sq = {
   back: 'All projects',
+  addProject: 'Add project',
+  projectName: 'Name, e.g. TeamPlaner',
+  projectExists: 'Exists',
+  addedByHand: 'added by hand, no hours',
+  removeProject: 'Remove the project',
   details: 'Details',
   kind: { client: 'Client project', product: 'Tretek product', shared: 'Shared work', unset: 'No client' },
   fromShpk: 'Tretek SHPK: {amount}',
@@ -111,6 +121,11 @@ const en: typeof sq = {
 const it: typeof sq = {
   ...en,
   back: 'Tutti i progetti',
+  addProject: 'Aggiungi progetto',
+  projectName: 'Nome, es. TeamPlaner',
+  projectExists: 'Esiste',
+  addedByHand: 'aggiunto a mano, senza ore',
+  removeProject: 'Rimuovi il progetto',
   details: 'Dettagli',
   kind: { client: 'Progetto per cliente', product: 'Prodotto Tretek', shared: 'Lavoro condiviso', unset: 'Senza cliente' },
   revenue: 'Ricavi',

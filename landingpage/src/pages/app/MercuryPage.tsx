@@ -6,7 +6,7 @@ import { Button, Card, Field, Modal } from '../../components/ui'
 import { api, apiBase } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { buildMercuryReport, isInternal, mercuryProduct, mercuryYears, partyName, spendGroup, type Insight, type MercuryTransaction, type MercuryView, type PartyTotal } from '../../lib/mercury'
-import type { TimesheetView } from '../../lib/timesheet'
+import { moneyProjects, type TimesheetView } from '../../lib/timesheet'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
@@ -138,7 +138,7 @@ export function MercuryPage() {
       setError(errorText(t, err))
     }
     const timesheet = await api<TimesheetView>('/api/finance/projects').then((data) => data.timesheet).catch(() => null)
-    if (timesheet) setProjects([...new Set(timesheet.entries.map((entry) => entry.project))].filter((name) => !timesheet.projects[name]?.internal))
+    if (timesheet) setProjects(moneyProjects(timesheet))
   }, [t])
 
   useEffect(() => {
