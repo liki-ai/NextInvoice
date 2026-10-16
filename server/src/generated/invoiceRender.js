@@ -2815,6 +2815,9 @@ const translations = {
 			pricesIncludeTaxHint: "Shkruaj çmimin përfundimtar; nëntotali pa TVSH llogaritet vetë.",
 			unsigned: "Pa nënshkrim dhe vulë",
 			unsignedHint: "Fatura del pa nënshkrimin dhe vulën, që t’i vendosësh me dorë pasi ta printosh.",
+			contractName: "Emri i kontratës",
+			contractNumber: "Numri i kontratës",
+			contractHint: "Jo e detyrueshme. Del në një rresht mbi artikujt e faturës.",
 			withTax: "me TVSH",
 			tax: "TVSH",
 			noMatchingClients: "Nuk u gjet asnjë klient",
@@ -3095,6 +3098,8 @@ const translations = {
 			sectionData: "Të dhënat",
 			defaultTaxRate: "TVSH e paracaktuar (%)",
 			defaultTaxRateHint: "Plotësohet vetë në çdo faturë të re; mund ta ndryshosh për secilën faturë.",
+			showContract: "Kontrata në faturë",
+			showContractHint: "Forma e faturës kërkon emrin dhe numrin e kontratës (jo të detyrueshme), që dalin në një rresht mbi artikujt.",
 			backupHint: "Shkarko një kopje të të gjitha të dhënave, ose riktheji nga një skedar.",
 			unsaved: "Ke ndryshime të paruajtura.",
 			memberNotice: "Cilësimet e kompanisë i ndryshon vetëm pronari ose një administrator. Ti mund t’i shohësh.",
@@ -3375,6 +3380,8 @@ const translations = {
 			limit: "Plani falas lejon 10 fatura në muaj. Kalo në Premium për ta importuar këtë skedar."
 		},
 		pdf: {
+			contractName: "Emri i kontratës",
+			contractNumber: "Numri i kontratës",
 			invoiceLabel: "Faturë",
 			dateLabel: "Data",
 			clientLabel: "Klienti",
@@ -3757,6 +3764,9 @@ const translations = {
 			pricesIncludeTaxHint: "Type the final price; the subtotal without VAT is worked out for you.",
 			unsigned: "Without signature and stamp",
 			unsignedHint: "The invoice comes out without the signature and stamp, to add by hand once printed.",
+			contractName: "Contract name",
+			contractNumber: "Contract number",
+			contractHint: "Optional. Shown in one line above the invoice items.",
 			withTax: "incl. VAT",
 			tax: "VAT",
 			noMatchingClients: "No matching clients",
@@ -4037,6 +4047,8 @@ const translations = {
 			sectionData: "Data",
 			defaultTaxRate: "Default VAT (%)",
 			defaultTaxRateHint: "Pre-filled on every new invoice; you can change it per invoice.",
+			showContract: "Contract on invoices",
+			showContractHint: "The invoice form asks for a contract name and number (optional), printed in one line above the items.",
 			backupHint: "Download a copy of all your data, or restore it from a file.",
 			unsaved: "You have unsaved changes.",
 			memberNotice: "Company settings can be changed only by the owner or an administrator. You can view them.",
@@ -4317,6 +4329,8 @@ const translations = {
 			limit: "The free plan allows 10 invoices a month. Upgrade to Premium to import this file."
 		},
 		pdf: {
+			contractName: "Contract name",
+			contractNumber: "Contract number",
 			invoiceLabel: "Invoice",
 			dateLabel: "Date",
 			clientLabel: "Client",
@@ -4699,6 +4713,9 @@ const translations = {
 			pricesIncludeTaxHint: "Scrivi il prezzo finale; l’imponibile senza IVA viene calcolato da solo.",
 			unsigned: "Senza firma e timbro",
 			unsignedHint: "La fattura esce senza firma e timbro, da apporre a mano dopo la stampa.",
+			contractName: "Nome del contratto",
+			contractNumber: "Numero del contratto",
+			contractHint: "Facoltativo. Compare in una riga sopra le voci della fattura.",
 			withTax: "IVA inclusa",
 			tax: "IVA",
 			noMatchingClients: "Nessun cliente trovato",
@@ -4979,6 +4996,8 @@ const translations = {
 			sectionData: "Dati",
 			defaultTaxRate: "IVA predefinita (%)",
 			defaultTaxRateHint: "Precompilata in ogni nuova fattura; puoi cambiarla per singola fattura.",
+			showContract: "Contratto in fattura",
+			showContractHint: "Il modulo della fattura chiede nome e numero del contratto (facoltativi), stampati in una riga sopra le voci.",
 			backupHint: "Scarica una copia di tutti i dati, o ripristinali da un file.",
 			unsaved: "Hai modifiche non salvate.",
 			memberNotice: "Le impostazioni dell'azienda possono essere modificate solo dal titolare o da un amministratore. Puoi consultarle.",
@@ -5259,6 +5278,8 @@ const translations = {
 			limit: "Il piano gratuito consente 10 fatture al mese. Passa a Premium per importare questo file."
 		},
 		pdf: {
+			contractName: "Contratto",
+			contractNumber: "N. contratto",
 			invoiceLabel: "Fattura",
 			dateLabel: "Data",
 			clientLabel: "Cliente",
@@ -5542,6 +5563,22 @@ function clientRows(v) {
 		["", client.email]
 	].filter(([, value]) => String(value || "").trim());
 }
+/** The contract the invoice bills under, as one quiet line above the items; nothing when neither field is filled. */
+function contractRow(v) {
+	const { invoice, L } = v;
+	const fields = [[L.contractName || "Contract name", invoice.contractName], [L.contractNumber || "Contract number", invoice.contractNumber]].map(([label, value]) => [label, String(value || "").trim()]).filter(([, value]) => value);
+	if (!fields.length) return "";
+	return `<div class="contract keep">${fields.map(([label, value]) => `<div><span class="ck">${esc(label)}:</span> <span class="cv">${esc(value)}</span></div>`).join("")}</div>`;
+}
+function contractCss(accent) {
+	return `
+    .contract { display: flex; margin: 0 0 12px; padding: 5px 10px; background: ${tint(accent, .94)}; border-bottom: 1px solid ${tint(accent, .7)}; font-size: 11px; line-height: 1.35; }
+    .contract > div { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+    .contract > div + div { margin-left: 12px; padding-left: 12px; border-left: 1px solid ${tint(accent, .6)}; }
+    .contract .ck { color: #6B7A7D; }
+    .contract .cv { font-weight: 600; color: #1D2B2E; }
+  `;
+}
 function classicTemplate(v) {
 	const { company, client, invoice, L, accent, money } = v;
 	const dark = shade(accent, .28);
@@ -5576,6 +5613,7 @@ function classicTemplate(v) {
     .sign .line { border-top: 1px solid #999; padding-top: 6px; }
     .stamp { width: 20%; text-align: center; }
     .stamp img { max-height: 96px; max-width: 110px; }
+    ${contractCss(accent)}
   `, `
     <div class="top">
       <div class="brand">
@@ -5608,6 +5646,7 @@ function classicTemplate(v) {
       ${client.phone ? `<p><strong>${esc(L.phoneLabel)}:</strong> ${esc(client.phone)}</p>` : ""}
       ${client.email ? `<p><strong>${esc(L.emailLabel || "Email")}:</strong> ${esc(client.email)}</p>` : ""}
     </div>
+    ${contractRow(v)}
     <table class="items">
       <thead>
         <tr>
@@ -5702,6 +5741,8 @@ function corporateTemplate(v) {
     .stamp img { max-height: 110px; max-width: 120px; }
     .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #555; }
     .foot b { display: block; color: #1D2B2E; margin-top: 4px; }
+    ${contractCss(accent)}
+    .parties + .contract { margin-top: -8px; }
   `;
 	const pay = paymentRows(v);
 	return shell(v, `Calibri, Carlito, "Segoe UI", -apple-system, Helvetica, Arial, sans-serif`, css, `
@@ -5738,6 +5779,7 @@ function corporateTemplate(v) {
         <tr><td class="k">${esc(L.dueDateLabel)}:</td><td>${esc(v.dueText)}</td></tr>
       </table>
     </div>
+    ${contractRow(v)}
     <table class="items${filler ? "" : " dense"}">
       <thead>
         <tr>
@@ -5833,6 +5875,8 @@ function minimalTemplate(v) {
     .stamp img { max-height: 96px; max-width: 110px; }
     .foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid ${hair}; text-align: center; font-size: 11px; color: ${muted}; }
     .foot b { display: block; margin-top: 4px; color: #1D2B2E; }
+    ${contractCss(accent)}
+    .cols + .contract { margin-top: -14px; margin-bottom: 18px; }
   `;
 	const pay = paymentRows(v);
 	return shell(v, `"Helvetica Neue", Helvetica, "Segoe UI", -apple-system, Arial, sans-serif`, css, `
@@ -5868,6 +5912,7 @@ function minimalTemplate(v) {
         <div class="kv"><span>${esc(L.dueDateLabel)}</span><span>${esc(v.dueText)}</span></div>
       </div>
     </div>
+    ${contractRow(v)}
     <table class="items">
       <thead>
         <tr>
