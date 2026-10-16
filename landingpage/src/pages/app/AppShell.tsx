@@ -126,13 +126,16 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {t('nav.logout')}
           </button>
         </div>
-        <NavLink
-          to="/app/upgrade"
-          onClick={onNavigate}
-          className="mt-2 block truncate px-2 text-xs font-semibold text-white/55 hover:text-white"
-        >
-          {t('billing.current')}: {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
-        </NavLink>
+        {/* A company that never pays sees nothing of the subscription. */}
+        {user?.billingSource !== 'complimentary' ? (
+          <NavLink
+            to="/app/upgrade"
+            onClick={onNavigate}
+            className="mt-2 block truncate px-2 text-xs font-semibold text-white/55 hover:text-white"
+          >
+            {t('billing.current')}: {user?.plan === 'premium' ? t('billing.premiumName') : t('billing.freeName')}
+          </NavLink>
+        ) : null}
       </div>
     </div>
   )

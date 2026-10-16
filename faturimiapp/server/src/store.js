@@ -240,7 +240,21 @@ function normalizeEmail(email) {
 
 const FREE_MONTHLY_LIMIT = 10;
 
+/**
+ * A company that never pays: its owner's email (or account id) is in PREMIUM_ACCOUNTS on the server,
+ * comma-separated. Kept in the server's environment, not in this repository, which is public.
+ */
+function isComplimentary(user) {
+  if (!user) return false;
+  const list = String(process.env.PREMIUM_ACCOUNTS || '')
+    .split(/[,;\s]+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  return list.length > 0 && (list.includes(String(user.email || '').toLowerCase()) || list.includes(String(user.id || '').toLowerCase()));
+}
+
 function isPremiumUser(user) {
+  if (isComplimentary(user)) return true;
   if (!user || user.plan !== 'premium') return false;
   if (user.planExpiresAt) {
     const expires = new Date(user.planExpiresAt).getTime();
@@ -256,7 +270,8 @@ function publicUser(user) {
     email: user.email,
     createdAt: user.createdAt,
     plan: premium ? 'premium' : 'free',
-    billingSource: user.billingSource || null,
+    // 'complimentary': the app shows no subscription to this company at all.
+    billingSource: isComplimentary(user) ? 'complimentary' : user.billingSource || null,
     planExpiresAt: user.planExpiresAt || null,
   };
 }
@@ -561,7 +576,7 @@ function canCreateInvoice(userId) {
       plan: 'premium',
       used: invoicesCreatedThisMonth(userId),
       limit: null,
-      billingSource: user.billingSource || null,
+      billingSource: isComplimentary(user) ? 'complimentary' : user.billingSource || null,
       planExpiresAt: user.planExpiresAt || null,
     };
   }

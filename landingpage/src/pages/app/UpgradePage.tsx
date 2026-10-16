@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n'
@@ -15,7 +15,7 @@ export function UpgradePage() {
   const { t } = useI18n()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { refreshUser } = useAuth()
+  const { refreshUser, user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
@@ -79,6 +79,8 @@ export function UpgradePage() {
   }
 
   const isPremium = usage?.plan === 'premium'
+  // A company that never pays has no subscription to look at.
+  if (user?.billingSource === 'complimentary') return <Navigate to="/app" replace />
 
   return (
     <div className="max-w-2xl">

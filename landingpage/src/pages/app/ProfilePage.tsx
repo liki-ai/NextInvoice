@@ -656,6 +656,7 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
           <Card>
             <h2 className="text-base font-semibold">{t('profile.account')}</h2>
             <p className="mt-1 truncate text-sm text-brand-ink/55">{user?.email}</p>
+            {user?.billingSource !== 'complimentary' ? (
             <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-brand-bg px-3.5 py-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('billing.current')}</p>
@@ -665,6 +666,7 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
                 {user?.plan === 'premium' ? t('billing.manage') : t('nav.subscribe')}
               </Link>
             </div>
+            ) : null}
             <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{t('profile.languageSectionTitle')}</p>
             <LanguagePicker variant="full" showLabel={false} className="mt-2.5" onChange={(code) => (manager ? void saveProfile({ language: code }).catch(() => undefined) : undefined)} />
             <button
