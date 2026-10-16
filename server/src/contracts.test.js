@@ -56,6 +56,7 @@ test('the other party is found among the clients by its number, its name or its 
   assert.equal(matchClient(clients, { counterparty: 'Kompania X', counterpartyBusinessId: 'NUI 811234567' })?.id, 'kru');
   assert.equal(matchClient(clients, { counterparty: 'Komisioni i Pavarur për Miniera dhe Minerale' })?.id, 'kpmm');
   assert.equal(matchClient(clients, { counterparty: 'AGJENCIA E MENAXHIMIT EMERGJENT' })?.id, 'ame');
+  assert.equal(matchClient(clients, { counterparty: 'KRUM' })?.id, 'kru');
   assert.equal(matchClient(clients, { counterparty: 'Komuna e Mitrovicës' }), null);
   assert.equal(matchClient(clients, { counterparty: '' }), null);
 });

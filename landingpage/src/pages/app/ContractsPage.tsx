@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, Check, CheckCircle2, CircleCheck, Copy, Download, Eye, FileSignature, FileText, Loader2, Plus, RotateCcw, Search, Trash2, Upload, UserPlus, Users } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, CircleCheck, Copy, Download, Eye, FileSignature, FileText, Loader2, Plus, RotateCcw, Search, Trash2, Upload, UserPlus, Users, FileSpreadsheet } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Field, Modal, Select, TextArea } from '../../components/ui'
@@ -7,6 +7,8 @@ import { cn } from '../../lib/cn'
 import { formatMoney } from '../../lib/invoice'
 import { composeClient } from '../../lib/client'
 import type { ClientRecord } from '../../lib/document'
+import { planContractImport, type ContractImportPlan } from '../../lib/contractImport'
+import { readAnyWorkbook } from '../../lib/serverFinance'
 import {
   ACCEPT,
   addMonths,
@@ -19,6 +21,7 @@ import {
   downloadContract,
   fileKind,
   lastDay,
+  importContracts,
   listContracts,
   readContractAgain,
   replaceContractFile,
@@ -70,6 +73,8 @@ export function ContractsPage() {
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Contract | 'new' | null>(null)
   const [previewing, setPreviewing] = useState<Contract | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [imported, setImported] = useState<number | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -103,13 +108,11 @@ export function ContractsPage() {
   const counts = useMemo(() => {
     const open = contracts.filter((item) => item.status !== 'completed')
     const states = open.map((item) => contractState(item, on))
-    const value = open.filter((item) => contractState(item, on) !== 'expired').reduce((sum, item) => sum + (Number(item.value) || 0), 0)
     return {
       active: open.length,
       completed: contracts.length - open.length,
       expiring: states.filter((state) => state === 'expiring').length,
       expired: states.filter((state) => state === 'expired').length,
-      value,
     }
   }, [contracts, on])
 
@@ -164,13 +167,20 @@ export function ContractsPage() {
           <h1 className="font-display text-4xl font-medium tracking-tight">{t('contracts.title')}</h1>
           <p className="mt-2 text-sm text-brand-ink/55">{t('contracts.intro')}</p>
         </div>
-        <Button type="button" onClick={() => setEditing('new')} className="shrink-0">
-          <Plus className="h-4 w-4" />
-          {t('contracts.add')}
-        </Button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button type="button" variant="secondary" onClick={() => setImporting(true)}>
+            <FileSpreadsheet className="h-4 w-4" />
+            {t('contracts.importExcel')}
+          </Button>
+          <Button type="button" onClick={() => setEditing('new')}>
+            <Plus className="h-4 w-4" />
+            {t('contracts.add')}
+          </Button>
+        </div>
       </div>
 
       {notice ? <p className="mt-6 rounded-xl bg-[#F8E8E4] px-4 py-3 text-sm text-[#B0472F]">{notice}</p> : null}
+      {imported != null ? <p className="mt-6 rounded-xl bg-[#E6F4EC] px-4 py-3 text-sm text-[#1F6A42]">{t('contracts.importDone', { count: imported })}</p> : null}
 
       {loading && contracts.length === 0 ? <p className="mt-12 text-brand-ink/55">{t('common.loading')}</p> : null}
 
@@ -192,7 +202,6 @@ export function ContractsPage() {
             <span>{t('contracts.statActive', { count: counts.active })}</span>
             {counts.expiring ? <span className="font-semibold text-[#9A6412]">{t('contracts.statExpiring', { count: counts.expiring })}</span> : null}
             {counts.expired ? <span className="font-semibold text-[#B0472F]">{t('contracts.statExpired', { count: counts.expired })}</span> : null}
-            {counts.value ? <span>{t('contracts.statValue', { amount: formatMoney(counts.value, currency) })}</span> : null}
           </div>
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -268,6 +277,18 @@ export function ContractsPage() {
         />
       ) : null}
       {previewing ? <PreviewModal contract={previewing} onClose={() => setPreviewing(null)} /> : null}
+      {importing ? (
+        <ImportContractsModal
+          contracts={contracts}
+          onClose={() => setImporting(false)}
+          onImported={(list, added) => {
+            setContracts(list)
+            setImporting(false)
+            setNotice('')
+            setImported(added)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -949,6 +970,137 @@ function ReadingNote({ icon, text, children }: { icon: 'spin' | 'done' | 'warn';
         {text} {children}
       </span>
     </p>
+  )
+}
+
+// --- Bringing contracts in from a spreadsheet.
+
+function ImportContractsModal({ contracts, onClose, onImported }: { contracts: Contract[]; onClose: () => void; onImported: (list: Contract[], added: number) => void }) {
+  const { t } = useI18n()
+  const { profile } = useAppData()
+  const currency = profile?.currency || 'EUR'
+  const [plan, setPlan] = useState<ContractImportPlan | null>(null)
+  const [picked, setPicked] = useState<Set<number>>(() => new Set())
+  const [fileName, setFileName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const input = useRef<HTMLInputElement>(null)
+
+  async function choose(file: File | undefined) {
+    if (!file) return
+    setError('')
+    setFileName(file.name)
+    try {
+      const next = planContractImport(await readAnyWorkbook(new Uint8Array(await file.arrayBuffer()), file.name), contracts)
+      if (!next) {
+        setPlan(null)
+        setError(t('contracts.importNone'))
+        return
+      }
+      setPlan(next)
+      setPicked(new Set(next.rows.map((row, index) => (row.existing ? -1 : index)).filter((index) => index !== -1)))
+    } catch {
+      setPlan(null)
+      setError(t('contracts.importUnreadable'))
+    }
+  }
+
+  async function run() {
+    if (!plan) return
+    setBusy(true)
+    setError('')
+    try {
+      const rows = plan.rows.filter((_row, index) => picked.has(index)).map((row) => ({ ...row.fields, status: row.status }))
+      const result = await importContracts(rows)
+      onImported(result.contracts, result.added)
+    } catch (err) {
+      setError(errorText(t, err))
+      setBusy(false)
+    }
+  }
+
+  const toggle = (index: number) =>
+    setPicked((current) => {
+      const next = new Set(current)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+
+  return (
+    <Modal
+      title={t('contracts.importTitle')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="button" onClick={() => void run()} disabled={!plan || picked.size === 0 || busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {t('contracts.importRun', { count: picked.size })}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4 p-6">
+        <input ref={input} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => void choose(e.target.files?.[0]).finally(() => (e.target.value = ''))} />
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          className="flex w-full items-center gap-3 rounded-2xl border-2 border-dashed border-brand-ink/15 bg-white px-5 py-4 text-left transition hover:border-brand/40 hover:bg-brand/5"
+        >
+          <FileSpreadsheet className="h-7 w-7 shrink-0 text-brand" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-brand-ink">{fileName || t('contracts.importChoose')}</span>
+            <span className="block text-xs text-brand-ink/50">{t('contracts.importHint')}</span>
+          </span>
+        </button>
+
+        {error ? <p className="rounded-xl bg-[#F8E8E4] px-4 py-3 text-sm text-[#B0472F]">{error}</p> : null}
+
+        {plan ? (
+          <div className="overflow-hidden rounded-2xl border border-brand-ink/8 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/8 px-4 py-3 text-xs text-brand-ink/55">
+              <span>{t('contracts.importFound', { count: plan.rows.length, sheet: plan.sheet })}</span>
+              <button
+                type="button"
+                onClick={() => setPicked(picked.size === plan.rows.length ? new Set() : new Set(plan.rows.map((_row, index) => index)))}
+                className="font-semibold text-brand hover:underline"
+              >
+                {picked.size === plan.rows.length ? t('contracts.importNoneSelected') : t('contracts.importAll')}
+              </button>
+            </div>
+            <ul className="max-h-[50vh] divide-y divide-brand-ink/5 overflow-auto">
+              {plan.rows.map((row, index) => {
+                const { fields } = row
+                const period = [shortDate(fields.startDate), shortDate(fields.endDate)].filter(Boolean).join(' – ')
+                return (
+                  <li key={index}>
+                    <label className={cn('flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-brand-bg/60', !picked.has(index) && 'opacity-55')}>
+                      <input type="checkbox" checked={picked.has(index)} onChange={() => toggle(index)} className="mt-1 h-4 w-4 shrink-0 accent-[#2C6E7B]" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-brand-ink">{fields.title}</span>
+                        <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs">
+                          {fields.counterparty ? <span className="font-medium text-[#4A5BA8]">{fields.counterparty}</span> : null}
+                          {period ? <span className="tabular-nums text-brand-ink/55">{period}</span> : null}
+                          {row.status === 'completed' ? <span className="text-brand-ink/45">{t('contracts.status.completed')}</span> : null}
+                          {row.existing ? <span className="font-semibold text-[#9A6412]">{t('contracts.importExisting')}</span> : null}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right text-sm">
+                        <span className="block font-semibold tabular-nums text-brand-ink">{fields.value != null ? formatMoney(fields.value, currency) : '—'}</span>
+                        {fields.monthlyValue ? <span className="block text-xs text-brand-ink/45">{t('contracts.perMonth', { amount: formatMoney(fields.monthlyValue, currency) })}</span> : null}
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </Modal>
   )
 }
 

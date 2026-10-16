@@ -105,6 +105,11 @@ export function fileKind(file: ContractFile | null) {
   return ''
 }
 
+/** Adds the contracts read from a spreadsheet; the server links each to its client and leaves out those already in the list. */
+export async function importContracts(rows: (Partial<ContractFields> & { status?: Contract['status'] })[]) {
+  return api<{ added: number; skipped: number; contracts: Contract[] }>('/api/contracts/import', { method: 'POST', body: { contracts: rows } })
+}
+
 export async function listContracts() {
   return (await api<{ contracts: Contract[] }>('/api/contracts')).contracts
 }

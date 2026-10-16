@@ -114,7 +114,14 @@ async function create(ownerId, account, body, file) {
   const fields = fieldsFrom(body || {});
   if (!file && !fields.title && !fields.number) throw contractError('CONTRACT_TITLE');
   const kept = await keepFile(ownerId, file);
-  const contract = {
+  const contract = newContract(account, fields, kept);
+  saveContracts(ownerId, [contract, ...getContracts(ownerId)]);
+  if (contract.reading && contract.reading.state === 'pending') enqueue(ownerId, contract.id);
+  return contract;
+}
+
+function newContract(account, fields, kept) {
+  return {
     id: crypto.randomUUID(),
     title: '',
     number: '',
@@ -147,9 +154,43 @@ async function create(ownerId, account, body, file) {
     createdBy: (account && account.email) || '',
     updatedAt: nowIso(),
   };
-  saveContracts(ownerId, [contract, ...getContracts(ownerId)]);
-  if (contract.reading && contract.reading.state === 'pending') enqueue(ownerId, contract.id);
-  return contract;
+}
+
+const IMPORT_MAX = 500;
+
+function sameKey(contract) {
+  return `${nameWords(contract.title).join(' ')}|${nameWords(contract.counterparty).join(' ')}`;
+}
+
+/**
+ * Adds the contracts of a spreadsheet, each linked to its client when the other party is one. A row
+ * whose contract is already in the list (same name and other party) is left out.
+ */
+function importContracts(ownerId, account, rows) {
+  const list = Array.isArray(rows) ? rows.slice(0, IMPORT_MAX) : [];
+  const current = getContracts(ownerId);
+  if (current.length + list.length > CONTRACTS_MAX) throw contractError('CONTRACTS_FULL');
+  const known = new Set(current.map(sameKey));
+  const clients = listClients(ownerId);
+  const added = [];
+  for (const row of list) {
+    const fields = fieldsFrom(row || {});
+    if (!fields.title && !fields.number) continue;
+    const contract = newContract(account, fields, null);
+    if (known.has(sameKey(contract))) continue;
+    known.add(sameKey(contract));
+    if (row.status === 'completed') {
+      contract.status = 'completed';
+      contract.completedAt = contract.endDate && contract.endDate <= nowIso().slice(0, 10) ? contract.endDate : nowIso().slice(0, 10);
+    }
+    if (!contract.maintenanceEndDate) contract.maintenanceEndDate = maintenanceEnd(contract.endDate, contract.maintenanceMonths);
+    const client = contract.counterparty ? matchClient(clients, contract) : null;
+    if (client) contract.clientId = client.id;
+    contract.clientChecked = true;
+    added.push(contract);
+  }
+  if (added.length > 0) saveContracts(ownerId, [...added, ...current]);
+  return { added: added.length, skipped: list.length - added.length };
 }
 
 function update(ownerId, id, body) {
@@ -334,6 +375,13 @@ function initials(words) {
   return words.filter((word) => word.length > 3).map((word) => word[0]).join('');
 }
 
+const LINK_WORDS = new Set(['e', 'i', 'te', 'se', 'ne', 'me', 'per', 'dhe', 'nga', 'of', 'the', 'and', 'for']);
+
+/** "KRU Mitrovica" → "krum": a short word kept whole (it is an abbreviation already), the first letter of the others. */
+function shortForm(words) {
+  return words.filter((word) => !LINK_WORDS.has(word)).map((word) => (word.length <= 3 ? word : word[0])).join('');
+}
+
 function sameName(a, b) {
   const wa = nameWords(a);
   const wb = nameWords(b);
@@ -342,8 +390,8 @@ function sameName(a, b) {
   const jb = wb.join(' ');
   if (ja === jb) return true;
   // One name written out in full and the other as its short form (KPMM, AME).
-  if (wa.length === 1 && wa[0].length >= 3 && wa[0] === initials(wb)) return true;
-  if (wb.length === 1 && wb[0].length >= 3 && wb[0] === initials(wa)) return true;
+  if (wa.length === 1 && wa[0].length >= 3 && (wa[0] === initials(wb) || wa[0] === shortForm(wb))) return true;
+  if (wb.length === 1 && wb[0].length >= 3 && (wb[0] === initials(wa) || wb[0] === shortForm(wa))) return true;
   // "KRU Mitrovica" and "K.R.U. Mitrovica Sh.A.": every word of the shorter name in the longer one.
   const [short, long] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
   return short.join('').length >= 6 && short.every((word) => long.includes(word) || long.join('').includes(word));
@@ -442,6 +490,7 @@ function startContractReading() {
 
 module.exports = {
   applyReading,
+  importContracts,
   matchClient,
   contractFile,
   contractText,

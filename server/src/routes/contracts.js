@@ -73,6 +73,16 @@ router.post(
   }),
 );
 
+/** Contracts from a spreadsheet, read on the page: one set of fields per row. */
+router.post('/import', (req, res, next) => {
+  try {
+    const result = contracts.importContracts(req.user.id, req.user, req.body?.contracts);
+    res.json({ ...result, contracts: contracts.list(req.user.id) });
+  } catch (err) {
+    if (!sendError(res, err)) next(err);
+  }
+});
+
 router.put('/:id', (req, res, next) => {
   try {
     const contract = contracts.update(req.user.id, req.params.id, req.body || {});
