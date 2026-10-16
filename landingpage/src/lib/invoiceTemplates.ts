@@ -1,4 +1,4 @@
-import { paymentStatus, remainingOf } from './document'
+import { parseLooseDate, paymentStatus, remainingOf } from './document'
 import { computeTotals, currencySymbol, resolveExportNote, toNumber, type Client, type CompanyProfile, type Invoice } from './invoice'
 
 export const INVOICE_TEMPLATES = ['classic', 'corporate', 'minimal'] as const
@@ -120,8 +120,8 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
     paid,
     due,
     showBalance: due > 0 && due < total,
-    date: localDate(invoice.date, pdfLabels),
-    dueText: localDate(invoice.dueDate, pdfLabels) || pdfLabels.onReceipt || '',
+    date: numericDate(invoice.date),
+    dueText: numericDate(invoice.dueDate) || pdfLabels.onReceipt || '',
     exportNote: resolveExportNote(company),
     logo: imageSrc(company.logoData),
     // Printed to be signed and stamped by hand: neither image goes on the page.
@@ -205,16 +205,46 @@ function clientRows(v: View): [string, string][] {
   return rows.filter(([, value]) => String(value || '').trim()) as [string, string][]
 }
 
-const MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-
-/** "OCT 19, 2026", as invoices store their dates, written in the invoice's language ("19 tetor 2026"); other dates as typed. */
-function localDate(value: string | undefined, L: Record<string, string>) {
+/** Every date on the invoice in numbers, day first ("OCT 19, 2026" prints as 19.10.2026); a date that cannot be read stays as typed. */
+function numericDate(value: string | undefined) {
   const raw = String(value || '').trim()
-  const names = String(L.monthNames || '').split(',')
-  const mdy = raw.match(/^([A-Z]{3})\s+(\d{1,2}),\s*(\d{4})$/i)
-  const month = mdy ? MONTH_ABBR.indexOf(mdy[1].toUpperCase()) : -1
-  if (!mdy || month < 0 || names.length !== 12) return raw
-  return `${Number(mdy[2])} ${names[month]} ${mdy[3]}`
+  const date = raw ? parseLooseDate(raw) : null
+  if (!date || Number.isNaN(date.getTime())) return raw
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()}`
+}
+
+/**
+ * The issuer's details as labelled lines in the invoice's language: "Adresa:" over the street and the
+ * city, then NUI, VAT, phone, email and website, each as "label: value". A line with no value is left out.
+ */
+function companyLines(v: View) {
+  const { company, L } = v
+  const labelled = (label: string, value?: string) => {
+    const text = String(value || '').trim()
+    return text ? [[label, text] as [string, string]] : []
+  }
+  return {
+    address: [company.streetAddress, v.cityLine].map((part) => String(part || '').trim()).filter(Boolean),
+    ids: [...labelled(L.nuiLabel || 'NUI', company.nui), ...labelled(L.vatLabel || 'VAT', company.vatNumber)],
+    contact: [
+      ...labelled(L.phoneLabel || 'Phone', company.phone),
+      ...labelled(L.emailLabel || 'Email', company.email),
+      ...labelled(L.websiteLabel || 'Website', company.website),
+    ],
+  }
+}
+
+/** companyLines as one column of paragraphs, for the templates that stack them under the company name. */
+function companyBlock(v: View) {
+  const { address, ids, contact } = companyLines(v)
+  const label = (text: string) => `<span class="ik">${esc(text)}:</span>`
+  return [
+    ...(address.length ? [label(v.L.addressLabel || 'Address'), ...address.map(esc)] : []),
+    ...[...ids, ...contact].map(([key, value]) => `${label(key)} ${esc(value)}`),
+  ]
+    .map((line) => `<p>${line}</p>`)
+    .join('')
 }
 
 /** The contract the invoice bills under, as one quiet line above the items; nothing when neither field is filled. */
@@ -253,6 +283,7 @@ function classicTemplate(v: View) {
     .logo { height: 64px; max-width: 150px; object-fit: contain; flex-shrink: 0; }
     .brand h1 { margin: 0 0 6px; font-size: 20px; color: ${dark}; }
     .brand p, .client p { margin: 2px 0; color: #444; }
+    .brand .ik { font-weight: 600; color: #1D2B2E; }
     .meta { text-align: right; flex-shrink: 0; }
     .meta h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: 2px; text-transform: uppercase; color: ${accent}; }
     .meta p { margin: 2px 0; }
@@ -286,13 +317,7 @@ function classicTemplate(v: View) {
         ${v.logo ? `<img class="logo" src="${v.logo}" alt="" />` : ''}
         <div>
           <h1>${esc(company.companyName)}</h1>
-          ${company.nui ? `<p>${esc(L.nuiLabel)}: ${esc(company.nui)}</p>` : ''}
-          ${company.vatNumber ? `<p>${esc(L.vatLabel || 'VAT')}: ${esc(company.vatNumber)}</p>` : ''}
-          ${company.streetAddress ? `<p>${esc(company.streetAddress)}</p>` : ''}
-          ${v.cityLine ? `<p>${esc(v.cityLine)}</p>` : ''}
-          ${company.email ? `<p>${esc(company.email)}</p>` : ''}
-          ${company.phone ? `<p>${esc(company.phone)}</p>` : ''}
-          ${company.website ? `<p>${esc(company.website)}</p>` : ''}
+          ${companyBlock(v)}
         </div>
       </div>
       <div class="meta">
@@ -389,6 +414,7 @@ function corporateTemplate(v: View) {
     .sub { display: flex; gap: 24px; justify-content: space-between; background: ${mid}; padding: 14px 32px 14px 64px; font-size: 10.5px; font-weight: 700; }
     .sub td { padding: 1px 0; vertical-align: top; }
     .sub td.k { text-align: right; padding-right: 28px; white-space: nowrap; }
+    .sub .ln + .ln { margin-top: 3px; }
     .parties { display: flex; justify-content: space-between; gap: 32px; margin: 26px 0 22px; font-size: 10.5px; }
     .parties td { padding: 4px 0; vertical-align: top; font-weight: 700; }
     .parties td.k { padding-right: 16px; white-space: nowrap; }
@@ -427,6 +453,7 @@ function corporateTemplate(v: View) {
     .parties + .contract { margin-top: -8px; }
   `
   const pay = paymentRows(v)
+  const issuer = companyLines(v)
   const body = `
     <div class="band">
       <div class="band-brand">
@@ -437,17 +464,13 @@ function corporateTemplate(v: View) {
     </div>
     <div class="sub">
       <div>
-        ${company.streetAddress ? `<div>${esc(company.streetAddress)}</div>` : ''}
-        ${v.cityLine ? `<div style="margin-top:4px">${esc(v.cityLine)}</div>` : ''}
+        ${issuer.address.length ? [`${esc(L.addressLabel || 'Address')}:`, ...issuer.address.map(esc)].map((line) => `<div class="ln">${line}</div>`).join('') : ''}
       </div>
       <table>
-        ${company.nui ? `<tr><td class="k">${esc(L.businessNumber || L.nuiLabel)}:</td><td>${esc(company.nui)}</td></tr>` : ''}
-        ${company.vatNumber ? `<tr><td class="k">${esc(L.vatLabel || 'VAT')}:</td><td>${esc(company.vatNumber)}</td></tr>` : ''}
+        ${issuer.ids.map(([label, value]) => `<tr><td class="k">${esc(label)}:</td><td>${esc(value)}</td></tr>`).join('')}
       </table>
       <div>
-        ${company.phone ? `<div>${esc(company.phone)}</div>` : ''}
-        ${company.email ? `<div style="margin-top:4px">${esc(company.email)}</div>` : ''}
-        ${company.website ? `<div style="margin-top:4px">${esc(company.website)}</div>` : ''}
+        ${issuer.contact.map(([label, value]) => `<div class="ln">${esc(label)}: ${esc(value)}</div>`).join('')}
       </div>
     </div>
     <div class="parties">
@@ -549,6 +572,7 @@ function minimalTemplate(v: View) {
     .cap { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: ${muted}; margin-bottom: 8px; }
     .cols p { margin: 2px 0; color: #444; }
     .cols p.lead { font-weight: 700; font-size: 13px; color: #1D2B2E; }
+    .cols .ik { color: ${muted}; }
     .kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
     .kv span:first-child { color: ${muted}; }
     .items { width: 100%; }
@@ -592,13 +616,7 @@ function minimalTemplate(v: View) {
       <div>
         <div class="cap">${esc(L.issuedBy)}</div>
         <p class="lead">${esc(company.companyName)}</p>
-        ${company.streetAddress ? `<p>${esc(company.streetAddress)}</p>` : ''}
-        ${v.cityLine ? `<p>${esc(v.cityLine)}</p>` : ''}
-        ${company.nui ? `<p>${esc(L.nuiLabel)}: ${esc(company.nui)}</p>` : ''}
-        ${company.vatNumber ? `<p>${esc(L.vatLabel || 'VAT')}: ${esc(company.vatNumber)}</p>` : ''}
-        ${company.phone ? `<p>${esc(company.phone)}</p>` : ''}
-        ${company.email ? `<p>${esc(company.email)}</p>` : ''}
-        ${company.website ? `<p>${esc(company.website)}</p>` : ''}
+        ${companyBlock(v)}
       </div>
       <div>
         <div class="cap">${esc(L.billedTo || L.clientLabel)}</div>
