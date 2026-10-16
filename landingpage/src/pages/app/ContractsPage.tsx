@@ -74,6 +74,7 @@ export function ContractsPage() {
   const [editing, setEditing] = useState<Contract | 'new' | null>(null)
   const [previewing, setPreviewing] = useState<Contract | null>(null)
   const [importing, setImporting] = useState(false)
+  const [asking, setAsking] = useState<{ kind: 'delete' | 'complete'; contract: Contract } | null>(null)
   const [imported, setImported] = useState<number | null>(null)
 
   const refresh = useCallback(async () => {
@@ -142,16 +143,21 @@ export function ContractsPage() {
   }
 
   function setCompleted(contract: Contract, completed: boolean) {
-    if (completed && !window.confirm(t('contracts.completeConfirm', { title: contractName(contract) }))) return
-    void act(async () => upsert(await updateContract(contract.id, { status: completed ? 'completed' : 'active' })))
+    if (completed) setAsking({ kind: 'complete', contract })
+    else void act(async () => upsert(await updateContract(contract.id, { status: 'active' })))
   }
 
-  function remove(contract: Contract) {
-    if (!window.confirm(t('contracts.deleteConfirm', { title: contractName(contract) }))) return
-    void act(async () => {
-      await deleteContract(contract.id)
-      drop(contract.id)
+  async function confirmAsked() {
+    if (!asking) return
+    const { kind, contract } = asking
+    await act(async () => {
+      if (kind === 'complete') upsert(await updateContract(contract.id, { status: 'completed' }))
+      else {
+        await deleteContract(contract.id)
+        drop(contract.id)
+      }
     })
+    setAsking(null)
   }
 
   const tabs: { key: Tab; label: string; count: number }[] = [
@@ -256,7 +262,7 @@ export function ContractsPage() {
                   onPreview={() => setPreviewing(contract)}
                   onDownload={() => void act(() => downloadContract(contract))}
                   onComplete={(done) => setCompleted(contract, done)}
-                  onDelete={() => remove(contract)}
+                  onDelete={() => setAsking({ kind: 'delete', contract })}
                 />
               ))}
             </ul>
@@ -277,6 +283,17 @@ export function ContractsPage() {
         />
       ) : null}
       {previewing ? <PreviewModal contract={previewing} onClose={() => setPreviewing(null)} /> : null}
+      {asking ? (
+        <ConfirmModal
+          title={asking.kind === 'delete' ? t('contracts.deleteTitle') : t('contracts.completeTitle')}
+          name={contractName(asking.contract)}
+          message={asking.kind === 'delete' ? t('contracts.deleteMessage') : t('contracts.completeMessage')}
+          action={asking.kind === 'delete' ? t('contracts.delete') : t('contracts.complete')}
+          danger={asking.kind === 'delete'}
+          onConfirm={confirmAsked}
+          onClose={() => setAsking(null)}
+        />
+      ) : null}
       {importing ? (
         <ImportContractsModal
           contracts={contracts}
@@ -970,6 +987,63 @@ function ReadingNote({ icon, text, children }: { icon: 'spin' | 'done' | 'warn';
         {text} {children}
       </span>
     </p>
+  )
+}
+
+/** Asks before something that changes a contract for good, in the page's own window instead of the browser's. */
+function ConfirmModal({
+  title,
+  name,
+  message,
+  action,
+  danger,
+  onConfirm,
+  onClose,
+}: {
+  title: string
+  name: string
+  message: string
+  action: string
+  danger?: boolean
+  onConfirm: () => Promise<void>
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const [busy, setBusy] = useState(false)
+  return (
+    <Modal
+      title={title}
+      size="sm"
+      onClose={onClose}
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            autoFocus
+            disabled={busy}
+            onClick={() => {
+              setBusy(true)
+              void onConfirm()
+            }}
+            className={danger ? 'bg-[#C0503A] hover:bg-[#A8432F]' : undefined}
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : danger ? <Trash2 className="h-4 w-4" /> : <CircleCheck className="h-4 w-4" />}
+            {action}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 bg-white p-6">
+        <p className="flex items-start gap-3 rounded-xl border border-brand-ink/8 bg-[#FAFBFB] px-4 py-3 text-sm font-semibold text-brand-ink">
+          <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+          <span>{name}</span>
+        </p>
+        <p className="text-sm text-brand-ink/65">{message}</p>
+      </div>
+    </Modal>
   )
 }
 
