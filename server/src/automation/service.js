@@ -462,6 +462,8 @@ function subscriptionFacts(ownerId, invoice) {
 }
 
 async function notifySent(ownerId, invoice, to) {
+  // The Slack channel hears of it whatever the email notices are set to.
+  require('../slack').invoiceSent(ownerId, invoice, to).catch(() => {});
   const { settings } = notifyTargets(ownerId);
   if (!settings.notifySent) return;
   const profile = realProfile(ownerId);

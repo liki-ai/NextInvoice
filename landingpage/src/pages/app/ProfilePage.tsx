@@ -7,6 +7,7 @@ import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, Select, TextArea } from '../../components/ui'
 import { LanguagePicker } from '../../components/LangSwitch'
 import { MailSettingsCard } from '../../components/MailSettingsCard'
+import { SlackSettingsCard } from '../../components/SlackSettingsCard'
 import { canManageCompany } from '../../lib/team'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
@@ -643,6 +644,7 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
           </Card>
 
           {manager ? <MailSettingsCard box="company" /> : null}
+          {manager ? <SlackSettingsCard /> : null}
         </fieldset>
 
         {/* Outside the administrators' part: everyone connects and manages their own mailbox. */}

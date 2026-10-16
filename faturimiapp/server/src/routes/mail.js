@@ -167,6 +167,7 @@ async function sendPaymentReminder(user, body) {
   countSend(user.id);
   await deliver(settings, { sender, to, cc, subject, text, html: messageHtml(text, { accent: profile.accentColor }), attachments });
   const saved = recordInvoiceReminder(user.id, ids, { from: sender.email, to, cc, subject, emailed: true });
+  require('../slack').reminderSent(user.id, invoices, to).catch(() => {});
   return { invoices: saved, attached: attachments.length };
 }
 

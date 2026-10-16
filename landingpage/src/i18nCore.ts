@@ -5,6 +5,7 @@ import { financeNav, financeTexts } from './i18nFinance'
 import { mercuryTexts } from './i18nMercury'
 import { projectDetailTexts } from './i18nProjectDetail'
 import { recurringNav, recurringTexts } from './i18nRecurring'
+import { slackTexts } from './i18nSlack'
 
 export const LANGS = [
   { code: 'sq', short: 'SQ', name: 'Shqip' },
@@ -24,6 +25,7 @@ export const translations = {
     mercury: mercuryTexts.sq,
     projectDetail: projectDetailTexts.sq,
     recurring: recurringTexts.sq,
+    slack: slackTexts.sq,
     nav: {
       finance: financeNav.sq,
       recurring: recurringNav.sq,
@@ -909,6 +911,7 @@ export const translations = {
     mercury: mercuryTexts.en,
     projectDetail: projectDetailTexts.en,
     recurring: recurringTexts.en,
+    slack: slackTexts.en,
     nav: {
       finance: financeNav.en,
       recurring: recurringNav.en,
@@ -1794,6 +1797,7 @@ export const translations = {
     mercury: mercuryTexts.it,
     projectDetail: projectDetailTexts.it,
     recurring: recurringTexts.it,
+    slack: slackTexts.it,
     nav: {
       finance: financeNav.it,
       recurring: recurringNav.it,
