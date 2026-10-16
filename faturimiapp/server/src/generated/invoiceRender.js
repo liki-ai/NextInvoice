@@ -3659,6 +3659,8 @@ const translations = {
 			limit: "Plani falas lejon 10 fatura në muaj. Kalo në Premium për ta importuar këtë skedar."
 		},
 		pdf: {
+			invoiceTitle: "Faturë",
+			monthNames: "janar,shkurt,mars,prill,maj,qershor,korrik,gusht,shtator,tetor,nëntor,dhjetor",
 			contractName: "Emri i kontratës",
 			contractNumber: "Numri i kontratës",
 			invoiceLabel: "Faturë",
@@ -4609,6 +4611,8 @@ const translations = {
 			limit: "The free plan allows 10 invoices a month. Upgrade to Premium to import this file."
 		},
 		pdf: {
+			invoiceTitle: "Invoice",
+			monthNames: "",
 			contractName: "Contract name",
 			contractNumber: "Contract number",
 			invoiceLabel: "Invoice",
@@ -5559,6 +5563,8 @@ const translations = {
 			limit: "Il piano gratuito consente 10 fatture al mese. Passa a Premium per importare questo file."
 		},
 		pdf: {
+			invoiceTitle: "Fattura",
+			monthNames: "gennaio,febbraio,marzo,aprile,maggio,giugno,luglio,agosto,settembre,ottobre,novembre,dicembre",
 			contractName: "Contratto",
 			contractNumber: "N. contratto",
 			invoiceLabel: "Fattura",
@@ -5768,7 +5774,8 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
 		paid,
 		due,
 		showBalance: due > 0 && due < total,
-		dueText: invoice.dueDate || pdfLabels.onReceipt || "",
+		date: localDate(invoice.date, pdfLabels),
+		dueText: localDate(invoice.dueDate, pdfLabels) || pdfLabels.onReceipt || "",
 		exportNote: resolveExportNote(company),
 		logo: imageSrc(company.logoData),
 		signature: invoice.unsigned ? "" : imageSrc(company.signatureData),
@@ -5844,6 +5851,29 @@ function clientRows(v) {
 		["", client.email]
 	].filter(([, value]) => String(value || "").trim());
 }
+const MONTH_ABBR = [
+	"JAN",
+	"FEB",
+	"MAR",
+	"APR",
+	"MAY",
+	"JUN",
+	"JUL",
+	"AUG",
+	"SEP",
+	"OCT",
+	"NOV",
+	"DEC"
+];
+/** "OCT 19, 2026", as invoices store their dates, written in the invoice's language ("19 tetor 2026"); other dates as typed. */
+function localDate(value, L) {
+	const raw = String(value || "").trim();
+	const names = String(L.monthNames || "").split(",");
+	const mdy = raw.match(/^([A-Z]{3})\s+(\d{1,2}),\s*(\d{4})$/i);
+	const month = mdy ? MONTH_ABBR.indexOf(mdy[1].toUpperCase()) : -1;
+	if (!mdy || month < 0 || names.length !== 12) return raw;
+	return `${Number(mdy[2])} ${names[month]} ${mdy[3]}`;
+}
 /** The contract the invoice bills under, as one quiet line above the items; nothing when neither field is filled. */
 function contractRow(v) {
 	const { invoice, L } = v;
@@ -5870,7 +5900,7 @@ function classicTemplate(v) {
     .brand h1 { margin: 0 0 6px; font-size: 20px; color: ${dark}; }
     .brand p, .client p { margin: 2px 0; color: #444; }
     .meta { text-align: right; flex-shrink: 0; }
-    .meta h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: 2px; color: ${accent}; }
+    .meta h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: 2px; text-transform: uppercase; color: ${accent}; }
     .meta p { margin: 2px 0; }
     .client { margin-bottom: 22px; }
     .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6B7A7D; margin-bottom: 6px; }
@@ -5913,7 +5943,7 @@ function classicTemplate(v) {
       <div class="meta">
         <h2>${esc(L.invoiceTitle || "INVOICE")}</h2>
         <p>${esc(L.invoiceLabel)}: <strong>${esc(invoice.number)}</strong></p>
-        <p>${esc(L.dateLabel)}: ${esc(invoice.date)}</p>
+        <p>${esc(L.dateLabel)}: ${esc(v.date)}</p>
         <p>${esc(L.dueDateLabel)}: ${esc(v.dueText)}</p>
       </div>
     </div>
@@ -6056,7 +6086,7 @@ function corporateTemplate(v) {
       </table>
       <table>
         <tr><td class="k">${esc(L.invoiceLabel)} #:</td><td>${esc(invoice.number)}</td></tr>
-        <tr><td class="k">${esc(L.dateLabel)}:</td><td>${esc(invoice.date)}</td></tr>
+        <tr><td class="k">${esc(L.dateLabel)}:</td><td>${esc(v.date)}</td></tr>
         <tr><td class="k">${esc(L.dueDateLabel)}:</td><td>${esc(v.dueText)}</td></tr>
       </table>
     </div>
@@ -6121,7 +6151,7 @@ function minimalTemplate(v) {
     .logo { height: 56px; max-width: 180px; object-fit: contain; }
     .name { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; }
     .title { text-align: right; }
-    .title h2 { margin: 0; font-size: 30px; font-weight: 300; letter-spacing: 3px; color: ${accent}; }
+    .title h2 { margin: 0; font-size: 30px; font-weight: 300; letter-spacing: 3px; text-transform: uppercase; color: ${accent}; }
     .title p { margin-top: 4px; font-size: 13px; color: ${muted}; }
     .rule { height: 2px; background: ${accent}; margin: 22px 0 24px; width: 48px; }
     .cols { display: flex; gap: 28px; margin-bottom: 30px; }
@@ -6189,7 +6219,7 @@ function minimalTemplate(v) {
       <div>
         <div class="cap">${esc(L.invoiceLabel)}</div>
         <div class="kv"><span>#</span><span>${esc(invoice.number)}</span></div>
-        <div class="kv"><span>${esc(L.dateLabel)}</span><span>${esc(invoice.date)}</span></div>
+        <div class="kv"><span>${esc(L.dateLabel)}</span><span>${esc(v.date)}</span></div>
         <div class="kv"><span>${esc(L.dueDateLabel)}</span><span>${esc(v.dueText)}</span></div>
       </div>
     </div>
