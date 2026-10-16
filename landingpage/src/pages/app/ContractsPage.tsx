@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, CheckCircle2, CircleCheck, Download, Eye, FileSignature, FileText, Loader2, Plus, RotateCcw, Search, Trash2, Upload, UserPlus, Users } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, CircleCheck, Copy, Download, Eye, FileSignature, FileText, Loader2, Plus, RotateCcw, Search, Trash2, Upload, UserPlus, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Field, Modal, Select, TextArea } from '../../components/ui'
@@ -313,7 +313,7 @@ function ContractRow({
   const state = contractState(contract, on)
   const pending = contract.reading?.state === 'pending'
   const money = contract.currency || currency
-  const sub = [contract.number && contract.title ? contract.number : '', party].filter(Boolean).join(' · ')
+  const number = contract.title ? contract.number : ''
 
   let period = ''
   if (contract.startDate && contract.endDate) period = `${shortDate(contract.startDate)} – ${shortDate(contract.endDate)}`
@@ -334,16 +334,36 @@ function ContractRow({
 
   return (
     <li className="flex flex-col gap-1 border-b border-brand-ink/5 pr-2 last:border-0 hover:bg-brand-bg/60 xl:flex-row xl:items-center">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onOpen}
-        className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-5 pt-3.5 text-left xl:grid-cols-[minmax(0,1fr)_190px_150px_130px] xl:py-3.5"
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            onOpen()
+          }
+        }}
+        className="grid min-w-0 flex-1 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-5 pt-3.5 text-left xl:grid-cols-[minmax(0,1fr)_190px_150px_130px] xl:py-3.5"
       >
         <span className="col-start-1 row-start-1 flex min-w-0 items-start gap-3 xl:col-start-auto xl:row-start-auto">
           <FileText className={cn('mt-0.5 h-5 w-5 shrink-0', contract.file ? 'text-brand' : 'text-brand-ink/25')} />
           <span className="min-w-0">
-            <span className="line-clamp-2 font-semibold text-brand-ink xl:line-clamp-1">{contractName(contract)}</span>
-            {sub ? <span className="block truncate text-xs text-brand-ink/50">{sub}</span> : null}
+            <span className="flex items-start gap-1">
+              <span className="line-clamp-2 font-semibold text-brand-ink xl:line-clamp-1">{contractName(contract)}</span>
+              <CopyButton text={contractName(contract)} label={t('contracts.copyName')} copied={t('contracts.copied')} />
+            </span>
+            {number || party ? (
+              <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px]">
+                {number ? (
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span className="truncate font-semibold tabular-nums text-brand">{number}</span>
+                    <CopyButton text={number} label={t('contracts.copyNumber')} copied={t('contracts.copied')} />
+                  </span>
+                ) : null}
+                {party ? <span className="truncate font-medium text-[#4A5BA8]">{party}</span> : null}
+              </span>
+            ) : null}
             {pending ? (
               <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-brand">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -363,7 +383,7 @@ function ContractRow({
         <span className="col-start-2 row-start-2 justify-self-end xl:col-start-auto xl:row-start-auto xl:justify-self-start">
           <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', STATE_STYLE[state])}>{t(`contracts.status.${state}`)}</span>
         </span>
-      </button>
+      </div>
       <span className="flex shrink-0 items-center justify-end gap-0.5 pb-2 pl-5 xl:w-[152px] xl:pb-0 xl:pl-0">
         <IconButton label={t('contracts.preview')} onClick={onPreview} disabled={!contract.file}>
           <Eye className="h-4 w-4" />
@@ -385,6 +405,28 @@ function ContractRow({
         </IconButton>
       </span>
     </li>
+  )
+}
+
+/** A small copy icon beside a name or number; it turns into a tick for a moment once copied. */
+function CopyButton({ text, label, copied }: { text: string; label: string; copied: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <button
+      type="button"
+      aria-label={done ? copied : label}
+      title={done ? copied : label}
+      onClick={(e) => {
+        e.stopPropagation()
+        void navigator.clipboard?.writeText(text).then(() => {
+          setDone(true)
+          window.setTimeout(() => setDone(false), 1500)
+        })
+      }}
+      className={cn('shrink-0 rounded-md p-1 transition', done ? 'text-[#1F7A4A]' : 'text-brand-ink/30 hover:bg-brand/8 hover:text-brand-dark')}
+    >
+      {done ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
   )
 }
 

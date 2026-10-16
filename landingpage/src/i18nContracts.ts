@@ -94,6 +94,9 @@ const sq = {
   notInClients: '"{name}" nuk është ende te klientët.',
   register: 'Regjistroje',
   matched: 'u gjet te klientët',
+  copyName: 'Kopjo emrin',
+  copyNumber: 'Kopjo numrin',
+  copied: 'U kopjua',
   noPreview: 'Ky dokument nuk shfaqet dot këtu. Shkarkoje për ta hapur.',
   previewFailed: 'Dokumenti nuk u hap. Provo përsëri.',
   err: {
@@ -198,6 +201,9 @@ const en: typeof sq = {
   notInClients: '"{name}" is not among your clients yet.',
   register: 'Add it',
   matched: 'found among clients',
+  copyName: 'Copy the name',
+  copyNumber: 'Copy the number',
+  copied: 'Copied',
   noPreview: 'This document cannot be shown here. Download it to open it.',
   previewFailed: 'The document did not open. Try again.',
   err: {
@@ -302,6 +308,9 @@ const it: typeof sq = {
   notInClients: '"{name}" non è ancora tra i clienti.',
   register: 'Aggiungilo',
   matched: 'trovato tra i clienti',
+  copyName: 'Copia il nome',
+  copyNumber: 'Copia il numero',
+  copied: 'Copiato',
   noPreview: 'Questo documento non si può mostrare qui. Scaricalo per aprirlo.',
   previewFailed: 'Il documento non si è aperto. Riprova.',
   err: {
