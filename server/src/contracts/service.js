@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { getContracts, saveContracts, contractOwners, getProfile } = require('../store');
+const { getContracts, saveContracts, contractOwners, getProfile, listClients } = require('../store');
 const { putFile, getFile, removeFile } = require('../finance/files');
 const { fileType, docxText } = require('../finance/extract');
 const { extractStructured } = require('../openaiClient');
@@ -10,11 +10,11 @@ const { extractStructured } = require('../openaiClient');
 // Kosovo are mostly scanned public procurement contracts, so the reading has to see the pages.
 
 const CONTRACTS_MAX = 2000;
-const TEXT_FIELDS = ['title', 'number', 'reference', 'counterparty', 'type', 'summary', 'paymentTerms', 'signatories', 'notes'];
+const TEXT_FIELDS = ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'clientId', 'type', 'summary', 'paymentTerms', 'signatories', 'notes'];
 const DATE_FIELDS = ['signedDate', 'startDate', 'endDate'];
 const NUMBER_FIELDS = ['value', 'monthlyValue'];
 /** What a reading of the document may fill in. */
-const READ_FIELDS = ['title', 'number', 'reference', 'counterparty', 'type', 'summary', 'paymentTerms', 'signatories', ...DATE_FIELDS, ...NUMBER_FIELDS, 'currency', 'vatIncluded'];
+const READ_FIELDS = ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'type', 'summary', 'paymentTerms', 'signatories', ...DATE_FIELDS, ...NUMBER_FIELDS, 'currency', 'vatIncluded'];
 const TEXT_LIMITS = { summary: 1000, notes: 2000, paymentTerms: 300, signatories: 300 };
 
 function nowIso() {
@@ -120,6 +120,9 @@ async function create(ownerId, account, body, file) {
     number: '',
     reference: '',
     counterparty: '',
+    counterpartyAddress: '',
+    counterpartyBusinessId: '',
+    clientId: '',
     type: '',
     summary: '',
     paymentTerms: '',
@@ -226,6 +229,8 @@ const SCHEMA = {
     number: { type: 'string', description: 'The contract number exactly as printed ("Numri i kontratës", "Nr i Kontratës"), e.g. 318-26-5977-2-2-1/C220; empty when none.' },
     reference: { type: 'string', description: 'Another identifier the contract carries: the procurement identification number ("numër identifikues"), the internal number ("Nr. i brendshëm") or a registry number; empty when none.' },
     counterparty: { type: 'string', description: 'The other party to the contract, the one that is not the company: usually the contracting authority or the client. Its proper name, without "në vazhdim".' },
+    counterpartyAddress: { type: 'string', description: 'Address of the other party as the contract gives it; empty when not stated.' },
+    counterpartyBusinessId: { type: 'string', description: 'Business or fiscal number of the other party (NUI, NRB, numri fiskal); empty when not stated.' },
     type: { type: 'string', description: 'A short kind in Albanian, e.g. "Kontratë publike", "Kontratë publike kornizë", "Kontratë shërbimi", "Aneks kontrate", "Marrëveshje".' },
     summary: { type: 'string', description: 'One or two sentences in Albanian on what the company has to deliver.' },
     signedDate: { type: 'string', description: 'The day it was signed, YYYY-MM-DD; when the parties signed on different days, the later day. Empty when not stated.' },
@@ -238,7 +243,7 @@ const SCHEMA = {
     paymentTerms: { type: 'string', description: 'When the company is paid, in a short Albanian phrase (e.g. "Brenda 30 ditëve pas faturës, çdo muaj"); empty when not stated.' },
     signatories: { type: 'string', description: 'Who signed, name and position, for each party, separated by "; ". Empty when not legible.' },
   },
-  required: ['title', 'number', 'reference', 'counterparty', 'type', 'summary', 'signedDate', 'startDate', 'endDate', 'value', 'monthlyValue', 'currency', 'vatIncluded', 'paymentTerms', 'signatories'],
+  required: ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'type', 'summary', 'signedDate', 'startDate', 'endDate', 'value', 'monthlyValue', 'currency', 'vatIncluded', 'paymentTerms', 'signatories'],
 };
 
 function instructions(companyName, fileName) {
@@ -288,6 +293,56 @@ function applyReading(contract, result) {
   return next;
 }
 
+// --- Finding the client the contract is with.
+
+const LEGAL_WORDS = new Set(['shpk', 'sh', 'sha', 'pk', 'llc', 'ltd', 'inc', 'gmbh', 'srl', 'spa', 'doo', 'dooel']);
+
+/** A name as words to compare: no accents, no punctuation, no legal form (sh.p.k., Sh.A., LLC). */
+function nameWords(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter((word) => word.length > 1 && !LEGAL_WORDS.has(word));
+}
+
+/** "Komisioni i Pavarur për Miniera dhe Minerale" → "kpmm": the first letters of its longer words. */
+function initials(words) {
+  return words.filter((word) => word.length > 3).map((word) => word[0]).join('');
+}
+
+function sameName(a, b) {
+  const wa = nameWords(a);
+  const wb = nameWords(b);
+  if (wa.length === 0 || wb.length === 0) return false;
+  const ja = wa.join(' ');
+  const jb = wb.join(' ');
+  if (ja === jb) return true;
+  // One name written out in full and the other as its short form (KPMM, AME).
+  if (wa.length === 1 && wa[0].length >= 3 && wa[0] === initials(wb)) return true;
+  if (wb.length === 1 && wb[0].length >= 3 && wb[0] === initials(wa)) return true;
+  // "KRU Mitrovica" and "K.R.U. Mitrovica Sh.A.": every word of the shorter name in the longer one.
+  const [short, long] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
+  return short.join('').length >= 6 && short.every((word) => long.includes(word) || long.join('').includes(word));
+}
+
+function digits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+/** The one client the other party of the contract is; null when none or several could be. */
+function matchClient(clients, { counterparty, counterpartyBusinessId }) {
+  const id = digits(counterpartyBusinessId);
+  if (id.length >= 6) {
+    const byId = clients.filter((client) => [client.businessId, client.fiscalNumber, client.vatNumber].some((value) => digits(value) === id));
+    if (byId.length === 1) return byId[0];
+  }
+  const byName = clients.filter((client) => sameName(client.fullName, counterparty));
+  return byName.length === 1 ? byName[0] : null;
+}
+
 const queue = [];
 let busy = false;
 
@@ -321,7 +376,15 @@ async function readOne(ownerId, id) {
     mutate(ownerId, id, (current) => {
       // A different document was put in while this one was being read; its own reading follows.
       if (!current.file || current.file.id !== fileId) return null;
-      return { ...applyReading(current, result), reading: { state: 'done', at: nowIso() } };
+      const next = { ...applyReading(current, result), reading: { state: 'done', at: nowIso() } };
+      if (!next.clientId) {
+        const client = matchClient(listClients(ownerId), next);
+        if (client) {
+          next.clientId = client.id;
+          next.filled = [...next.filled, 'clientId'];
+        }
+      }
+      return next;
     });
   } catch (err) {
     mutate(ownerId, id, (current) => {
@@ -332,9 +395,24 @@ async function readOne(ownerId, id) {
   }
 }
 
-/** Documents still waiting when the server last stopped are read now. */
+/**
+ * Documents still waiting when the server last stopped are read now. Contracts read before clients
+ * were matched get their client once.
+ */
 function startContractReading() {
   for (const ownerId of contractOwners()) {
+    const unmatched = getContracts(ownerId).filter((item) => !item.clientId && !item.clientChecked && item.counterparty);
+    if (unmatched.length > 0) {
+      const clients = listClients(ownerId);
+      saveContracts(
+        ownerId,
+        getContracts(ownerId).map((item) => {
+          if (!unmatched.some((other) => other.id === item.id)) return item;
+          const client = matchClient(clients, item);
+          return client ? { ...item, clientId: client.id, clientChecked: true, filled: [...(item.filled || []), 'clientId'] } : { ...item, clientChecked: true };
+        }),
+      );
+    }
     for (const contract of getContracts(ownerId)) {
       if (contract.reading && contract.reading.state === 'pending') enqueue(ownerId, contract.id);
     }
@@ -343,6 +421,7 @@ function startContractReading() {
 
 module.exports = {
   applyReading,
+  matchClient,
   contractFile,
   contractText,
   create,

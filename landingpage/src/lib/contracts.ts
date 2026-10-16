@@ -12,6 +12,10 @@ export type Contract = {
   number: string
   reference: string
   counterparty: string
+  counterpartyAddress: string
+  counterpartyBusinessId: string
+  /** The client in the catalogue the contract is with; '' when it is not linked. */
+  clientId: string
   type: string
   summary: string
   paymentTerms: string
@@ -35,7 +39,7 @@ export type Contract = {
 
 export type ContractFields = Pick<
   Contract,
-  'title' | 'number' | 'reference' | 'counterparty' | 'type' | 'summary' | 'paymentTerms' | 'signatories' | 'notes' | 'signedDate' | 'startDate' | 'endDate' | 'value' | 'monthlyValue' | 'currency' | 'vatIncluded'
+  'title' | 'number' | 'reference' | 'counterparty' | 'counterpartyAddress' | 'counterpartyBusinessId' | 'clientId' | 'type' | 'summary' | 'paymentTerms' | 'signatories' | 'notes' | 'signedDate' | 'startDate' | 'endDate' | 'value' | 'monthlyValue' | 'currency' | 'vatIncluded'
 >
 
 export type ContractState = 'active' | 'expiring' | 'expired' | 'upcoming' | 'completed'

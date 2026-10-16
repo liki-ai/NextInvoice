@@ -41,3 +41,21 @@ test('a later reading replaces what an earlier one filled, and drops what is not
   assert.equal(next.number, 'NEW-2');
   assert.equal(next.endDate, '2027-01-01');
 });
+
+const { matchClient } = require('./contracts/service');
+
+const clients = [
+  { id: 'kpmm', fullName: 'KPMM', businessId: '' },
+  { id: 'kru', fullName: 'KRU Mitrovica Sh.A.', businessId: '811234567' },
+  { id: 'ame', fullName: 'Agjencia e Menaxhimit Emergjent' },
+  { id: 'tretek', fullName: 'Tretek SH.P.K.' },
+];
+
+test('the other party is found among the clients by its number, its name or its short form', () => {
+  assert.equal(matchClient(clients, { counterparty: 'K.R.U. MITROVICA SH.A.', counterpartyBusinessId: '' })?.id, 'kru');
+  assert.equal(matchClient(clients, { counterparty: 'Kompania X', counterpartyBusinessId: 'NUI 811234567' })?.id, 'kru');
+  assert.equal(matchClient(clients, { counterparty: 'Komisioni i Pavarur për Miniera dhe Minerale' })?.id, 'kpmm');
+  assert.equal(matchClient(clients, { counterparty: 'AGJENCIA E MENAXHIMIT EMERGJENT' })?.id, 'ame');
+  assert.equal(matchClient(clients, { counterparty: 'Komuna e Mitrovicës' }), null);
+  assert.equal(matchClient(clients, { counterparty: '' }), null);
+});

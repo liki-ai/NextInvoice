@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, CheckCircle2, CircleCheck, Download, Eye, FileSignature, FileText, Loader2, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CircleCheck, Download, Eye, FileSignature, FileText, Loader2, Plus, RotateCcw, Search, Trash2, Upload, UserPlus, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Field, Modal, Select, TextArea } from '../../components/ui'
 import { cn } from '../../lib/cn'
 import { formatMoney } from '../../lib/invoice'
+import { composeClient } from '../../lib/client'
+import type { ClientRecord } from '../../lib/document'
 import {
   ACCEPT,
   contractBlob,
@@ -56,7 +58,7 @@ function sizeText(bytes: number) {
 
 export function ContractsPage() {
   const { t } = useI18n()
-  const { profile } = useAppData()
+  const { profile, clients } = useAppData()
   const currency = profile?.currency || 'EUR'
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,11 +110,13 @@ export function ContractsPage() {
     }
   }, [contracts, on])
 
+  const clientName = useMemo(() => new Map(clients.map((client) => [client.id, client.fullName])), [clients])
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     const rows = contracts.filter((item) => (tab === 'all' ? true : tab === 'completed' ? item.status === 'completed' : item.status !== 'completed'))
     const found = q
-      ? rows.filter((item) => [item.title, item.number, item.reference, item.counterparty, item.type, item.summary, item.file?.name].join(' ').toLowerCase().includes(q))
+      ? rows.filter((item) => [item.title, item.number, item.reference, item.counterparty, clientName.get(item.clientId), item.type, item.summary, item.file?.name].join(' ').toLowerCase().includes(q))
       : rows
     // Open contracts by the day they end, soonest first; finished ones by when they were finished.
     return [...found].sort((a, b) => {
@@ -120,7 +124,7 @@ export function ContractsPage() {
       if (a.status === 'completed') return String(b.completedAt || '').localeCompare(String(a.completedAt || ''))
       return (a.endDate || '9999').localeCompare(b.endDate || '9999') || b.createdAt.localeCompare(a.createdAt)
     })
-  }, [contracts, tab, query])
+  }, [contracts, tab, query, clientName])
 
   async function act(run: () => Promise<void>) {
     try {
@@ -232,6 +236,7 @@ export function ContractsPage() {
                 <ContractRow
                   key={contract.id}
                   contract={contract}
+                  party={clientName.get(contract.clientId) || contract.counterparty}
                   on={on}
                   currency={currency}
                   t={t}
@@ -284,6 +289,7 @@ function IconButton({ label, onClick, disabled, danger, children }: { label: str
 
 function ContractRow({
   contract,
+  party,
   on,
   currency,
   t,
@@ -294,6 +300,7 @@ function ContractRow({
   onDelete,
 }: {
   contract: Contract
+  party: string
   on: string
   currency: string
   t: T
@@ -306,7 +313,7 @@ function ContractRow({
   const state = contractState(contract, on)
   const pending = contract.reading?.state === 'pending'
   const money = contract.currency || currency
-  const sub = [contract.number && contract.title ? contract.number : '', contract.counterparty].filter(Boolean).join(' · ')
+  const sub = [contract.number && contract.title ? contract.number : '', party].filter(Boolean).join(' · ')
 
   let period = ''
   if (contract.startDate && contract.endDate) period = `${shortDate(contract.startDate)} – ${shortDate(contract.endDate)}`
@@ -383,7 +390,7 @@ function ContractRow({
 
 // --- Adding and changing a contract.
 
-const TEXT_KEYS = ['title', 'number', 'reference', 'counterparty', 'type', 'summary', 'paymentTerms', 'signatories', 'notes', 'signedDate', 'startDate', 'endDate', 'currency'] as const
+const TEXT_KEYS = ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'clientId', 'type', 'summary', 'paymentTerms', 'signatories', 'notes', 'signedDate', 'startDate', 'endDate', 'currency'] as const
 type FormKey = (typeof TEXT_KEYS)[number] | 'value' | 'monthlyValue' | 'vatIncluded'
 type Form = Record<FormKey, string>
 
@@ -411,6 +418,9 @@ function fieldsFrom(form: Form): ContractFields {
     number: form.number,
     reference: form.reference,
     counterparty: form.counterparty,
+    counterpartyAddress: form.counterpartyAddress,
+    counterpartyBusinessId: form.counterpartyBusinessId,
+    clientId: form.clientId,
     type: form.type,
     summary: form.summary,
     paymentTerms: form.paymentTerms,
@@ -613,7 +623,20 @@ function ContractModal({
           <Field label={label('title', t('contracts.field.title'))} value={form.title} onChange={(e) => set('title')(e.target.value)} placeholder={t('contracts.phTitle')} wrapperClassName="sm:col-span-2" />
           <Field label={label('number', t('contracts.field.number'))} value={form.number} onChange={(e) => set('number')(e.target.value)} />
           <Field label={label('reference', t('contracts.field.reference'))} value={form.reference} onChange={(e) => set('reference')(e.target.value)} />
-          <Field label={label('counterparty', t('contracts.field.counterparty'))} value={form.counterparty} onChange={(e) => set('counterparty')(e.target.value)} placeholder={t('contracts.phCounterparty')} />
+          <ClientPicker
+            form={form}
+            fromDocument={fromDoc('counterparty')}
+            matched={fromDoc('clientId')}
+            onPick={(client) => {
+              set('clientId')(client.id)
+              // The name the document gives stays; it is shown beside the client it was linked to.
+              if (!form.counterparty) set('counterparty')(client.fullName)
+            }}
+            onType={(text) => {
+              set('clientId')('')
+              set('counterparty')(text)
+            }}
+          />
           <Field label={label('type', t('contracts.field.type'))} value={form.type} onChange={(e) => set('type')(e.target.value)} placeholder={t('contracts.phType')} />
         </Section>
 
@@ -640,6 +663,198 @@ function ContractModal({
           <Field label={label('signatories', t('contracts.field.signatories'))} value={form.signatories} onChange={(e) => set('signatories')(e.target.value)} />
           <TextArea label={t('contracts.field.notes')} rows={2} value={form.notes} onChange={(e) => set('notes')(e.target.value)} />
         </Section>
+      </div>
+    </Modal>
+  )
+}
+
+/** Words of a name to search by: no accents, no punctuation. */
+function searchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+/**
+ * The client the contract is with: one of the catalogue's clients, picked or found when the document
+ * was read, or a name typed here that can be added as a new client on the spot.
+ */
+function ClientPicker({
+  form,
+  fromDocument,
+  matched,
+  onPick,
+  onType,
+}: {
+  form: Form
+  fromDocument: boolean
+  matched: boolean
+  onPick: (client: ClientRecord) => void
+  onType: (text: string) => void
+}) {
+  const { t } = useI18n()
+  const { clients } = useAppData()
+  const [open, setOpen] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const linked = clients.find((client) => client.id === form.clientId) || null
+  const typed = form.counterparty.trim()
+
+  const options = useMemo(() => {
+    const words = searchText(typed).split(' ').filter(Boolean)
+    const sorted = [...clients].sort((a, b) => a.fullName.localeCompare(b.fullName))
+    const found = words.length ? sorted.filter((client) => words.every((word) => searchText(`${client.fullName} ${client.businessId || ''}`).includes(word))) : sorted
+    return found.slice(0, 8)
+  }, [clients, typed])
+
+  const labelText = [t('contracts.client'), matched ? t('contracts.matched') : fromDocument ? t('contracts.fromDocument') : ''].filter(Boolean).join(' · ')
+
+  return (
+    <div className="mb-5 sm:col-span-2">
+      <span className="mb-2.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{labelText}</span>
+      {linked ? (
+        <div className="flex items-center gap-3 rounded-xl border border-brand/25 bg-brand/5 px-3.5 py-2.5">
+          <Users className="h-4 w-4 shrink-0 text-brand" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-brand-ink">{linked.fullName}</span>
+            {typed && searchText(typed) !== searchText(linked.fullName) ? (
+              <span className="block truncate text-xs text-brand-ink/50">{t('contracts.inDocument', { name: typed })}</span>
+            ) : null}
+          </span>
+          <button type="button" onClick={() => onType(typed)} className="shrink-0 text-xs font-semibold text-brand hover:underline">
+            {t('contracts.changeClient')}
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-ink/35" />
+          <input
+            value={form.counterparty}
+            onChange={(e) => {
+              onType(e.target.value)
+              setOpen(true)
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+            placeholder={t('contracts.pickClient')}
+            className="w-full rounded-xl border border-brand-ink/10 bg-white py-2.5 pl-10 pr-3.5 text-sm text-brand-ink outline-none transition placeholder:text-brand-ink/40 focus:border-brand focus:ring-2 focus:ring-brand/15"
+          />
+          {open ? (
+            <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-72 overflow-auto rounded-xl border border-brand-ink/10 bg-white py-1 shadow-lg">
+              {options.map((client) => (
+                <button
+                  key={client.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onPick(client)
+                    setOpen(false)
+                  }}
+                  className="block w-full px-3.5 py-2 text-left text-sm hover:bg-brand/6"
+                >
+                  <span className="block truncate font-semibold text-brand-ink">{client.fullName}</span>
+                  {client.address || client.businessId ? <span className="block truncate text-xs text-brand-ink/45">{[client.businessId, client.address].filter(Boolean).join(' · ')}</span> : null}
+                </button>
+              ))}
+              {options.length === 0 ? <p className="px-3.5 py-2 text-sm text-brand-ink/50">{t('contracts.noClients')}</p> : null}
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setOpen(false)
+                  setAdding(true)
+                }}
+                className="flex w-full items-center gap-2 border-t border-brand-ink/8 px-3.5 py-2.5 text-left text-sm font-semibold text-brand hover:bg-brand/6"
+              >
+                <UserPlus className="h-4 w-4 shrink-0" />
+                <span className="truncate">{typed ? t('contracts.newClientNamed', { name: typed }) : t('contracts.newClient')}</span>
+              </button>
+            </div>
+          ) : null}
+          {!open && typed ? (
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-brand-ink/55">
+              {t('contracts.notInClients', { name: typed })}
+              <button type="button" onClick={() => setAdding(true)} className="font-semibold text-brand hover:underline">
+                {t('contracts.register')}
+              </button>
+            </p>
+          ) : null}
+        </div>
+      )}
+      {adding ? (
+        <NewClientModal
+          initial={{ fullName: typed, address: form.counterpartyAddress, businessId: form.counterpartyBusinessId }}
+          onClose={() => setAdding(false)}
+          onSaved={(client) => {
+            setAdding(false)
+            onPick(client)
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function NewClientModal({
+  initial,
+  onClose,
+  onSaved,
+}: {
+  initial: { fullName: string; address: string; businessId: string }
+  onClose: () => void
+  onSaved: (client: ClientRecord) => void
+}) {
+  const { t } = useI18n()
+  const { createClient } = useAppData()
+  const [client, setClient] = useState({ ...initial, email: '', phone: '' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const set = (key: keyof typeof client) => (e: { target: { value: string } }) => setClient((current) => ({ ...current, [key]: e.target.value }))
+
+  async function save() {
+    const payload = composeClient(client)
+    if (!payload.fullName) {
+      setError(t('clients.validationName'))
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      onSaved(await createClient(payload as Omit<ClientRecord, 'id' | 'createdAt'>))
+    } catch (err) {
+      setError(errorText(t, err))
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal
+      title={t('contracts.newClientTitle')}
+      size="sm"
+      onClose={onClose}
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="button" onClick={() => void save()} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      <div className="p-6">
+        {error ? <p className="mb-4 rounded-xl bg-[#F8E8E4] px-4 py-3 text-sm text-[#B0472F]">{error}</p> : null}
+        <Field label={t('newInvoice.fullName')} value={client.fullName} onChange={set('fullName')} autoFocus />
+        <Field label={t('newInvoice.address')} value={client.address} onChange={set('address')} />
+        <Field label={`${t('docs.businessId')} (${t('common.optional')})`} value={client.businessId} onChange={set('businessId')} />
+        <div className="grid gap-x-4 sm:grid-cols-2">
+          <Field label={`${t('docs.email')} (${t('common.optional')})`} type="email" value={client.email} onChange={set('email')} />
+          <Field label={`${t('newInvoice.phone')} (${t('common.optional')})`} value={client.phone} onChange={set('phone')} />
+        </div>
       </div>
     </Modal>
   )
