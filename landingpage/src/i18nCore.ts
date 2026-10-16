@@ -853,6 +853,8 @@ export const translations = {
       limit: 'Plani falas lejon 10 fatura në muaj. Kalo në Premium për ta importuar këtë skedar.',
     },
     pdf: {
+      invoiceTitle: 'Faturë',
+      monthNames: 'janar,shkurt,mars,prill,maj,qershor,korrik,gusht,shtator,tetor,nëntor,dhjetor',
       contractName: 'Emri i kontratës',
       contractNumber: 'Numri i kontratës',
       invoiceLabel: 'Faturë',
@@ -1749,6 +1751,8 @@ export const translations = {
       limit: 'The free plan allows 10 invoices a month. Upgrade to Premium to import this file.',
     },
     pdf: {
+      invoiceTitle: 'Invoice',
+      monthNames: '',
       contractName: 'Contract name',
       contractNumber: 'Contract number',
       invoiceLabel: 'Invoice',
@@ -2645,6 +2649,8 @@ export const translations = {
       limit: 'Il piano gratuito consente 10 fatture al mese. Passa a Premium per importare questo file.',
     },
     pdf: {
+      invoiceTitle: 'Fattura',
+      monthNames: 'gennaio,febbraio,marzo,aprile,maggio,giugno,luglio,agosto,settembre,ottobre,novembre,dicembre',
       contractName: 'Contratto',
       contractNumber: 'N. contratto',
       invoiceLabel: 'Fattura',

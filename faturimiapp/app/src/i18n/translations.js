@@ -410,6 +410,8 @@ export const translations = {
       categoryOther: 'Tjetër',
     },
     pdf: {
+      invoiceTitle: 'Faturë',
+      monthNames: 'janar,shkurt,mars,prill,maj,qershor,korrik,gusht,shtator,tetor,nëntor,dhjetor',
       contractName: 'Emri i kontratës',
       contractNumber: 'Numri i kontratës',
       invoiceLabel: 'Fatura / Invoice',
@@ -898,6 +900,8 @@ export const translations = {
       categoryOther: 'Other',
     },
     pdf: {
+      invoiceTitle: 'Invoice',
+      monthNames: '',
       contractName: 'Contract name',
       contractNumber: 'Contract number',
       invoiceLabel: 'Fatura / Invoice',
@@ -1386,6 +1390,8 @@ export const translations = {
       categoryOther: 'Altro',
     },
     pdf: {
+      invoiceTitle: 'Fattura',
+      monthNames: 'gennaio,febbraio,marzo,aprile,maggio,giugno,luglio,agosto,settembre,ottobre,novembre,dicembre',
       contractName: 'Contratto',
       contractNumber: 'N. contratto',
       invoiceLabel: 'Fattura',
