@@ -4,7 +4,8 @@
 #   Logs:      journalctl -u nextinvoice-backup
 # Dumps with pg_dump (custom format) inside the db container, reads the whole dump back with pg_restore,
 # then uploads it with S3 server-side encryption and checks the size S3 stored. Nothing is uploaded
-# unless every check passed. The newest $KEEP_LOCAL dumps also stay on this disk for quick restores.
+# unless every check passed. S3 is the only copy: once the upload is confirmed, nothing stays on this disk
+# (a dump whose upload failed is kept here until the next good run).
 # AWS keys: /root/.aws (profile mynextinvoice-backup), entered on the server, never in git.
 # Restoring: deploy/BACKUP-RESTORE.md.
 set -euo pipefail
@@ -18,7 +19,6 @@ CONTAINER=nextinvoice-db
 DB=nextinvoice
 DB_USER=nextinvoice
 LOCAL_DIR="${BACKUP_DIR:-/opt/nextinvoice/backups}"
-KEEP_LOCAL=3
 MIN_FREE_MB=2048
 # The dump is ~88 MB (October 2026); anything under this means the dump went wrong.
 MIN_BYTES=1000000
@@ -67,8 +67,6 @@ upload() {
 upload "$LOCAL_DIR/$NAME" || { echo "Upload failed; the dump is kept at $LOCAL_DIR/$NAME."; exit 1; }
 upload "$LOCAL_DIR/$NAME.sha256" || { echo "Checksum upload failed."; exit 1; }
 
-# Only after a good upload: keep the newest $KEEP_LOCAL dumps on this disk.
-ls -1t "$LOCAL_DIR"/nextinvoice-*.dump | tail -n +$((KEEP_LOCAL + 1)) | while read -r old; do
-  rm -f "$old" "$old.sha256"
-done
+# Only after a good upload: this dump and any older one left by a failed upload are now covered by S3.
+rm -f "$LOCAL_DIR"/nextinvoice-*.dump "$LOCAL_DIR"/nextinvoice-*.dump.sha256
 echo "Backup finished."

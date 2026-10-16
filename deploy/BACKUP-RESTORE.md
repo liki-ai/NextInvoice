@@ -13,7 +13,7 @@ Production database: PostgreSQL 17 in the container `nextinvoice-db` on `root@15
 | Format | `pg_dump -Fc` (PostgreSQL custom format, compressed), about 90 MB |
 | Name | `nextinvoice-YYYY-MM-DDTHHMMSSZ.dump` (UTC) plus `.dump.sha256` |
 | S3 | `s3://tretek-mynextinvoice-db-backups/mynextinvoice/production/database/`, region `eu-north-1`, SSE-S3 (AES256) |
-| On the server | newest 3 dumps in `/opt/nextinvoice/backups/` (root only) |
+| On the server | nothing once the upload is confirmed (since 2026-10-16, the user's choice); a dump whose upload failed stays in `/opt/nextinvoice/backups/` until the next good run |
 | AWS keys | `/root/.aws/credentials`, profile `mynextinvoice-backup` (root, 0600); never in git |
 
 Each run: checks free disk space, dumps into a hidden temporary folder, reads the whole dump back with
