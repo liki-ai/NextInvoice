@@ -26,7 +26,7 @@ export function resolveAccent(template: InvoiceTemplateId, accentColor?: string 
 
 type PdfInvoice = Pick<
   Invoice,
-  'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'taxRate' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency'
+  'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'taxRate' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency' | 'unsigned'
 >
 
 export type InvoiceHtmlInput = {
@@ -123,8 +123,9 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
     dueText: invoice.dueDate || pdfLabels.onReceipt || '',
     exportNote: resolveExportNote(company),
     logo: imageSrc(company.logoData),
-    signature: imageSrc(company.signatureData),
-    stamp: imageSrc(company.stampData),
+    // Printed to be signed and stamped by hand: neither image goes on the page.
+    signature: invoice.unsigned ? '' : imageSrc(company.signatureData),
+    stamp: invoice.unsigned ? '' : imageSrc(company.stampData),
     hasPayment: Boolean(company.bankName || company.iban || company.swift),
   }
 }

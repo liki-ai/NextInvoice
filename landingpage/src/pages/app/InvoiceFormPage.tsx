@@ -27,6 +27,7 @@ import { cn } from '../../lib/cn'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
 import { TemplateSwitch } from '../../components/TemplateSwitch'
+import { UnsignedToggle } from '../../components/UnsignedToggle'
 import { clientDisplayName, clientMatchesQuery, composeClient, findMatchingClient, frequentClients } from '../../lib/client'
 import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catalog'
 import { fileToSupportedImageDataUrl } from '../../lib/proof'
@@ -82,6 +83,7 @@ export function InvoiceFormPage() {
     discount: String(existing?.discount ?? '0'),
     taxRate: String(existing?.taxRate ?? '0'),
     pricesIncludeTax: Boolean(existing?.pricesIncludeTax),
+    unsigned: Boolean(existing?.unsigned),
     notes: existing?.notes || '',
     canSaveOnly: true,
   })
@@ -97,6 +99,7 @@ export function InvoiceFormPage() {
   const [dueDate, setDueDate] = useState(() => existing?.dueDate || '')
   const [items, setItems] = useState<InvoiceItem[]>(() => (existing?.items?.length ? formItems(existing) : [emptyItem()]))
   // Prices typed with VAT included: the total is what was typed and the subtotal is worked back from it.
+  const [unsigned, setUnsigned] = useState(() => Boolean(existing?.unsigned))
   const [pricesIncludeTax, setPricesIncludeTax] = useState(() =>
     existing ? Boolean(existing.pricesIncludeTax) : localStorage.getItem('nextinvoice.pricesIncludeTax') === '1',
   )
@@ -144,6 +147,7 @@ export function InvoiceFormPage() {
     setDueDate(existing.dueDate || '')
     setItems(existing.items?.length ? formItems(existing) : [emptyItem()])
     setPricesIncludeTax(Boolean(existing.pricesIncludeTax))
+    setUnsigned(Boolean(existing.unsigned))
     setDiscount(String(existing.discount ?? '0'))
     taxTouched.current = true
     setTaxRate(String(existing.taxRate ?? 0))
@@ -165,6 +169,7 @@ export function InvoiceFormPage() {
     setDueDate(draftCopy.dueDate || '')
     setItems(formItems(source, true))
     setPricesIncludeTax(Boolean(source.pricesIncludeTax))
+    setUnsigned(Boolean(source.unsigned))
     setDiscount(String(source.discount ?? '0'))
     taxTouched.current = true
     setTaxRate(String(source.taxRate ?? 0))
@@ -233,6 +238,7 @@ export function InvoiceFormPage() {
     dueDate,
     items: netItems,
     pricesIncludeTax,
+    unsigned,
     discount,
     taxRate,
     notes,
@@ -261,6 +267,7 @@ export function InvoiceFormPage() {
         clientId: snap.clientId,
         items: validItems,
         pricesIncludeTax: snap.pricesIncludeTax,
+        unsigned: snap.unsigned,
         discount: snap.discount,
         taxRate: totals.taxRate,
         notes: snap.notes,
@@ -290,7 +297,7 @@ export function InvoiceFormPage() {
       void persistDraft()
     }, 700)
     return () => window.clearTimeout(timer)
-  }, [canSaveOnly, clientId, client, items, pricesIncludeTax, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
+  }, [canSaveOnly, clientId, client, items, pricesIncludeTax, unsigned, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
 
   const draft = useMemo(
     () => ({
@@ -302,10 +309,11 @@ export function InvoiceFormPage() {
       discount,
       taxRate: appliedTaxRate,
       notes,
+      unsigned,
       subtotal,
       total,
     }),
-    [invoiceNumber, date, dueDate, client, netItems, discount, appliedTaxRate, notes, subtotal, total],
+    [invoiceNumber, date, dueDate, client, netItems, discount, appliedTaxRate, notes, unsigned, subtotal, total],
   )
 
   const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
@@ -439,6 +447,7 @@ export function InvoiceFormPage() {
       clientId,
       items: validItems,
       pricesIncludeTax,
+      unsigned,
       discount,
       taxRate: totals.taxRate,
       notes,
@@ -519,6 +528,8 @@ export function InvoiceFormPage() {
           dueDate: payload.dueDate,
           reason: correctReason.trim() || (amountsChanged ? '' : t('docs.dateChangeReason')),
         })
+        // A correction carries the figures only; printing without signature and stamp is set apart.
+        if (Boolean(existing?.unsigned) !== payload.unsigned) await updateInvoice(invoiceId, { unsigned: payload.unsigned })
         savedId = invoiceId
       } else if (savedId) {
         await updateInvoice(savedId, payload)
@@ -867,6 +878,7 @@ export function InvoiceFormPage() {
               ) : null}
             </div>
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <UnsignedToggle checked={unsigned} onChange={setUnsigned} />
           </Card>
           <Card>
             <div className="space-y-2 text-sm">
@@ -1011,6 +1023,7 @@ export function InvoiceFormPage() {
           }
         >
           <TemplateSwitch value={template} onChange={setTemplateChoice} />
+          <UnsignedToggle checked={unsigned} onChange={setUnsigned} className="border-b border-brand-ink/8 bg-white px-5 py-3" />
           <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
         </Modal>
       ) : null}

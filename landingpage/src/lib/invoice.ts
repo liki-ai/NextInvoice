@@ -45,6 +45,8 @@ export type Invoice = {
    * the form to show them with VAT again when the invoice is reopened.
    */
   pricesIncludeTax?: boolean
+  /** Printed without the company's signature and stamp, to be signed and stamped by hand. */
+  unsigned?: boolean
   notes?: string
   subtotal: number
   total: number
@@ -391,6 +393,7 @@ export function draftFromInvoice(source: Invoice, existing: Invoice[]): Omit<Inv
     discount: source.discount,
     taxRate: source.taxRate || 0,
     pricesIncludeTax: Boolean(source.pricesIncludeTax),
+    unsigned: Boolean(source.unsigned),
     notes: source.notes || '',
     subtotal: source.subtotal,
     total: source.total,

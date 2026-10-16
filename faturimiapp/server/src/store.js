@@ -724,6 +724,8 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
       ...(partial.dueDate !== undefined ? { dueDate: partial.dueDate } : {}),
       ...(partial.notes !== undefined ? { notes: partial.notes } : {}),
       ...(partial.sent !== undefined ? { sent: partial.sent } : {}),
+      // Printing without signature and stamp changes no figure, so an issued invoice may change it.
+      ...(partial.unsigned !== undefined ? { unsigned: Boolean(partial.unsigned) } : {}),
       ...(partial.sentAt !== undefined ? { sentAt: partial.sentAt } : {}),
       ...(partial.status === 'paid' || partial.status === 'unpaid' ? { status: partial.status } : {}),
       ...(partial.proofUri !== undefined ? { proofUri: partial.proofUri } : {}),
@@ -1335,6 +1337,7 @@ function sharedInvoice(token) {
         discount: invoice.discount,
         taxRate: invoice.taxRate,
         notes: invoice.notes || '',
+        unsigned: Boolean(invoice.unsigned),
         subtotal: invoice.subtotal,
         total: invoice.total,
         amountPaid: invoice.amountPaid,
