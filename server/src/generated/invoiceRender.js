@@ -484,7 +484,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$4 = {
+const sq$5 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -748,7 +748,7 @@ const sq$4 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$4 = {
+const en$5 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -1012,8 +1012,8 @@ const en$4 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$4 = {
-	...en$4,
+const it$5 = {
+	...en$5,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1279,17 +1279,17 @@ const it$4 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$4,
+		...sq$5,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$4,
+		...en$5,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$4,
+		...it$5,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1301,7 +1301,7 @@ const financeNav = {
 };
 //#endregion
 //#region src/i18nMercury.ts
-const sq$3 = {
+const sq$4 = {
 	tab: "Mercury",
 	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
 	settings: "Lidhja me Mercury",
@@ -1395,7 +1395,7 @@ const sq$3 = {
 		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
 	}
 };
-const en$3 = {
+const en$4 = {
 	tab: "Mercury",
 	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
 	settings: "Mercury connection",
@@ -1490,10 +1490,10 @@ const en$3 = {
 	}
 };
 const mercuryTexts = {
-	sq: sq$3,
-	en: en$3,
+	sq: sq$4,
+	en: en$4,
 	it: {
-		...en$3,
+		...en$4,
 		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
 		settings: "Collegamento Mercury",
 		syncNow: "Aggiorna",
@@ -1544,7 +1544,7 @@ const mercuryTexts = {
 };
 //#endregion
 //#region src/i18nProjectDetail.ts
-const sq$2 = {
+const sq$3 = {
 	back: "Të gjitha projektet",
 	addProject: "Shto projekt",
 	projectName: "Emri, p.sh. TeamPlaner",
@@ -1607,7 +1607,7 @@ const sq$2 = {
 		costPerHour: "Kosto / orë"
 	}
 };
-const en$2 = {
+const en$3 = {
 	back: "All projects",
 	addProject: "Add project",
 	projectName: "Name, e.g. TeamPlaner",
@@ -1671,10 +1671,10 @@ const en$2 = {
 	}
 };
 const projectDetailTexts = {
-	sq: sq$2,
-	en: en$2,
+	sq: sq$3,
+	en: en$3,
 	it: {
-		...en$2,
+		...en$3,
 		back: "Tutti i progetti",
 		addProject: "Aggiungi progetto",
 		projectName: "Nome, es. TeamPlaner",
@@ -1696,7 +1696,7 @@ const projectDetailTexts = {
 		monthlyTitle: "Mese per mese: ricavi contro costi",
 		teamTitle: "Squadra ({count})",
 		col: {
-			...en$2.col,
+			...en$3.col,
 			month: "Mese",
 			hours: "Ore",
 			cost: "Costo",
@@ -2472,6 +2472,284 @@ const slackTexts = {
 		}
 	}
 };
+const contractsTexts = {
+	sq: {
+		nav: "Kontratat",
+		title: "Kontratat",
+		intro: "Kontratat e kompanisë me dokumentin e nënshkruar. Ngarko PDF ose Word dhe emri, numri, palët, datat dhe vlera plotësohen vetë.",
+		add: "Kontratë e re",
+		empty: "Nuk ka kontrata ende.",
+		emptyHint: "Shto kontratën e parë duke ngarkuar dokumentin e saj.",
+		tabActive: "Aktive",
+		tabCompleted: "Të përfunduara",
+		tabAll: "Të gjitha",
+		colContract: "Kontrata",
+		colPeriod: "Kohëzgjatja",
+		colValue: "Vlera",
+		colStatus: "Statusi",
+		statActive: "{count} aktive",
+		statExpiring: "{count} skadojnë brenda 30 ditëve",
+		statExpired: "{count} kanë skaduar pa u shënuar të përfunduara",
+		statValue: "Vlera e kontratave aktive: {amount}",
+		status: {
+			active: "Aktive",
+			expiring: "Skadon së shpejti",
+			expired: "Ka skaduar",
+			upcoming: "Nuk ka filluar",
+			completed: "Përfunduar"
+		},
+		daysLeft: "edhe {days} ditë",
+		endedAgo: "skadoi para {days} ditësh",
+		completedOn: "u përfundua më {date}",
+		from: "nga {date}",
+		until: "deri më {date}",
+		perMonth: "{amount} / muaj",
+		withVat: "me TVSH",
+		withoutVat: "pa TVSH",
+		noFile: "Pa dokument",
+		reading: "Po lexohet…",
+		preview: "Shiko dokumentin",
+		download: "Shkarko",
+		complete: "Shëno të përfunduar",
+		completeConfirm: "Të shënohet kontrata \"{title}\" si e përfunduar?",
+		reopen: "Rikthe si aktive",
+		edit: "Ndrysho",
+		delete: "Fshij",
+		deleteConfirm: "Të fshihet kontrata \"{title}\" bashkë me dokumentin e saj? Kjo nuk kthehet më.",
+		newTitle: "Kontratë e re",
+		editTitle: "Ndrysho kontratën",
+		drop: "Tërhiq dokumentin këtu ose kliko për ta zgjedhur",
+		dropHint: "PDF (edhe i skanuar), Word (.docx, .doc), foto ose tekst, deri në 25 MB.",
+		replaceFile: "Zëvendëso dokumentin",
+		uploading: "Po ngarkohet dokumenti…",
+		readingLong: "Po lexohet dokumenti. Të dhënat plotësohen vetë; një kontratë e skanuar me shumë faqe merr deri në një minutë.",
+		readDone: "Të dhënat u morën nga dokumenti. Kontrolloji para se ta ruash.",
+		readFailed: "Dokumenti nuk u lexua dot. Plotëso të dhënat me dorë ose provo përsëri.",
+		readUnsupported: "Ky lloj dokumenti ruhet, por nuk lexohet automatikisht. Plotëso të dhënat me dorë.",
+		readAgain: "Lexoje përsëri",
+		fromDocument: "nga dokumenti",
+		sectionMain: "Kontrata",
+		sectionDates: "Datat",
+		sectionValue: "Vlera dhe pagesa",
+		sectionMore: "Të tjera",
+		field: {
+			title: "Emri i kontratës",
+			number: "Numri i kontratës",
+			reference: "Nr. identifikues / i brendshëm",
+			counterparty: "Pala tjetër",
+			type: "Lloji",
+			signedDate: "Nënshkruar më",
+			startDate: "Fillon më",
+			endDate: "Përfundon më",
+			value: "Vlera totale",
+			monthlyValue: "Vlera mujore",
+			currency: "Monedha",
+			vat: "TVSH",
+			summary: "Përshkrimi",
+			paymentTerms: "Kushtet e pagesës",
+			signatories: "Nënshkruesit",
+			notes: "Shënime"
+		},
+		vatIncluded: "Me TVSH",
+		vatExcluded: "Pa TVSH",
+		vatUnknown: "Pa përcaktuar",
+		phTitle: "p.sh. Mirëmbajtja e sistemit të faturimit",
+		phType: "p.sh. Kontratë publike kornizë",
+		phCounterparty: "Klienti ose autoriteti kontraktues",
+		noPreview: "Ky dokument nuk shfaqet dot këtu. Shkarkoje për ta hapur.",
+		previewFailed: "Dokumenti nuk u hap. Provo përsëri.",
+		err: {
+			CONTRACT_TITLE: "Shkruaj emrin e kontratës ose ngarko dokumentin e saj.",
+			LIMIT_FILE_SIZE: "Dokumenti është më i madh se 25 MB.",
+			CONTRACTS_FULL: "Lista e kontratave është plot.",
+			FILE_REQUIRED: "Zgjidh një dokument."
+		}
+	},
+	en: {
+		nav: "Contracts",
+		title: "Contracts",
+		intro: "The company’s contracts with their signed documents. Upload a PDF or Word file and the name, number, parties, dates and value fill in by themselves.",
+		add: "New contract",
+		empty: "No contracts yet.",
+		emptyHint: "Add the first contract by uploading its document.",
+		tabActive: "Active",
+		tabCompleted: "Completed",
+		tabAll: "All",
+		colContract: "Contract",
+		colPeriod: "Term",
+		colValue: "Value",
+		colStatus: "Status",
+		statActive: "{count} active",
+		statExpiring: "{count} end within 30 days",
+		statExpired: "{count} have ended but are not marked completed",
+		statValue: "Value of active contracts: {amount}",
+		status: {
+			active: "Active",
+			expiring: "Ending soon",
+			expired: "Ended",
+			upcoming: "Not started",
+			completed: "Completed"
+		},
+		daysLeft: "{days} days left",
+		endedAgo: "ended {days} days ago",
+		completedOn: "completed on {date}",
+		from: "from {date}",
+		until: "until {date}",
+		perMonth: "{amount} / month",
+		withVat: "incl. VAT",
+		withoutVat: "excl. VAT",
+		noFile: "No document",
+		reading: "Reading…",
+		preview: "View document",
+		download: "Download",
+		complete: "Mark completed",
+		completeConfirm: "Mark the contract \"{title}\" as completed?",
+		reopen: "Make active again",
+		edit: "Edit",
+		delete: "Delete",
+		deleteConfirm: "Delete the contract \"{title}\" and its document? This cannot be undone.",
+		newTitle: "New contract",
+		editTitle: "Edit contract",
+		drop: "Drop the document here or click to choose it",
+		dropHint: "PDF (scanned too), Word (.docx, .doc), photo or text, up to 25 MB.",
+		replaceFile: "Replace document",
+		uploading: "Uploading the document…",
+		readingLong: "Reading the document. The fields fill in by themselves; a scanned contract with many pages takes up to a minute.",
+		readDone: "The fields were taken from the document. Check them before saving.",
+		readFailed: "The document could not be read. Fill in the fields by hand or try again.",
+		readUnsupported: "This kind of document is kept but not read automatically. Fill in the fields by hand.",
+		readAgain: "Read again",
+		fromDocument: "from the document",
+		sectionMain: "Contract",
+		sectionDates: "Dates",
+		sectionValue: "Value and payment",
+		sectionMore: "More",
+		field: {
+			title: "Contract name",
+			number: "Contract number",
+			reference: "Identification / internal no.",
+			counterparty: "Other party",
+			type: "Type",
+			signedDate: "Signed on",
+			startDate: "Starts on",
+			endDate: "Ends on",
+			value: "Total value",
+			monthlyValue: "Monthly value",
+			currency: "Currency",
+			vat: "VAT",
+			summary: "Description",
+			paymentTerms: "Payment terms",
+			signatories: "Signed by",
+			notes: "Notes"
+		},
+		vatIncluded: "Incl. VAT",
+		vatExcluded: "Excl. VAT",
+		vatUnknown: "Not stated",
+		phTitle: "e.g. Billing system maintenance",
+		phType: "e.g. Public framework contract",
+		phCounterparty: "The client or contracting authority",
+		noPreview: "This document cannot be shown here. Download it to open it.",
+		previewFailed: "The document did not open. Try again.",
+		err: {
+			CONTRACT_TITLE: "Enter the contract name or upload its document.",
+			LIMIT_FILE_SIZE: "The document is larger than 25 MB.",
+			CONTRACTS_FULL: "The list of contracts is full.",
+			FILE_REQUIRED: "Choose a document."
+		}
+	},
+	it: {
+		nav: "Contratti",
+		title: "Contratti",
+		intro: "I contratti dell’azienda con il documento firmato. Carica un PDF o un Word e nome, numero, parti, date e valore si compilano da soli.",
+		add: "Nuovo contratto",
+		empty: "Ancora nessun contratto.",
+		emptyHint: "Aggiungi il primo contratto caricando il suo documento.",
+		tabActive: "Attivi",
+		tabCompleted: "Conclusi",
+		tabAll: "Tutti",
+		colContract: "Contratto",
+		colPeriod: "Durata",
+		colValue: "Valore",
+		colStatus: "Stato",
+		statActive: "{count} attivi",
+		statExpiring: "{count} scadono entro 30 giorni",
+		statExpired: "{count} scaduti ma non segnati come conclusi",
+		statValue: "Valore dei contratti attivi: {amount}",
+		status: {
+			active: "Attivo",
+			expiring: "In scadenza",
+			expired: "Scaduto",
+			upcoming: "Non iniziato",
+			completed: "Concluso"
+		},
+		daysLeft: "ancora {days} giorni",
+		endedAgo: "scaduto da {days} giorni",
+		completedOn: "concluso il {date}",
+		from: "dal {date}",
+		until: "fino al {date}",
+		perMonth: "{amount} / mese",
+		withVat: "IVA incl.",
+		withoutVat: "IVA escl.",
+		noFile: "Nessun documento",
+		reading: "Lettura…",
+		preview: "Vedi documento",
+		download: "Scarica",
+		complete: "Segna come concluso",
+		completeConfirm: "Segnare il contratto \"{title}\" come concluso?",
+		reopen: "Rendi di nuovo attivo",
+		edit: "Modifica",
+		delete: "Elimina",
+		deleteConfirm: "Eliminare il contratto \"{title}\" e il suo documento? Non si può annullare.",
+		newTitle: "Nuovo contratto",
+		editTitle: "Modifica contratto",
+		drop: "Trascina qui il documento o clicca per sceglierlo",
+		dropHint: "PDF (anche scansionato), Word (.docx, .doc), foto o testo, fino a 25 MB.",
+		replaceFile: "Sostituisci documento",
+		uploading: "Caricamento del documento…",
+		readingLong: "Lettura del documento. I campi si compilano da soli; un contratto scansionato di molte pagine richiede fino a un minuto.",
+		readDone: "I campi sono stati presi dal documento. Controllali prima di salvare.",
+		readFailed: "Il documento non è stato letto. Compila i campi a mano o riprova.",
+		readUnsupported: "Questo tipo di documento viene conservato ma non letto automaticamente. Compila i campi a mano.",
+		readAgain: "Leggi di nuovo",
+		fromDocument: "dal documento",
+		sectionMain: "Contratto",
+		sectionDates: "Date",
+		sectionValue: "Valore e pagamento",
+		sectionMore: "Altro",
+		field: {
+			title: "Nome del contratto",
+			number: "Numero del contratto",
+			reference: "N. identificativo / interno",
+			counterparty: "Altra parte",
+			type: "Tipo",
+			signedDate: "Firmato il",
+			startDate: "Inizia il",
+			endDate: "Termina il",
+			value: "Valore totale",
+			monthlyValue: "Valore mensile",
+			currency: "Valuta",
+			vat: "IVA",
+			summary: "Descrizione",
+			paymentTerms: "Condizioni di pagamento",
+			signatories: "Firmatari",
+			notes: "Note"
+		},
+		vatIncluded: "IVA inclusa",
+		vatExcluded: "IVA esclusa",
+		vatUnknown: "Non indicata",
+		phTitle: "es. Manutenzione del sistema di fatturazione",
+		phType: "es. Contratto quadro pubblico",
+		phCounterparty: "Il cliente o l’ente appaltante",
+		noPreview: "Questo documento non si può mostrare qui. Scaricalo per aprirlo.",
+		previewFailed: "Il documento non si è aperto. Riprova.",
+		err: {
+			CONTRACT_TITLE: "Inserisci il nome del contratto o carica il suo documento.",
+			LIMIT_FILE_SIZE: "Il documento supera i 25 MB.",
+			CONTRACTS_FULL: "L’elenco dei contratti è pieno.",
+			FILE_REQUIRED: "Scegli un documento."
+		}
+	}
+};
 //#endregion
 //#region src/i18nCore.ts
 const LANGS = [
@@ -2501,6 +2779,7 @@ const translations = {
 		projectDetail: projectDetailTexts.sq,
 		recurring: recurringTexts.sq,
 		slack: slackTexts.sq,
+		contracts: contractsTexts.sq,
 		nav: {
 			finance: financeNav.sq,
 			recurring: recurringNav.sq,
@@ -3450,6 +3729,7 @@ const translations = {
 		projectDetail: projectDetailTexts.en,
 		recurring: recurringTexts.en,
 		slack: slackTexts.en,
+		contracts: contractsTexts.en,
 		nav: {
 			finance: financeNav.en,
 			recurring: recurringNav.en,
@@ -4399,6 +4679,7 @@ const translations = {
 		projectDetail: projectDetailTexts.it,
 		recurring: recurringTexts.it,
 		slack: slackTexts.it,
+		contracts: contractsTexts.it,
 		nav: {
 			finance: financeNav.it,
 			recurring: recurringNav.it,
