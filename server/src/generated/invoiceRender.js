@@ -1546,6 +1546,11 @@ const mercuryTexts = {
 //#region src/i18nProjectDetail.ts
 const sq$1 = {
 	back: "Të gjitha projektet",
+	addProject: "Shto projekt",
+	projectName: "Emri, p.sh. TeamPlaner",
+	projectExists: "Ekziston",
+	addedByHand: "shtuar me dorë, pa orë",
+	removeProject: "Hiqe projektin",
 	details: "Detajet",
 	kind: {
 		client: "Projekt për klient",
@@ -1604,6 +1609,11 @@ const sq$1 = {
 };
 const en$1 = {
 	back: "All projects",
+	addProject: "Add project",
+	projectName: "Name, e.g. TeamPlaner",
+	projectExists: "Exists",
+	addedByHand: "added by hand, no hours",
+	removeProject: "Remove the project",
 	details: "Details",
 	kind: {
 		client: "Client project",
@@ -1666,6 +1676,11 @@ const projectDetailTexts = {
 	it: {
 		...en$1,
 		back: "Tutti i progetti",
+		addProject: "Aggiungi progetto",
+		projectName: "Nome, es. TeamPlaner",
+		projectExists: "Esiste",
+		addedByHand: "aggiunto a mano, senza ore",
+		removeProject: "Rimuovi il progetto",
 		details: "Dettagli",
 		kind: {
 			client: "Progetto per cliente",
