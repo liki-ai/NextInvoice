@@ -783,9 +783,19 @@ function matchStatement(statement, invoices, options = {}) {
 	const lineWords = statement.lines.map((line) => new Set(words(line.text)));
 	const frequency = /* @__PURE__ */ new Map();
 	for (const set of lineWords) for (const word of set) frequency.set(word, (frequency.get(word) || 0) + 1);
-	const common = (word) => (frequency.get(word) || 0) > Math.max(statement.lines.length * .15, 8);
+	const common = (word) => {
+		const seen = frequency.get(word) || 0;
+		return seen > Math.max(statement.lines.length * .15, 8) || statement.lines.length >= 4 && seen >= statement.lines.length * .5;
+	};
+	const nameWords = (entry) => words(entry.invoice.client?.fullName || "").filter((word) => !COMPANY_WORDS.has(word) && !/^\d+$/.test(word));
+	const clientsOfWord = /* @__PURE__ */ new Map();
 	for (const entry of entries) {
-		const all = words(entry.invoice.client?.fullName || "").filter((word) => !COMPANY_WORDS.has(word) && !/^\d+$/.test(word));
+		const key = entry.invoice.clientId || entry.invoice.client?.id || plain(entry.invoice.client?.fullName);
+		for (const word of nameWords(entry)) clientsOfWord.set(word, (clientsOfWord.get(word) || /* @__PURE__ */ new Set()).add(key));
+	}
+	const shared = (word) => (clientsOfWord.get(word)?.size || 0) > 1;
+	for (const entry of entries) {
+		const all = nameWords(entry).filter((word) => !shared(word));
 		const long = all.filter((word) => word.length >= 4 && !common(word));
 		entry.names = long.length > 0 ? long : all.filter((word) => word.length === 3 && !common(word));
 	}
@@ -942,8 +952,11 @@ function matchStatement(statement, invoices, options = {}) {
 		const notExact = leftovers.filter((left) => left.line.date === day).filter((left) => !exactFit(left));
 		for (const left of notExact) if (!onAccountFit(left)) unexplained.push(left);
 	}
+	const sameAmount = /* @__PURE__ */ new Map();
+	for (const left of unexplained) sameAmount.set(left.rest, (sameAmount.get(left.rest) || 0) + 1);
 	for (const left of unexplained) {
-		const fits = left.foreign || left.payers.size > 0 ? [] : entries.filter((entry) => entry.open > 0 && entry.date && entry.date <= left.line.date && Math.abs(entry.open - left.rest) <= 5 && entry.open === entry.start);
+		const series = (sameAmount.get(left.rest) || 0) > 1;
+		const fits = left.foreign || left.payers.size > 0 || series ? [] : entries.filter((entry) => entry.open > 0 && entry.date && entry.date <= left.line.date && Math.abs(entry.open - left.rest) <= 5 && entry.open === entry.start);
 		const clients = new Set(fits.map(clientKey));
 		const mentionsOther = entries.some((entry) => identifies(entry, left.set));
 		if (fits.length > 0 && clients.size === 1 && !mentionsOther) {
