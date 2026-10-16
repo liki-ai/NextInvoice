@@ -3,12 +3,19 @@ import { Link } from 'react-router-dom'
 import { BellRing, Check, CheckCircle2, Copy, Mail, Paperclip, Send } from 'lucide-react'
 import { useAppData } from '../context/AppDataContext'
 import { LANGS, translateIn, useI18n, type Lang } from '../i18n'
-import { daysOverdue, formatMoneyList, remainingOf, totalsByCurrency } from '../lib/document'
+import { daysOverdue, formatMoneyList, parseLooseDate, remainingOf, totalsByCurrency } from '../lib/document'
 import { formatMoney, formatStamp, lastReminderTime, owedInvoicesOfClient, type Invoice } from '../lib/invoice'
 import { displayCompanyValue } from '../lib/companySamples'
 import { mailErrorText, splitRecipients } from '../lib/mail'
 import { cn } from '../lib/cn'
 import { Button, Field, Modal, Select, TextArea } from './ui'
+
+/** An invoice's date as DD.MM.YYYY, however it was typed; as it stands when it cannot be read. */
+function letterDate(value?: string) {
+  const date = parseLooseDate(value)
+  if (!date) return String(value || '')
+  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`
+}
 
 /** Above this many invoices the server sends the reminder without the PDFs. */
 const PDF_MAX = 10
@@ -32,7 +39,7 @@ function owedTotal(list: Invoice[], fallbackCurrency: string) {
  * marked as reminded.
  */
 export function RemindPaymentModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
-  const { invoices, profile, mail, shareInvoice, remindInvoices } = useAppData()
+  const { invoices, profile, mail, remindInvoices } = useAppData()
   const { t, lang: uiLang } = useI18n()
   const client = invoice.clientSnapshot || invoice.client
 
@@ -42,9 +49,6 @@ export function RemindPaymentModal({ invoice, onClose }: { invoice: Invoice; onC
     return list.some((item) => item.id === invoice.id) ? list : [invoice, ...list]
   })
   const [chosenIds, setChosenIds] = useState(() => new Set(owed.map((item) => item.id)))
-  const [links, setLinks] = useState<Record<string, string>>(() =>
-    Object.fromEntries(owed.filter((item) => item.shareToken).map((item) => [item.id, `${window.location.origin}/i/?t=${item.shareToken}`])),
-  )
   const [messageLang, setMessageLang] = useState<Lang>(uiLang)
   const [to, setTo] = useState(client?.email || '')
   const [cc, setCc] = useState('')
@@ -63,40 +67,15 @@ export function RemindPaymentModal({ invoice, onClose }: { invoice: Invoice; onC
   const chosen = useMemo(() => owed.filter((item) => chosenIds.has(item.id)), [owed, chosenIds])
   const fallbackCurrency = profile?.currency || 'EUR'
 
-  // Each invoice in the message carries the link where the client opens it; make the missing ones.
-  useEffect(() => {
-    let cancelled = false
-    for (const item of owed) {
-      if (item.shareToken) continue
-      shareInvoice(item.id)
-        .then((token) => {
-          if (!cancelled) setLinks((prev) => ({ ...prev, [item.id]: `${window.location.origin}/i/?t=${token}` }))
-        })
-        .catch(() => {
-          // The reminder still names the invoice; it only goes without its link.
-        })
-    }
-    return () => {
-      cancelled = true
-    }
-  }, [owed, shareInvoice])
-
   const drafted = useMemo(() => {
     const company = displayCompanyValue('companyName', profile?.companyName)
     const person = displayCompanyValue('contactPerson', profile?.contactPerson)
     const bank = [profile?.bankName, profile?.iban ? `IBAN ${profile.iban}` : '', profile?.swift ? `SWIFT ${profile.swift}` : ''].filter(Boolean).join(', ')
     const say = (key: string, params?: Record<string, string | number>) => translateIn(messageLang, key, params)
+    // One short line per invoice, and no links: the client has the invoices already.
     const lines = chosen
-      .map((item) => {
-        const line = say('remind.line', {
-          number: item.number,
-          date: item.date,
-          due: item.dueDate || say('pdf.onReceipt'),
-          amount: formatMoney(remainingOf(item), item.currency || fallbackCurrency),
-        })
-        return links[item.id] ? `${line}\n${links[item.id]}` : line
-      })
-      .join('\n\n')
+      .map((item) => say('remind.line', { number: item.number, date: letterDate(item.date), amount: formatMoney(remainingOf(item), item.currency || fallbackCurrency) }))
+      .join('\n')
     return {
       subject:
         chosen.length === 1
@@ -107,10 +86,10 @@ export function RemindPaymentModal({ invoice, onClose }: { invoice: Invoice; onC
         lines,
         total: owedTotal(chosen, fallbackCurrency),
         payment: bank ? `\n${say('send.paymentLine', { details: bank })}\n` : '',
-        sender: [person, company].filter(Boolean).join('\n'),
+        sender: company || person,
       }),
     }
-  }, [profile, fallbackCurrency, messageLang, chosen, links])
+  }, [profile, fallbackCurrency, messageLang, chosen])
 
   // The text follows the chosen invoices and language; edits made after that are the user's.
   useEffect(() => {
