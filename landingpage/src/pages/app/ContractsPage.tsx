@@ -9,6 +9,7 @@ import { composeClient } from '../../lib/client'
 import type { ClientRecord } from '../../lib/document'
 import {
   ACCEPT,
+  addMonths,
   contractBlob,
   contractState,
   contractText,
@@ -17,6 +18,7 @@ import {
   deleteContract,
   downloadContract,
   fileKind,
+  lastDay,
   listContracts,
   readContractAgain,
   replaceContractFile,
@@ -36,6 +38,7 @@ const STATE_STYLE: Record<ContractState, string> = {
   expiring: 'bg-[#FDF1DC] text-[#9A6412]',
   expired: 'bg-[#F8E8E4] text-[#B0472F]',
   upcoming: 'bg-[#E8EEF8] text-[#3A5A93]',
+  maintenance: 'bg-[#E3F1F2] text-[#1F6670]',
   completed: 'bg-brand-ink/6 text-brand-ink/55',
 }
 
@@ -122,7 +125,7 @@ export function ContractsPage() {
     return [...found].sort((a, b) => {
       if (a.status !== b.status) return a.status === 'completed' ? 1 : -1
       if (a.status === 'completed') return String(b.completedAt || '').localeCompare(String(a.completedAt || ''))
-      return (a.endDate || '9999').localeCompare(b.endDate || '9999') || b.createdAt.localeCompare(a.createdAt)
+      return (lastDay(a) || '9999').localeCompare(lastDay(b) || '9999') || b.createdAt.localeCompare(a.createdAt)
     })
   }, [contracts, tab, query, clientName])
 
@@ -322,8 +325,9 @@ function ContractRow({
 
   let periodNote = ''
   if (state === 'completed' && contract.completedAt) periodNote = t('contracts.completedOn', { date: shortDate(contract.completedAt) })
-  else if (state === 'expired') periodNote = t('contracts.endedAgo', { days: daysBetween(contract.endDate, on) })
-  else if (contract.endDate && state !== 'upcoming') periodNote = t('contracts.daysLeft', { days: daysBetween(on, contract.endDate) })
+  else if (state === 'expired') periodNote = t('contracts.endedAgo', { days: daysBetween(lastDay(contract), on) })
+  else if (lastDay(contract) && state !== 'upcoming') periodNote = t('contracts.daysLeft', { days: daysBetween(on, lastDay(contract)) })
+  const maintenanceNote = contract.maintenanceEndDate && contract.maintenanceEndDate > (contract.endDate || '') ? t('contracts.maintenanceUntil', { date: shortDate(contract.maintenanceEndDate) }) : ''
 
   const valueNote = [
     contract.monthlyValue ? t('contracts.perMonth', { amount: formatMoney(contract.monthlyValue, money) }) : '',
@@ -374,6 +378,7 @@ function ContractRow({
         </span>
         <span className="col-start-1 row-start-2 pl-8 text-sm text-brand-ink/70 xl:col-start-auto xl:row-start-auto xl:pl-0">
           <span className="block tabular-nums">{period || '—'}</span>
+          {maintenanceNote ? <span className="block text-xs text-[#1F6670]">{maintenanceNote}</span> : null}
           {periodNote ? <span className={cn('block text-xs', state === 'expired' ? 'text-[#B0472F]' : state === 'expiring' ? 'text-[#9A6412]' : 'text-brand-ink/45')}>{periodNote}</span> : null}
         </span>
         <span className="col-start-2 row-start-1 max-w-[8.5rem] text-right text-sm xl:col-start-auto xl:row-start-auto xl:max-w-none">
@@ -432,20 +437,20 @@ function CopyButton({ text, label, copied }: { text: string; label: string; copi
 
 // --- Adding and changing a contract.
 
-const TEXT_KEYS = ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'clientId', 'type', 'summary', 'paymentTerms', 'signatories', 'notes', 'signedDate', 'startDate', 'endDate', 'currency'] as const
-type FormKey = (typeof TEXT_KEYS)[number] | 'value' | 'monthlyValue' | 'vatIncluded'
+const TEXT_KEYS = ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'clientId', 'type', 'summary', 'paymentTerms', 'signatories', 'notes', 'signedDate', 'startDate', 'endDate', 'maintenanceEndDate', 'currency'] as const
+type FormKey = (typeof TEXT_KEYS)[number] | 'value' | 'monthlyValue' | 'maintenanceMonths' | 'vatIncluded'
 type Form = Record<FormKey, string>
 
 function formValue(contract: Contract | null, key: FormKey): string {
   if (!contract) return ''
   if (key === 'vatIncluded') return contract.vatIncluded === true ? 'yes' : contract.vatIncluded === false ? 'no' : ''
-  if (key === 'value' || key === 'monthlyValue') return contract[key] != null ? String(contract[key]) : ''
+  if (key === 'value' || key === 'monthlyValue' || key === 'maintenanceMonths') return contract[key] != null ? String(contract[key]) : ''
   return String(contract[key] || '')
 }
 
 function formFrom(contract: Contract | null, currency: string): Form {
   const form = {} as Form
-  for (const key of [...TEXT_KEYS, 'value', 'monthlyValue', 'vatIncluded'] as FormKey[]) form[key] = formValue(contract, key)
+  for (const key of [...TEXT_KEYS, 'value', 'monthlyValue', 'maintenanceMonths', 'vatIncluded'] as FormKey[]) form[key] = formValue(contract, key)
   if (!form.currency) form.currency = currency
   return form
 }
@@ -471,6 +476,8 @@ function fieldsFrom(form: Form): ContractFields {
     signedDate: form.signedDate,
     startDate: form.startDate,
     endDate: form.endDate,
+    maintenanceMonths: amount(form.maintenanceMonths),
+    maintenanceEndDate: form.maintenanceEndDate,
     currency: form.currency,
     value: amount(form.value),
     monthlyValue: amount(form.monthlyValue),
@@ -616,6 +623,12 @@ function ContractModal({
                 <Eye className="h-4 w-4" />
                 {t('contracts.preview')}
               </Button>
+              {readingState === 'done' ? (
+                <Button type="button" variant="ghost" onClick={() => void retry()} disabled={uploading} className="py-2">
+                  <RotateCcw className="h-4 w-4" />
+                  {t('contracts.readAgain')}
+                </Button>
+              ) : null}
               <Button type="button" variant="ghost" onClick={() => input.current?.click()} disabled={uploading} className="py-2">
                 <Upload className="h-4 w-4" />
                 {t('contracts.replaceFile')}
@@ -686,6 +699,21 @@ function ContractModal({
           <Field type="date" label={label('signedDate', t('contracts.field.signedDate'))} value={form.signedDate} onChange={(e) => set('signedDate')(e.target.value)} />
           <Field type="date" label={label('startDate', t('contracts.field.startDate'))} value={form.startDate} onChange={(e) => set('startDate')(e.target.value)} />
           <Field type="date" label={label('endDate', t('contracts.field.endDate'))} value={form.endDate} onChange={(e) => set('endDate')(e.target.value)} />
+        </Section>
+
+        <Section title={t('contracts.sectionMaintenance')}>
+          <Field
+            inputMode="numeric"
+            label={label('maintenanceMonths', t('contracts.field.maintenanceMonths'))}
+            value={form.maintenanceMonths}
+            onChange={(e) => {
+              set('maintenanceMonths')(e.target.value)
+              // Counted from the end of the work, until a day is set by hand.
+              const months = parseInt(e.target.value, 10)
+              if (!touched.has('maintenanceEndDate') && form.endDate && months > 0) setForm((current) => ({ ...current, maintenanceEndDate: addMonths(current.endDate, months) }))
+            }}
+          />
+          <Field type="date" label={label('maintenanceEndDate', t('contracts.field.maintenanceEndDate'))} value={form.maintenanceEndDate} onChange={(e) => set('maintenanceEndDate')(e.target.value)} />
         </Section>
 
         <Section title={t('contracts.sectionValue')}>
