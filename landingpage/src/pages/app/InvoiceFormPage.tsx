@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Camera, Eye, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { Camera, ChevronDown, Eye, FileText, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
@@ -104,6 +104,7 @@ export function InvoiceFormPage() {
   const [unsigned, setUnsigned] = useState(() => Boolean(existing?.unsigned))
   const [contractName, setContractName] = useState(existing?.contractName || '')
   const [contractNumber, setContractNumber] = useState(existing?.contractNumber || '')
+  const [contractOpen, setContractOpen] = useState(true)
   const [pricesIncludeTax, setPricesIncludeTax] = useState(() =>
     existing ? Boolean(existing.pricesIncludeTax) : localStorage.getItem('nextinvoice.pricesIncludeTax') === '1',
   )
@@ -746,6 +747,35 @@ export function InvoiceFormPage() {
             ) : null}
           </Card>
 
+          {/* Asked only by companies that turned it on in the invoice settings, or kept when the invoice already has it. */}
+          {profile?.showContract || contractName || contractNumber ? (
+            <Card className="overflow-hidden p-0">
+              <button
+                type="button"
+                aria-expanded={contractOpen}
+                onClick={() => setContractOpen((open) => !open)}
+                className={cn('flex w-full items-center justify-between gap-3 px-6 py-4 text-left', contractOpen && 'border-b border-brand-ink/8')}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand/8 text-brand">
+                    <FileText className="h-4 w-4" />
+                  </span>
+                  <span className="font-semibold">{t('profile.showContract')}</span>
+                </span>
+                <ChevronDown className={cn('h-4 w-4 text-brand-ink/45 transition', contractOpen && 'rotate-180')} />
+              </button>
+              {contractOpen ? (
+                <div className="px-6 pt-4">
+                  <div className="grid gap-x-4 sm:grid-cols-2">
+                    <Field label={t('newInvoice.contractName')} value={contractName} onChange={(e) => setContractName(e.target.value)} />
+                    <Field label={t('newInvoice.contractNumber')} value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} />
+                  </div>
+                  <p className="-mt-2 pb-4 text-xs text-brand-ink/45">{t('newInvoice.contractHint')}</p>
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
+
           <Card className="overflow-hidden p-0">
             <div className="flex items-center justify-between border-b border-brand-ink/8 px-6 py-4">
               <h2 className="font-semibold">{t('newInvoice.itemsSectionTitle')}</h2>
@@ -896,16 +926,6 @@ export function InvoiceFormPage() {
                 </label>
               ) : null}
             </div>
-            {/* Asked only by companies that turned it on in the invoice settings, or kept when the invoice already has it. */}
-            {profile?.showContract || contractName || contractNumber ? (
-              <div>
-                <div className="grid gap-x-4 sm:grid-cols-2">
-                  <Field label={t('newInvoice.contractName')} value={contractName} onChange={(e) => setContractName(e.target.value)} />
-                  <Field label={t('newInvoice.contractNumber')} value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} />
-                </div>
-                <p className="-mt-2 mb-4 text-xs text-brand-ink/45">{t('newInvoice.contractHint')}</p>
-              </div>
-            ) : null}
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
             <UnsignedToggle checked={unsigned} onChange={setUnsigned} />
           </Card>
