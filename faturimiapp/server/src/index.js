@@ -27,6 +27,8 @@ const teamRouter = require('./routes/team');
 const financeRouter = require('./routes/finance');
 const recurringRouter = require('./routes/recurring');
 const slackRouter = require('./routes/slack');
+const contractsRouter = require('./routes/contracts');
+const { startContractReading } = require('./contracts/service');
 const { startSlack } = require('./slack');
 const { handleStripeWebhook } = require('./routes/billing');
 const { initStore, flushStore, storeHealth } = require('./store');
@@ -84,6 +86,7 @@ app.use('/api/finance', financeRouter);
 app.use('/api/mercury', mercuryRouter);
 app.use('/api/recurring', recurringRouter);
 app.use('/api/slack', slackRouter);
+app.use('/api/contracts', contractsRouter);
 app.use('/api', extractClientRouter);
 app.use('/api', extractCompanyRouter);
 
@@ -107,6 +110,8 @@ initStore()
     startAutomation();
     // Paid invoices are posted to the company's Slack channel within a minute.
     startSlack();
+    // Contract documents still waiting to be read when the server last stopped.
+    startContractReading();
     // A deploy stops the old process with SIGTERM. Finish the writes in flight before going.
     let stopping = false;
     const stop = (signal) => {

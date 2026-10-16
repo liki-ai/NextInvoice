@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, useEffect } from 'react'
+import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '../lib/cn'
 
@@ -112,16 +112,19 @@ export function Modal({
   /** 'sm' for a short message or confirmation; 'lg' for forms and previews. */
   size?: 'sm' | 'lg'
 }) {
+  const root = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      // With a modal opened over another, Escape closes only the one on top.
+      const open = document.querySelectorAll('[data-modal]')
+      if (e.key === 'Escape' && open[open.length - 1] === root.current) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+    <div ref={root} data-modal className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
       <button type="button" aria-label="Close" className="absolute inset-0 bg-brand-ink/45 backdrop-blur-[2px]" onClick={onClose} />
       <div className={cn('relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl', size === 'sm' ? 'max-w-lg' : 'max-w-4xl')}>
         <div className="flex items-center justify-between border-b border-brand-ink/8 px-6 py-4">

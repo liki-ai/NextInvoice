@@ -64,6 +64,7 @@ async function initStore() {
   if (!cache.recurring) cache.recurring = {};
   if (!cache.finance) cache.finance = {};
   if (!cache.mercury) cache.mercury = {};
+  if (!cache.contracts) cache.contracts = {};
   if (!Array.isArray(cache.passwordResets)) cache.passwordResets = [];
   return cache;
 }
@@ -1166,6 +1167,28 @@ function saveMercury(userId, mercury) {
   return db.mercury[userId] || null;
 }
 
+/** The company's contracts: what each one is, its dates and value, and the document behind it. */
+function getContracts(userId) {
+  const db = readDb();
+  const list = db.contracts && db.contracts[userId];
+  return Array.isArray(list) ? list : [];
+}
+
+/** Ids of the companies that keep contracts, for reading the documents left unread by a restart. */
+function contractOwners() {
+  const db = readDb();
+  return Object.keys(db.contracts || {});
+}
+
+function saveContracts(userId, list) {
+  const db = readDb();
+  if (!db.contracts) db.contracts = {};
+  if (list && list.length > 0) db.contracts[userId] = list;
+  else delete db.contracts[userId];
+  writeDb(db);
+  return getContracts(userId);
+}
+
 const EMAIL_LOG_MAX = 20;
 
 /** Notes on the invoice that it went out by email, and marks it sent. */
@@ -1940,6 +1963,9 @@ module.exports = {
   mercuryOwners,
   saveMercury,
   saveFinance,
+  getContracts,
+  contractOwners,
+  saveContracts,
   recordInvoiceEmail,
   recordInvoiceReminder,
   reconcilePayments,

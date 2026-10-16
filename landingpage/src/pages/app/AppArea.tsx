@@ -19,6 +19,7 @@ import { ClientListPage } from './ClientListPage'
 import { ClientFormPage } from './ClientFormPage'
 import { ItemListPage } from './ItemListPage'
 import { ItemFormPage } from './ItemFormPage'
+import { ContractsPage } from './ContractsPage'
 import { UsersPage } from './UsersPage'
 import { InvoiceSettingsPage } from './InvoiceSettingsPage'
 
@@ -59,6 +60,7 @@ export default function AppArea() {
         <Route path="items" element={<ItemListPage />} />
         <Route path="items/new" element={<ItemFormPage />} />
         <Route path="items/:itemId" element={<ItemFormPage />} />
+        <Route path="contracts" element={<ContractsPage />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>
     </Routes>

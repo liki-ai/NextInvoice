@@ -7,7 +7,7 @@ const DB_PATH = path.join(DATA_DIR, 'db.json');
 // In Postgres each of these collections is stored as one document per user, so saving one
 // person's invoice rewrites that person's invoices and nothing else. Everything else in the
 // database object (the user list, password resets) is one document each.
-const PER_USER = ['profiles', 'invoices', 'obligations', 'clients', 'items', 'syncOps', 'migrations', 'mail', 'invites', 'finance', 'recurring', 'mercury'];
+const PER_USER = ['profiles', 'invoices', 'obligations', 'clients', 'items', 'syncOps', 'migrations', 'mail', 'invites', 'finance', 'recurring', 'mercury', 'contracts'];
 
 function emptyDb() {
   return {
@@ -23,6 +23,7 @@ function emptyDb() {
     invites: {},
     finance: {},
     mercury: {},
+    contracts: {},
     recurring: {},
     passwordResets: [],
   };

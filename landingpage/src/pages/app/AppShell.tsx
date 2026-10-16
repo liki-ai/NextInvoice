@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
+import { FileSignature, FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider, useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -39,6 +39,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { to: '/app/clients', icon: Users, key: 'nav.clients', active: (pathname) => pathname.startsWith('/app/clients') },
       { to: '/app/items', icon: Tag, key: 'nav.items', active: (pathname) => pathname.startsWith('/app/items') },
+      { to: '/app/contracts', icon: FileSignature, key: 'contracts.nav', active: (pathname) => pathname.startsWith('/app/contracts') },
     ],
   },
   {
