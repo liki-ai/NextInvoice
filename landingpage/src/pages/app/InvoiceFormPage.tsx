@@ -84,6 +84,8 @@ export function InvoiceFormPage() {
     taxRate: String(existing?.taxRate ?? '0'),
     pricesIncludeTax: Boolean(existing?.pricesIncludeTax),
     unsigned: Boolean(existing?.unsigned),
+    contractName: existing?.contractName || '',
+    contractNumber: existing?.contractNumber || '',
     notes: existing?.notes || '',
     canSaveOnly: true,
   })
@@ -100,6 +102,8 @@ export function InvoiceFormPage() {
   const [items, setItems] = useState<InvoiceItem[]>(() => (existing?.items?.length ? formItems(existing) : [emptyItem()]))
   // Prices typed with VAT included: the total is what was typed and the subtotal is worked back from it.
   const [unsigned, setUnsigned] = useState(() => Boolean(existing?.unsigned))
+  const [contractName, setContractName] = useState(existing?.contractName || '')
+  const [contractNumber, setContractNumber] = useState(existing?.contractNumber || '')
   const [pricesIncludeTax, setPricesIncludeTax] = useState(() =>
     existing ? Boolean(existing.pricesIncludeTax) : localStorage.getItem('nextinvoice.pricesIncludeTax') === '1',
   )
@@ -148,6 +152,8 @@ export function InvoiceFormPage() {
     setItems(existing.items?.length ? formItems(existing) : [emptyItem()])
     setPricesIncludeTax(Boolean(existing.pricesIncludeTax))
     setUnsigned(Boolean(existing.unsigned))
+    setContractName(existing.contractName || '')
+    setContractNumber(existing.contractNumber || '')
     setDiscount(String(existing.discount ?? '0'))
     taxTouched.current = true
     setTaxRate(String(existing.taxRate ?? 0))
@@ -170,6 +176,8 @@ export function InvoiceFormPage() {
     setItems(formItems(source, true))
     setPricesIncludeTax(Boolean(source.pricesIncludeTax))
     setUnsigned(Boolean(source.unsigned))
+    setContractName(source.contractName || '')
+    setContractNumber(source.contractNumber || '')
     setDiscount(String(source.discount ?? '0'))
     taxTouched.current = true
     setTaxRate(String(source.taxRate ?? 0))
@@ -239,6 +247,8 @@ export function InvoiceFormPage() {
     items: netItems,
     pricesIncludeTax,
     unsigned,
+    contractName,
+    contractNumber,
     discount,
     taxRate,
     notes,
@@ -268,6 +278,8 @@ export function InvoiceFormPage() {
         items: validItems,
         pricesIncludeTax: snap.pricesIncludeTax,
         unsigned: snap.unsigned,
+        contractName: snap.contractName.trim(),
+        contractNumber: snap.contractNumber.trim(),
         discount: snap.discount,
         taxRate: totals.taxRate,
         notes: snap.notes,
@@ -297,7 +309,7 @@ export function InvoiceFormPage() {
       void persistDraft()
     }, 700)
     return () => window.clearTimeout(timer)
-  }, [canSaveOnly, clientId, client, items, pricesIncludeTax, unsigned, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
+  }, [canSaveOnly, clientId, client, items, pricesIncludeTax, unsigned, contractName, contractNumber, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
 
   const draft = useMemo(
     () => ({
@@ -310,10 +322,12 @@ export function InvoiceFormPage() {
       taxRate: appliedTaxRate,
       notes,
       unsigned,
+      contractName,
+      contractNumber,
       subtotal,
       total,
     }),
-    [invoiceNumber, date, dueDate, client, netItems, discount, appliedTaxRate, notes, unsigned, subtotal, total],
+    [invoiceNumber, date, dueDate, client, netItems, discount, appliedTaxRate, notes, unsigned, contractName, contractNumber, subtotal, total],
   )
 
   const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
@@ -448,6 +462,8 @@ export function InvoiceFormPage() {
       items: validItems,
       pricesIncludeTax,
       unsigned,
+      contractName: contractName.trim(),
+      contractNumber: contractNumber.trim(),
       discount,
       taxRate: totals.taxRate,
       notes,
@@ -530,6 +546,9 @@ export function InvoiceFormPage() {
         })
         // A correction carries the figures only; printing without signature and stamp is set apart.
         if (Boolean(existing?.unsigned) !== payload.unsigned) await updateInvoice(invoiceId, { unsigned: payload.unsigned })
+        if ((existing?.contractName || '') !== payload.contractName || (existing?.contractNumber || '') !== payload.contractNumber) {
+          await updateInvoice(invoiceId, { contractName: payload.contractName, contractNumber: payload.contractNumber })
+        }
         savedId = invoiceId
       } else if (savedId) {
         await updateInvoice(savedId, payload)
@@ -877,6 +896,16 @@ export function InvoiceFormPage() {
                 </label>
               ) : null}
             </div>
+            {/* Asked only by companies that turned it on in the invoice settings, or kept when the invoice already has it. */}
+            {profile?.showContract || contractName || contractNumber ? (
+              <div>
+                <div className="grid gap-x-4 sm:grid-cols-2">
+                  <Field label={t('newInvoice.contractName')} value={contractName} onChange={(e) => setContractName(e.target.value)} />
+                  <Field label={t('newInvoice.contractNumber')} value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} />
+                </div>
+                <p className="-mt-2 mb-4 text-xs text-brand-ink/45">{t('newInvoice.contractHint')}</p>
+              </div>
+            ) : null}
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
             <UnsignedToggle checked={unsigned} onChange={setUnsigned} />
           </Card>

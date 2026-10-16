@@ -47,6 +47,9 @@ export type Invoice = {
   pricesIncludeTax?: boolean
   /** Printed without the company's signature and stamp, to be signed and stamped by hand. */
   unsigned?: boolean
+  /** The client's contract this invoice bills under, printed in one line above the items. */
+  contractName?: string
+  contractNumber?: string
   notes?: string
   subtotal: number
   total: number
@@ -109,6 +112,8 @@ export type CompanyProfile = {
   accentColor?: string
   /** Pre-filled on every new invoice. */
   defaultTaxRate?: number
+  /** The invoice form asks for a contract name and number; off for companies that bill without contracts. */
+  showContract?: boolean
 }
 
 export const DEFAULT_EXPORT_NOTE = 'Eksport ne bazë te Ligjit (05-L-037 Neni 33)'
@@ -394,6 +399,8 @@ export function draftFromInvoice(source: Invoice, existing: Invoice[]): Omit<Inv
     taxRate: source.taxRate || 0,
     pricesIncludeTax: Boolean(source.pricesIncludeTax),
     unsigned: Boolean(source.unsigned),
+    contractName: source.contractName || '',
+    contractNumber: source.contractNumber || '',
     notes: source.notes || '',
     subtotal: source.subtotal,
     total: source.total,

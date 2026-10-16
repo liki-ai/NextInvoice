@@ -26,7 +26,7 @@ export function resolveAccent(template: InvoiceTemplateId, accentColor?: string 
 
 type PdfInvoice = Pick<
   Invoice,
-  'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'taxRate' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency' | 'unsigned'
+  'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'taxRate' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency' | 'unsigned' | 'contractName' | 'contractNumber'
 >
 
 export type InvoiceHtmlInput = {
@@ -204,6 +204,31 @@ function clientRows(v: View): [string, string][] {
   return rows.filter(([, value]) => String(value || '').trim()) as [string, string][]
 }
 
+/** The contract the invoice bills under, as one quiet line above the items; nothing when neither field is filled. */
+function contractRow(v: View) {
+  const { invoice, L } = v
+  const fields = [
+    [L.contractName || 'Contract name', invoice.contractName],
+    [L.contractNumber || 'Contract number', invoice.contractNumber],
+  ]
+    .map(([label, value]) => [label, String(value || '').trim()])
+    .filter(([, value]) => value)
+  if (!fields.length) return ''
+  return `<div class="contract keep">${fields
+    .map(([label, value]) => `<div><span class="ck">${esc(label)}:</span> <span class="cv">${esc(value)}</span></div>`)
+    .join('')}</div>`
+}
+
+function contractCss(accent: string) {
+  return `
+    .contract { display: flex; margin: 0 0 12px; padding: 5px 10px; background: ${tint(accent, 0.94)}; border-bottom: 1px solid ${tint(accent, 0.7)}; font-size: 11px; line-height: 1.35; }
+    .contract > div { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+    .contract > div + div { margin-left: 12px; padding-left: 12px; border-left: 1px solid ${tint(accent, 0.6)}; }
+    .contract .ck { color: #6B7A7D; }
+    .contract .cv { font-weight: 600; color: #1D2B2E; }
+  `
+}
+
 /* ------------------------------------------------------------------ classic */
 
 function classicTemplate(v: View) {
@@ -240,6 +265,7 @@ function classicTemplate(v: View) {
     .sign .line { border-top: 1px solid #999; padding-top: 6px; }
     .stamp { width: 20%; text-align: center; }
     .stamp img { max-height: 96px; max-width: 110px; }
+    ${contractCss(accent)}
   `
   const body = `
     <div class="top">
@@ -273,6 +299,7 @@ function classicTemplate(v: View) {
       ${client.phone ? `<p><strong>${esc(L.phoneLabel)}:</strong> ${esc(client.phone)}</p>` : ''}
       ${client.email ? `<p><strong>${esc(L.emailLabel || 'Email')}:</strong> ${esc(client.email)}</p>` : ''}
     </div>
+    ${contractRow(v)}
     <table class="items">
       <thead>
         <tr>
@@ -383,6 +410,8 @@ function corporateTemplate(v: View) {
     .stamp img { max-height: 110px; max-width: 120px; }
     .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #555; }
     .foot b { display: block; color: #1D2B2E; margin-top: 4px; }
+    ${contractCss(accent)}
+    .parties + .contract { margin-top: -8px; }
   `
   const pay = paymentRows(v)
   const body = `
@@ -421,6 +450,7 @@ function corporateTemplate(v: View) {
         <tr><td class="k">${esc(L.dueDateLabel)}:</td><td>${esc(v.dueText)}</td></tr>
       </table>
     </div>
+    ${contractRow(v)}
     <table class="items${filler ? '' : ' dense'}">
       <thead>
         <tr>
@@ -532,6 +562,8 @@ function minimalTemplate(v: View) {
     .stamp img { max-height: 96px; max-width: 110px; }
     .foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid ${hair}; text-align: center; font-size: 11px; color: ${muted}; }
     .foot b { display: block; margin-top: 4px; color: #1D2B2E; }
+    ${contractCss(accent)}
+    .cols + .contract { margin-top: -14px; margin-bottom: 18px; }
   `
   const pay = paymentRows(v)
   const body = `
@@ -569,6 +601,7 @@ function minimalTemplate(v: View) {
         <div class="kv"><span>${esc(L.dueDateLabel)}</span><span>${esc(v.dueText)}</span></div>
       </div>
     </div>
+    ${contractRow(v)}
     <table class="items">
       <thead>
         <tr>

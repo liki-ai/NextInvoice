@@ -410,6 +410,8 @@ export const translations = {
       categoryOther: 'Tjetër',
     },
     pdf: {
+      contractName: 'Emri i kontratës',
+      contractNumber: 'Numri i kontratës',
       invoiceLabel: 'Fatura / Invoice',
       dateLabel: 'Data / Date',
       clientLabel: 'Klienti / Client',
@@ -896,6 +898,8 @@ export const translations = {
       categoryOther: 'Other',
     },
     pdf: {
+      contractName: 'Contract name',
+      contractNumber: 'Contract number',
       invoiceLabel: 'Fatura / Invoice',
       dateLabel: 'Data / Date',
       clientLabel: 'Klienti / Client',
@@ -1382,6 +1386,8 @@ export const translations = {
       categoryOther: 'Altro',
     },
     pdf: {
+      contractName: 'Contratto',
+      contractNumber: 'N. contratto',
       invoiceLabel: 'Fattura',
       dateLabel: 'Data',
       clientLabel: 'Cliente',

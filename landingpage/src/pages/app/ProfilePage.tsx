@@ -68,11 +68,16 @@ function toForm(profile: CompanyProfile): CompanyProfile {
     invoiceTemplate: normalizeTemplate(profile.invoiceTemplate),
     accentColor: isHexColor(profile.accentColor) ? profile.accentColor : '',
     defaultTaxRate: normalizeTaxRate(profile.defaultTaxRate),
+    showContract: Boolean(profile.showContract),
   }
 }
 
 function sameFields(a: CompanyProfile, b: CompanyProfile) {
-  return EDITABLE.every((key) => (a[key] ?? '') === (b[key] ?? '')) && (a.defaultTaxRate ?? 0) === (b.defaultTaxRate ?? 0)
+  return (
+    EDITABLE.every((key) => (a[key] ?? '') === (b[key] ?? '')) &&
+    (a.defaultTaxRate ?? 0) === (b.defaultTaxRate ?? 0) &&
+    Boolean(a.showContract) === Boolean(b.showContract)
+  )
 }
 
 function useDebounced<T>(value: T, delay: number) {
@@ -321,6 +326,7 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
       if (payload.logoData !== (baseline?.logoData ?? '')) payload.logoUri = ''
       payload.language = lang
       payload.defaultTaxRate = form.defaultTaxRate ?? 0
+      payload.showContract = Boolean(form.showContract)
       const saved = await saveProfile(payload)
       setForm(toForm(saved))
       setNotice(t('profile.saveSuccess'))
@@ -442,6 +448,18 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
           <p className="-mt-2 text-xs text-brand-ink/45">{t('profile.exportNoteHint')}</p>
         </div>
       ) : null}
+      <label className="mt-4 flex cursor-pointer items-start gap-2.5">
+        <input
+          type="checkbox"
+          checked={Boolean(form.showContract)}
+          onChange={(e) => setField('showContract', e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-[#2C6E7F]"
+        />
+        <span>
+          <span className="block text-sm font-semibold">{t('profile.showContract')}</span>
+          <span className="block text-xs text-brand-ink/45">{t('profile.showContractHint')}</span>
+        </span>
+      </label>
     </SettingsSection>
   )
   const signatureSection = (
