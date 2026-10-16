@@ -24,6 +24,9 @@ export type Contract = {
   signedDate: string
   startDate: string
   endDate: string
+  /** A warranty or maintenance period after the work: its length, and its last day. */
+  maintenanceMonths: number | null
+  maintenanceEndDate: string
   value: number | null
   monthlyValue: number | null
   currency: string
@@ -39,10 +42,10 @@ export type Contract = {
 
 export type ContractFields = Pick<
   Contract,
-  'title' | 'number' | 'reference' | 'counterparty' | 'counterpartyAddress' | 'counterpartyBusinessId' | 'clientId' | 'type' | 'summary' | 'paymentTerms' | 'signatories' | 'notes' | 'signedDate' | 'startDate' | 'endDate' | 'value' | 'monthlyValue' | 'currency' | 'vatIncluded'
+  'title' | 'number' | 'reference' | 'counterparty' | 'counterpartyAddress' | 'counterpartyBusinessId' | 'clientId' | 'type' | 'summary' | 'paymentTerms' | 'signatories' | 'notes' | 'signedDate' | 'startDate' | 'endDate' | 'maintenanceMonths' | 'maintenanceEndDate' | 'value' | 'monthlyValue' | 'currency' | 'vatIncluded'
 >
 
-export type ContractState = 'active' | 'expiring' | 'expired' | 'upcoming' | 'completed'
+export type ContractState = 'active' | 'maintenance' | 'expiring' | 'expired' | 'upcoming' | 'completed'
 
 export const ACCEPT = '.pdf,.docx,.doc,.odt,.rtf,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*,text/plain'
 
@@ -59,13 +62,31 @@ export function daysBetween(from: string, to: string) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY)
 }
 
-/** Where the contract stands today: done by hand, not yet started, running, near its end, or past it. */
+/** The contract's last day: the end of its warranty or maintenance when it has one, else its end. */
+export function lastDay(contract: Contract) {
+  return contract.maintenanceEndDate && contract.maintenanceEndDate > (contract.endDate || '') ? contract.maintenanceEndDate : contract.endDate
+}
+
+/**
+ * Where the contract stands today: done by hand, not yet started, running, past its work but still
+ * under warranty or maintenance, near its last day, or past it.
+ */
 export function contractState(contract: Contract, on = today()): ContractState {
   if (contract.status === 'completed') return 'completed'
-  if (contract.endDate && contract.endDate < on) return 'expired'
+  const last = lastDay(contract)
+  if (last && last < on) return 'expired'
   if (contract.startDate && contract.startDate > on) return 'upcoming'
-  if (contract.endDate && daysBetween(on, contract.endDate) <= EXPIRING_DAYS) return 'expiring'
+  if (last && daysBetween(on, last) <= EXPIRING_DAYS) return 'expiring'
+  if (contract.endDate && contract.endDate < on) return 'maintenance'
   return 'active'
+}
+
+/** 2026-01-20 + 24 months → 2028-01-20, as the server counts it. */
+export function addMonths(day: string, months: number) {
+  const [year, month, date] = day.split('-').map(Number)
+  const total = month - 1 + Math.round(months)
+  const last = new Date(Date.UTC(year + Math.floor(total / 12), (total % 12) + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(year + Math.floor(total / 12), total % 12, Math.min(date, last))).toISOString().slice(0, 10)
 }
 
 /** 2026-09-17 → 17.09.2026. */

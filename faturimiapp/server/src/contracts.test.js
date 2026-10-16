@@ -59,3 +59,14 @@ test('the other party is found among the clients by its number, its name or its 
   assert.equal(matchClient(clients, { counterparty: 'Komuna e Mitrovicës' }), null);
   assert.equal(matchClient(clients, { counterparty: '' }), null);
 });
+
+test('a warranty after the work keeps its own end, counted from the end of the work when not given', () => {
+  const next = applyReading({ filled: [] }, { ...reading, startDate: '2025-07-21', endDate: '2026-01-20', maintenanceMonths: 24, maintenanceEndDate: '' });
+  assert.equal(next.endDate, '2026-01-20');
+  assert.equal(next.maintenanceMonths, 24);
+  assert.equal(next.maintenanceEndDate, '2028-01-20');
+  const stated = applyReading({ filled: [] }, { ...reading, endDate: '2026-01-20', maintenanceMonths: 24, maintenanceEndDate: '2028-02-15' });
+  assert.equal(stated.maintenanceEndDate, '2028-02-15');
+  const none = applyReading({ filled: [] }, { ...reading, maintenanceMonths: null, maintenanceEndDate: '' });
+  assert.ok(!none.maintenanceEndDate);
+});

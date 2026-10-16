@@ -11,8 +11,8 @@ const { extractStructured } = require('../openaiClient');
 
 const CONTRACTS_MAX = 2000;
 const TEXT_FIELDS = ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'clientId', 'type', 'summary', 'paymentTerms', 'signatories', 'notes'];
-const DATE_FIELDS = ['signedDate', 'startDate', 'endDate'];
-const NUMBER_FIELDS = ['value', 'monthlyValue'];
+const DATE_FIELDS = ['signedDate', 'startDate', 'endDate', 'maintenanceEndDate'];
+const NUMBER_FIELDS = ['value', 'monthlyValue', 'maintenanceMonths'];
 /** What a reading of the document may fill in. */
 const READ_FIELDS = ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'type', 'summary', 'paymentTerms', 'signatories', ...DATE_FIELDS, ...NUMBER_FIELDS, 'currency', 'vatIncluded'];
 const TEXT_LIMITS = { summary: 1000, notes: 2000, paymentTerms: 300, signatories: 300 };
@@ -131,6 +131,8 @@ async function create(ownerId, account, body, file) {
     signedDate: '',
     startDate: '',
     endDate: '',
+    maintenanceMonths: null,
+    maintenanceEndDate: '',
     value: null,
     monthlyValue: null,
     currency: '',
@@ -158,6 +160,7 @@ function update(ownerId, id, body) {
     // A field the person changed is theirs now; reading the document again leaves it alone.
     const changed = Object.keys(fields).filter((key) => fields[key] !== contract[key]);
     next.filled = (contract.filled || []).filter((key) => !changed.includes(key));
+    if (!next.maintenanceEndDate) next.maintenanceEndDate = maintenanceEnd(next.endDate, next.maintenanceMonths);
     if (body.status === 'completed' && contract.status !== 'completed') {
       next.status = 'completed';
       next.completedAt = cleanDate(body.completedAt) || nowIso().slice(0, 10);
@@ -238,12 +241,14 @@ const SCHEMA = {
     endDate: { type: 'string', description: 'The day it ends, YYYY-MM-DD. When only a duration is given (12 muaj, 3 vite) count it from the start day: start 2026-09-17 + 3 years = 2029-09-16. Empty when neither is stated.' },
     value: { type: ['number', 'null'], description: 'The total contract price or the estimated ceiling of a framework contract; null when only unit prices are given.' },
     monthlyValue: { type: ['number', 'null'], description: 'The price per month when the contract states one; else null.' },
+    maintenanceMonths: { type: ['number', 'null'], description: 'Many contracts go on after the work is delivered: a warranty or maintenance period (garancioni, mirëmbajtja, periudha e garancisë, "garancioni për 24 muaj pas pranimit"). Its length in months (2 vite = 24); null when the contract has none.' },
+    maintenanceEndDate: { type: 'string', description: 'The last day of that warranty or maintenance period, YYYY-MM-DD, when the contract states it or the day it is counted from (pranimi, the acceptance) is stated. Empty otherwise; it is then counted from endDate.' },
     currency: { type: 'string', description: 'ISO code of the amounts, EUR when the sign is € or none is stated.' },
     vatIncluded: { type: ['boolean', 'null'], description: 'true when the price says it includes VAT (me TVSH), false when it says without VAT (pa TVSH), null when it does not say.' },
     paymentTerms: { type: 'string', description: 'When the company is paid, in a short Albanian phrase (e.g. "Brenda 30 ditëve pas faturës, çdo muaj"); empty when not stated.' },
     signatories: { type: 'string', description: 'Who signed, name and position, for each party, separated by "; ". Empty when not legible.' },
   },
-  required: ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'type', 'summary', 'signedDate', 'startDate', 'endDate', 'value', 'monthlyValue', 'currency', 'vatIncluded', 'paymentTerms', 'signatories'],
+  required: ['title', 'number', 'reference', 'counterparty', 'counterpartyAddress', 'counterpartyBusinessId', 'type', 'summary', 'signedDate', 'startDate', 'endDate', 'maintenanceMonths', 'maintenanceEndDate', 'value', 'monthlyValue', 'currency', 'vatIncluded', 'paymentTerms', 'signatories'],
 };
 
 function instructions(companyName, fileName) {
@@ -253,6 +258,7 @@ function instructions(companyName, fileName) {
     'Dates are often printed as 17.09.2026 or 27/04/26: write them as 2026-09-17 and 2026-04-27.',
     'Amounts are plain numbers: 2.987,76 € and 2,987.76 € are both 2987.76.',
     'The duration and the payment terms are often in the special conditions (Kushtet e Veçanta) further in, not on the first page; read the whole document.',
+    'endDate is the end of the term for doing the work (afati i realizimit); a warranty or maintenance period after it goes into maintenanceMonths and maintenanceEndDate, not into endDate.',
     fileName ? `File name: ${fileName}` : '',
   ]
     .filter(Boolean)
@@ -289,8 +295,23 @@ function applyReading(contract, result) {
     next[key] = value;
     filled.add(key);
   }
+  // A warranty of so many months counts from the end of the work when the contract gives no last day.
+  const counted = maintenanceEnd(next.endDate, next.maintenanceMonths);
+  if (counted && (isEmpty(next.maintenanceEndDate) || (filled.has('maintenanceEndDate') && isEmpty(cleanDate(result.maintenanceEndDate))))) {
+    next.maintenanceEndDate = counted;
+    filled.add('maintenanceEndDate');
+  }
   next.filled = [...filled];
   return next;
+}
+
+/** 2026-01-20 + 24 months → 2028-01-20; '' without both. */
+function maintenanceEnd(endDate, months) {
+  if (!endDate || !months) return '';
+  const [year, month, day] = endDate.split('-').map(Number);
+  const total = month - 1 + Math.round(months);
+  const last = new Date(Date.UTC(year + Math.floor(total / 12), (total % 12) + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year + Math.floor(total / 12), total % 12, Math.min(day, last))).toISOString().slice(0, 10);
 }
 
 // --- Finding the client the contract is with.
