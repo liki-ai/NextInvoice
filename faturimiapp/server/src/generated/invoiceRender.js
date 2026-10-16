@@ -5488,7 +5488,15 @@ function baseCss(font) {
     .center { text-align: center; }
     .nowrap { white-space: nowrap; }
     .pre { white-space: pre-wrap; }
-    @page { size: A4; margin: 12mm; }
+    /* No top or bottom page margin leaves Chrome no room for its headers and footers (date, title,
+       address, page numbers), so "Save as PDF" starts with them off. The sheet's empty header and
+       footer rows repeat on every printed page and stand in for that margin. */
+    @page { size: A4; margin: 0 12mm; }
+    .sheet { width: 100%; }
+    .sheet > * > tr > td { padding: 0; }
+    .sheet > tbody > tr { break-inside: auto; page-break-inside: auto; }
+    .sheet-gap { height: 12mm; }
+    @media screen { .sheet > thead, .sheet > tfoot { display: none; } }
     @media print { .page { padding: 0; } }
   `;
 }
@@ -5500,7 +5508,7 @@ function shell(v, font, css, body) {
 <title>${esc(v.invoice.number)}</title>
 <style>${baseCss(font)}${css}</style>
 </head>
-<body><div class="page">${body}</div></body>
+<body><table class="sheet"><thead><tr><td class="sheet-gap"></td></tr></thead><tfoot><tr><td class="sheet-gap"></td></tr></tfoot><tbody><tr><td><div class="page">${body}</div></td></tr></tbody></table></body>
 </html>`;
 }
 function paymentRows(v) {
