@@ -128,6 +128,35 @@ function regularMonthly(amounts: number[]) {
   return most >= 3 ? best : null
 }
 
+function words(value: unknown) {
+  return new Set(plainText(value).split(' ').filter((word) => word.length > 1))
+}
+
+/** The same name, or nearly: at least 85 of every 100 words in common. */
+function similarTitle(a: unknown, b: unknown) {
+  const wa = words(a)
+  const wb = words(b)
+  if (wa.size === 0 || wb.size === 0) return false
+  let both = 0
+  for (const word of wa) if (wb.has(word)) both += 1
+  return both / Math.max(wa.size, wb.size) >= 0.85
+}
+
+/**
+ * Whether a row is a contract already in the list, as the server decides it when importing: the same
+ * contract number, or the same name with the same other party or value, unless it starts more than
+ * 45 days apart (a renewal). The server also knows short forms (AVUK) and leaves those out too.
+ */
+export function sameContract(a: Partial<ContractFields>, b: Partial<ContractFields>) {
+  const number = plainText(a.number).replace(/ /g, '')
+  if (number.length >= 4 && number === plainText(b.number).replace(/ /g, '')) return true
+  if (!similarTitle(a.title, b.title)) return false
+  if (a.startDate && b.startDate && Math.abs(Date.parse(a.startDate) - Date.parse(b.startDate)) > 45 * 86400000) return false
+  if (!a.counterparty || !b.counterparty) return true
+  if (plainText(a.counterparty) === plainText(b.counterparty)) return true
+  return a.value != null && b.value != null && Math.abs(Number(a.value) - Number(b.value)) < 0.01
+}
+
 /** Finds the header row: the first of the first rows that names a contract column and at least one more. */
 function findHeader(rows: CellValue[][]) {
   for (let index = 0; index < Math.min(rows.length, 15); index++) {
@@ -138,8 +167,6 @@ function findHeader(rows: CellValue[][]) {
 }
 
 export function planContractImport(workbook: Workbook, existing: Contract[]): ContractImportPlan | null {
-  const known = new Set(existing.map((item) => `${plainText(item.title)}|${plainText(item.counterparty)}`))
-  const knownTitles = new Set(existing.map((item) => plainText(item.title)))
   for (const sheet of workbook.sheets) {
     const header = findHeader(sheet.rows)
     if (!header) continue
@@ -165,11 +192,10 @@ export function planContractImport(workbook: Workbook, existing: Contract[]): Co
         monthlyValue: amountOf(get('monthlyValue')) ?? regularMonthly(months),
         notes: cellText(get('notes')),
       }
-      const key = `${plainText(title)}|${plainText(counterparty)}`
       rows.push({
         fields,
         status: DONE.test(plainText(get('status'))) ? 'completed' : 'active',
-        existing: known.has(key) || (!counterparty && knownTitles.has(plainText(title))),
+        existing: existing.some((item) => sameContract(item, fields)) || rows.some((row) => sameContract(row.fields, fields)),
       })
     }
     if (rows.length > 0) {

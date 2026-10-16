@@ -13,6 +13,7 @@ const upload = multer({ limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 
 const ERRORS = {
   CONTRACT_TITLE: [400, 'Name the contract or add its document.'],
+  CONTRACT_DUPLICATE: [409, 'This contract is already in the list.'],
   CONTRACTS_FULL: [409, 'The list of contracts is full.'],
   FILE_REQUIRED: [400, 'Choose a file.'],
   LIMIT_FILE_SIZE: [413, 'The file is larger than 25 MB.'],
@@ -22,7 +23,7 @@ function sendError(res, err) {
   const code = err && (err.contractCode || err.code);
   const mapped = ERRORS[code];
   if (!mapped) return false;
-  res.status(mapped[0]).json({ error: mapped[1], code });
+  res.status(mapped[0]).json({ error: mapped[1], code, ...(err.detail ? { detail: err.detail } : {}) });
   return true;
 }
 

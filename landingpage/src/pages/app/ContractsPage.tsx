@@ -48,7 +48,7 @@ const STATE_STYLE: Record<ContractState, string> = {
 function errorText(t: T, err: unknown) {
   const code = (err as { code?: string })?.code
   if (code) {
-    const known = t(`contracts.err.${code}`)
+    const known = t(`contracts.err.${code}`, { name: (err as { detail?: string })?.detail || '' })
     if (known !== `contracts.err.${code}`) return known
   }
   return (err as Error)?.message || t('common.error')
@@ -75,7 +75,7 @@ export function ContractsPage() {
   const [previewing, setPreviewing] = useState<Contract | null>(null)
   const [importing, setImporting] = useState(false)
   const [asking, setAsking] = useState<{ kind: 'delete' | 'complete'; contract: Contract } | null>(null)
-  const [imported, setImported] = useState<number | null>(null)
+  const [imported, setImported] = useState<{ added: number; skipped: number } | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -186,7 +186,7 @@ export function ContractsPage() {
       </div>
 
       {notice ? <p className="mt-6 rounded-xl bg-[#F8E8E4] px-4 py-3 text-sm text-[#B0472F]">{notice}</p> : null}
-      {imported != null ? <p className="mt-6 rounded-xl bg-[#E6F4EC] px-4 py-3 text-sm text-[#1F6A42]">{t('contracts.importDone', { count: imported })}</p> : null}
+      {imported != null ? <p className="mt-6 rounded-xl bg-[#E6F4EC] px-4 py-3 text-sm text-[#1F6A42]">{t('contracts.importDone', { count: imported.added })}{imported.skipped ? ` ${t('contracts.importSkipped', { count: imported.skipped })}` : ''}</p> : null}
 
       {loading && contracts.length === 0 ? <p className="mt-12 text-brand-ink/55">{t('common.loading')}</p> : null}
 
@@ -298,11 +298,11 @@ export function ContractsPage() {
         <ImportContractsModal
           contracts={contracts}
           onClose={() => setImporting(false)}
-          onImported={(list, added) => {
+          onImported={(list, added, skipped) => {
             setContracts(list)
             setImporting(false)
             setNotice('')
-            setImported(added)
+            setImported({ added, skipped })
           }}
         />
       ) : null}
@@ -676,6 +676,12 @@ function ContractModal({
             {!uploading && readingState === 'pending' ? <ReadingNote icon="spin" text={t('contracts.readingLong')} /> : null}
             {!uploading && readingState === 'done' && live?.filled?.length ? <ReadingNote icon="done" text={t('contracts.readDone')} /> : null}
             {!uploading && readingState === 'unsupported' ? <ReadingNote icon="warn" text={t('contracts.readUnsupported')} /> : null}
+            {!uploading && live?.duplicateOf && contracts.some((item) => item.id === live.duplicateOf) ? (
+              <ReadingNote
+                icon="warn"
+                text={t(createdHere ? 'contracts.duplicateNew' : 'contracts.duplicateOld', { name: contractName(contracts.find((item) => item.id === live.duplicateOf) as Contract) })}
+              />
+            ) : null}
             {!uploading && readingState === 'failed' ? (
               <ReadingNote icon="warn" text={t('contracts.readFailed')}>
                 <button type="button" onClick={() => void retry()} className="font-semibold text-brand underline-offset-2 hover:underline">
@@ -1049,7 +1055,7 @@ function ConfirmModal({
 
 // --- Bringing contracts in from a spreadsheet.
 
-function ImportContractsModal({ contracts, onClose, onImported }: { contracts: Contract[]; onClose: () => void; onImported: (list: Contract[], added: number) => void }) {
+function ImportContractsModal({ contracts, onClose, onImported }: { contracts: Contract[]; onClose: () => void; onImported: (list: Contract[], added: number, skipped: number) => void }) {
   const { t } = useI18n()
   const { profile } = useAppData()
   const currency = profile?.currency || 'EUR'
@@ -1086,7 +1092,7 @@ function ImportContractsModal({ contracts, onClose, onImported }: { contracts: C
     try {
       const rows = plan.rows.filter((_row, index) => picked.has(index)).map((row) => ({ ...row.fields, status: row.status }))
       const result = await importContracts(rows)
-      onImported(result.contracts, result.added)
+      onImported(result.contracts, result.added, result.skipped)
     } catch (err) {
       setError(errorText(t, err))
       setBusy(false)

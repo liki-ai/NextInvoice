@@ -36,6 +36,8 @@ export type Contract = {
   file: ContractFile | null
   reading: ContractReading | null
   filled: string[]
+  /** The contract already in the list that a read document turned out to be; '' when none. */
+  duplicateOf?: string
   createdAt: string
   updatedAt: string
 }

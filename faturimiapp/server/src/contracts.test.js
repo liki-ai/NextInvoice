@@ -71,3 +71,18 @@ test('a warranty after the work keeps its own end, counted from the end of the w
   const none = applyReading({ filled: [] }, { ...reading, maintenanceMonths: null, maintenanceEndDate: '' });
   assert.ok(!none.maintenanceEndDate);
 });
+
+const { findDuplicate } = require('./contracts/service');
+
+test('the same contract is found under another short name, its value or its number; a renewal is not', () => {
+  const list = [
+    { id: 'fcms', title: 'Zhvillimi dhe mirëmbajtja e Sistemit të kontrollimit të ushqimit (FCMS)', counterparty: 'Agjencia e Ushqimit dhe Veterinarisë', number: '40800-24-9255-2-1-1/C264', startDate: '2025-02-20', value: 295820 },
+    { id: 'kru', title: 'Mirëmbajtja e sistemit të faturimit mobil offline', counterparty: 'K.R.U. MITROVICA SH.A.', clientId: 'kru', startDate: '2026-03-20', value: 3499.92 },
+    { id: 'hr', title: 'Mobile Billing', counterparty: 'HR Jugor' },
+  ];
+  assert.equal(findDuplicate(list, { title: 'ZHVILLIMI DHE MIREMBAJTJA E SISTEMIT TE KONTROLLIMIT TE USHQIMIT (FCMS)', counterparty: 'AVUK', startDate: '2025-03-04', value: 295820 }, clients)?.id, 'fcms');
+  assert.equal(findDuplicate(list, { title: 'Tjetër emër', number: '40800-24-9255-2-1-1/c264' }, clients)?.id, 'fcms');
+  assert.equal(findDuplicate(list, { title: 'Mirembajtja e sistemit te faturimit mobil offline', counterparty: 'KRUM', startDate: '2026-03-25' }, clients)?.id, 'kru');
+  assert.equal(findDuplicate(list, { title: 'Mirembajtja e sistemit te faturimit mobil offline', counterparty: 'KRUM', startDate: '2027-03-20' }, clients), null);
+  assert.equal(findDuplicate(list, { title: 'Mobile Billing', counterparty: 'Gjakova' }, clients), null);
+});

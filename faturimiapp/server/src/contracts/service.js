@@ -113,6 +113,15 @@ async function create(ownerId, account, body, file) {
   if (getContracts(ownerId).length >= CONTRACTS_MAX) throw contractError('CONTRACTS_FULL');
   const fields = fieldsFrom(body || {});
   if (!file && !fields.title && !fields.number) throw contractError('CONTRACT_TITLE');
+  // Typed in by hand: the same contract twice is refused. A document is read first and warned about.
+  if (!file) {
+    const same = findDuplicate(getContracts(ownerId), fields, listClients(ownerId));
+    if (same) {
+      const err = contractError('CONTRACT_DUPLICATE');
+      err.detail = same.title || same.number;
+      throw err;
+    }
+  }
   const kept = await keepFile(ownerId, file);
   const contract = newContract(account, fields, kept);
   saveContracts(ownerId, [contract, ...getContracts(ownerId)]);
@@ -158,9 +167,6 @@ function newContract(account, fields, kept) {
 
 const IMPORT_MAX = 500;
 
-function sameKey(contract) {
-  return `${nameWords(contract.title).join(' ')}|${nameWords(contract.counterparty).join(' ')}`;
-}
 
 /**
  * Adds the contracts of a spreadsheet, each linked to its client when the other party is one. A row
@@ -170,15 +176,13 @@ function importContracts(ownerId, account, rows) {
   const list = Array.isArray(rows) ? rows.slice(0, IMPORT_MAX) : [];
   const current = getContracts(ownerId);
   if (current.length + list.length > CONTRACTS_MAX) throw contractError('CONTRACTS_FULL');
-  const known = new Set(current.map(sameKey));
   const clients = listClients(ownerId);
   const added = [];
   for (const row of list) {
     const fields = fieldsFrom(row || {});
     if (!fields.title && !fields.number) continue;
     const contract = newContract(account, fields, null);
-    if (known.has(sameKey(contract))) continue;
-    known.add(sameKey(contract));
+    if (findDuplicate([...current, ...added], contract, clients)) continue;
     if (row.status === 'completed') {
       contract.status = 'completed';
       contract.completedAt = contract.endDate && contract.endDate <= nowIso().slice(0, 10) ? contract.endDate : nowIso().slice(0, 10);
@@ -355,6 +359,55 @@ function maintenanceEnd(endDate, months) {
   return new Date(Date.UTC(year + Math.floor(total / 12), total % 12, Math.min(day, last))).toISOString().slice(0, 10);
 }
 
+// --- Telling the same contract apart from another one.
+
+function numberKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** The same name, or nearly: at least 85 of every 100 words in common. */
+function similarTitle(a, b) {
+  const wa = new Set(nameWords(a));
+  const wb = new Set(nameWords(b));
+  if (wa.size === 0 || wb.size === 0) return false;
+  let both = 0;
+  for (const word of wa) if (wb.has(word)) both += 1;
+  return both / Math.max(wa.size, wb.size) >= 0.85;
+}
+
+function partyOf(contract, clients) {
+  if (contract.clientId) return contract.clientId;
+  const client = contract.counterparty ? matchClient(clients, contract) : null;
+  return client ? client.id : '';
+}
+
+/** Same other party (by client, name or short form), the same value, or no party on one of them. */
+function sameSide(a, b, clients) {
+  if ((!a.counterparty && !a.clientId) || (!b.counterparty && !b.clientId)) return true;
+  const pa = partyOf(a, clients);
+  if (pa && pa === partyOf(b, clients)) return true;
+  if (sameName(a.counterparty, b.counterparty)) return true;
+  return a.value != null && b.value != null && Math.abs(Number(a.value) - Number(b.value)) < 0.01;
+}
+
+/**
+ * The contract already in `list` that `contract` is: the same contract number, or the same name
+ * with the same other party or value. A renewal (same name, a start more than 45 days apart) is
+ * another contract.
+ */
+function findDuplicate(list, contract, clients) {
+  const number = numberKey(contract.number);
+  return (
+    list.find((other) => {
+      if (other.id && other.id === contract.id) return false;
+      if (number.length >= 4 && number === numberKey(other.number)) return true;
+      if (!similarTitle(other.title, contract.title)) return false;
+      if (other.startDate && contract.startDate && Math.abs(Date.parse(other.startDate) - Date.parse(contract.startDate)) > 45 * 86400000) return false;
+      return sameSide(other, contract, clients);
+    }) || null
+  );
+}
+
 // --- Finding the client the contract is with.
 
 const LEGAL_WORDS = new Set(['shpk', 'sh', 'sha', 'pk', 'llc', 'ltd', 'inc', 'gmbh', 'srl', 'spa', 'doo', 'dooel']);
@@ -446,13 +499,17 @@ async function readOne(ownerId, id) {
       // A different document was put in while this one was being read; its own reading follows.
       if (!current.file || current.file.id !== fileId) return null;
       const next = { ...applyReading(current, result), reading: { state: 'done', at: nowIso() } };
+      const clients = listClients(ownerId);
       if (!next.clientId) {
-        const client = matchClient(listClients(ownerId), next);
+        const client = matchClient(clients, next);
         if (client) {
           next.clientId = client.id;
           next.filled = [...next.filled, 'clientId'];
         }
       }
+      // The document may be a contract that is already in the list; the page says so.
+      const same = findDuplicate(getContracts(ownerId), next, clients);
+      next.duplicateOf = same ? same.id : '';
       return next;
     });
   } catch (err) {
@@ -490,6 +547,7 @@ function startContractReading() {
 
 module.exports = {
   applyReading,
+  findDuplicate,
   importContracts,
   matchClient,
   contractFile,
