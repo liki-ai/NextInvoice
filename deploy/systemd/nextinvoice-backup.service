@@ -1,0 +1,14 @@
+# Installed at /etc/systemd/system/. Run by nextinvoice-backup.timer; see deploy/BACKUP-RESTORE.md.
+[Unit]
+Description=NextInvoice database backup to Amazon S3
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/nextinvoice/backup-s3.sh
+Environment=HOME=/root
+TimeoutStartSec=2h
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

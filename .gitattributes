@@ -1,2 +1,3 @@
 # Shell scripts run on the Linux server (and are copied there as they are): always LF.
 *.sh text eol=lf
+deploy/systemd/* text eol=lf

@@ -1,0 +1,12 @@
+# Installed at /etc/systemd/system/. Every day at 02:00 Kosovo time (IANA has no Europe/Pristina;
+# Kosovo uses Europe/Belgrade). A run missed while the server was off happens at the next boot.
+[Unit]
+Description=Daily NextInvoice database backup to Amazon S3
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 Europe/Belgrade
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

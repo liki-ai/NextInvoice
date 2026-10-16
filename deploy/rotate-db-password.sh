@@ -33,11 +33,11 @@ REMOTE
 echo "==> copying the code and building the api"
 tar -C "$ROOT/server" --exclude=node_modules --exclude=data --exclude=.env -cf - . | ssh "$HOST" 'rm -rf /opt/nextinvoice/server/src && tar -C /opt/nextinvoice/server -xf -'
 scp -q "$ROOT/deploy/docker-compose.yml" "$HOST:/opt/nextinvoice/docker-compose.next.yml"
-scp -q "$ROOT/deploy/backup.sh" "$HOST:/opt/nextinvoice/"
+scp -q "$ROOT/deploy/backup-s3.sh" "$HOST:/opt/nextinvoice/"
 ssh "$HOST" bash -s <<'REMOTE'
 set -eu
 cd /opt/nextinvoice
-chmod +x backup.sh
+chmod +x backup-s3.sh
 # The new compose file wants the secret in place; the new password stands in for the build only.
 cp -p secrets/db_password.new secrets/db_password
 docker compose -f docker-compose.next.yml build api 2>&1 | tail -3
