@@ -169,6 +169,32 @@ function companySnapshot(profile) {
   }
 }
 
+/** The people who may sign the company's invoices. A removed one stays stored for the invoices it signed. */
+function activeSigners(profile) {
+  return (Array.isArray(profile?.signers) ? profile.signers : []).filter((item) => item && item.id && !item.removed)
+}
+
+/** The signer an invoice gets when nobody picked one: the default, or else the first. */
+function defaultSignerId(profile) {
+  const active = activeSigners(profile)
+  return (active.find((item) => item.id === profile?.defaultSignerId) || active[0] || {}).id || ''
+}
+
+/**
+ * Before there were signers the company kept one signature. It becomes the first signer, the default,
+ * named after the contact person and linked to the owner, and every invoice so far is marked as signed
+ * by them, so nothing printed changes. Returns whether anything moved.
+ */
+function migrateSigners(profile, invoices, { id, userId }) {
+  if (!profile || Array.isArray(profile.signers) || !profile.signatureData) return false
+  profile.signers = [{ id, name: String(profile.contactPerson || '').trim(), role: '', userId: userId || '', signatureData: profile.signatureData }]
+  profile.defaultSignerId = id
+  for (const invoice of invoices || []) {
+    if (invoice && !invoice.signerId) invoice.signerId = id
+  }
+  return true
+}
+
 function clientSnapshot(client) {
   if (!client) return { fullName: '', firstName: '', lastName: '', address: '', phone: '', email: '', businessId: '', notes: '', measurements: {}, photos: [] }
   const firstName = String(client.firstName || '').trim()
@@ -329,6 +355,9 @@ module.exports = {
   isOverdue,
   allocateInvoiceNumber,
   companySnapshot,
+  activeSigners,
+  defaultSignerId,
+  migrateSigners,
   clientSnapshot,
   vatFreeClientIds,
   pdfCompany,

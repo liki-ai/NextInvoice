@@ -91,6 +91,8 @@ export function companyForPdf(
     industry: snapshot.industry ?? live.industry,
     logoData: live.logoData,
     signatureData: live.signatureData,
+    signers: live.signers,
+    defaultSignerId: live.defaultSignerId,
     stampData: live.stampData,
     invoiceTemplate: live.invoiceTemplate,
     accentColor: live.accentColor,

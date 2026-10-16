@@ -47,6 +47,8 @@ export type Invoice = {
   pricesIncludeTax?: boolean
   /** Printed without the company's signature and stamp, to be signed and stamped by hand. */
   unsigned?: boolean
+  /** Which of the company's signers signs it; none means the company's default signer. */
+  signerId?: string
   /** The client's contract this invoice bills under, printed in one line above the items. */
   contractName?: string
   contractNumber?: string
@@ -105,8 +107,12 @@ export type CompanyProfile = {
   /** Set by the mobile app: a path on that phone, useless in a browser. */
   logoUri?: string
   logoData?: string
+  /** The default signer's signature, kept in step by the server for the apps that know only one. */
   signatureData?: string
   stampData?: string
+  /** The people who may sign the company's invoices, each with their own signature. */
+  signers?: import('./signers').Signer[]
+  defaultSignerId?: string
   invoiceTemplate?: string
   /** Empty = the template's own colour. */
   accentColor?: string

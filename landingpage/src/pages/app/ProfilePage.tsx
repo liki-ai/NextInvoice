@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Check, Eye, ImagePlus, LogOut, Settings, Trash2 } from 'lucide-react'
+import { Check, Eye, ImagePlus, LogOut, Plus, Settings, Star, Trash2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -8,7 +8,8 @@ import { Button, Card, Field, Modal, Select, TextArea } from '../../components/u
 import { LanguagePicker } from '../../components/LangSwitch'
 import { MailSettingsCard } from '../../components/MailSettingsCard'
 import { SlackSettingsCard } from '../../components/SlackSettingsCard'
-import { canManageCompany } from '../../lib/team'
+import { canManageCompany, type Team, type TeamMember } from '../../lib/team'
+import { SIGNER_ROLES, companySigners, defaultSigner, signerRoleKey, type Signer } from '../../lib/signers'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { CURRENCIES, DEFAULT_EXPORT_NOTE, normalizeTaxRate, usesExportNote, type CompanyProfile } from '../../lib/invoice'
@@ -43,13 +44,12 @@ const EDITABLE = [
   'exportNote',
   'industry',
   'logoData',
-  'signatureData',
   'stampData',
   'invoiceTemplate',
   'accentColor',
 ] as const satisfies readonly (keyof CompanyProfile)[]
 
-type ImageField = 'logoData' | 'signatureData' | 'stampData'
+type ImageField = 'logoData' | 'stampData'
 
 const TEMPLATE_KEYS: Record<InvoiceTemplateId, string> = {
   classic: 'Classic',
@@ -69,6 +69,8 @@ function toForm(profile: CompanyProfile): CompanyProfile {
     accentColor: isHexColor(profile.accentColor) ? profile.accentColor : '',
     defaultTaxRate: normalizeTaxRate(profile.defaultTaxRate),
     showContract: Boolean(profile.showContract),
+    signers: companySigners(profile),
+    defaultSignerId: defaultSigner(profile)?.id || '',
   }
 }
 
@@ -76,7 +78,9 @@ function sameFields(a: CompanyProfile, b: CompanyProfile) {
   return (
     EDITABLE.every((key) => (a[key] ?? '') === (b[key] ?? '')) &&
     (a.defaultTaxRate ?? 0) === (b.defaultTaxRate ?? 0) &&
-    Boolean(a.showContract) === Boolean(b.showContract)
+    Boolean(a.showContract) === Boolean(b.showContract) &&
+    JSON.stringify(a.signers || []) === JSON.stringify(b.signers || []) &&
+    (a.defaultSignerId || '') === (b.defaultSignerId || '')
   )
 }
 
@@ -192,12 +196,170 @@ function ImageSlot({
   )
 }
 
+/**
+ * The company's authorized representatives, each with their own signature: name, role, the app user
+ * they are, and which one is the default. One taken off the list while invoices still name them stays
+ * stored, hidden, so those invoices keep printing their signature.
+ */
+function SignersEditor({
+  signers,
+  defaultId,
+  usedIds,
+  members,
+  busyId,
+  onChange,
+  onPickImage,
+}: {
+  signers: Signer[]
+  defaultId: string
+  usedIds: Set<string>
+  members: TeamMember[]
+  busyId: string
+  onChange: (signers: Signer[], defaultId: string) => void
+  onPickImage: (id: string, file: File) => void
+}) {
+  const { t } = useI18n()
+  const shown = signers.filter((item) => !item.removed)
+  const current = shown.find((item) => item.id === defaultId)?.id || shown[0]?.id || ''
+  // Rows whose role is typed by hand show the text box, also while it is still empty.
+  const [typedRole, setTypedRole] = useState<Set<string>>(() => new Set(signers.filter((item) => item.role && !signerRoleKey(item.role)).map((item) => item.id)))
+
+  function patch(id: string, change: Partial<Signer>) {
+    onChange(
+      signers.map((item) => (item.id === id ? { ...item, ...change } : item)),
+      current,
+    )
+  }
+
+  function add() {
+    const id = crypto.randomUUID()
+    onChange([...signers, { id, name: '', role: '', userId: '', signatureData: '' }], current || id)
+  }
+
+  function remove(id: string) {
+    const next = usedIds.has(id) ? signers.map((item) => (item.id === id ? { ...item, removed: true } : item)) : signers.filter((item) => item.id !== id)
+    const left = next.filter((item) => !item.removed)
+    onChange(next, current === id ? left[0]?.id || '' : current)
+  }
+
+  return (
+    <div>
+      <p className="text-sm font-semibold">{t('profile.signersTitle')}</p>
+      <p className="mt-1 text-xs leading-5 text-brand-ink/50">{t('profile.signersHint')}</p>
+      {shown.length === 0 ? <p className="mt-4 rounded-xl bg-brand-bg px-4 py-3 text-sm text-brand-ink/55">{t('profile.signersEmpty')}</p> : null}
+      <div className="mt-4 space-y-3">
+        {shown.map((signer) => {
+          const isDefault = signer.id === current
+          const preset = signerRoleKey(signer.role) ? signer.role || '' : ''
+          const typed = typedRole.has(signer.id)
+          return (
+            <div key={signer.id} className={cn('rounded-2xl border p-4', isDefault ? 'border-brand/40 bg-brand/[0.03]' : 'border-brand-ink/10')}>
+              <div className="flex flex-col gap-5 md:flex-row">
+                <div className="shrink-0">
+                  <ImageSlot
+                    label={t('profile.signature')}
+                    value={signer.signatureData}
+                    wide
+                    busy={busyId === signer.id}
+                    uploadLabel={t('profile.upload')}
+                    changeLabel={t('profile.change')}
+                    removeLabel={t('profile.remove')}
+                    onPick={(file) => onPickImage(signer.id, file)}
+                    onRemove={() => patch(signer.id, { signatureData: '' })}
+                  />
+                </div>
+                <div className="grid min-w-0 flex-1 gap-x-4 sm:grid-cols-2">
+                  <Field
+                    wrapperClassName="sm:col-span-2"
+                    label={t('profile.signerName')}
+                    value={signer.name}
+                    onChange={(e) => patch(signer.id, { name: e.target.value })}
+                  />
+                  <div className="mb-4">
+                    <Select
+                      label={t('profile.signerRole')}
+                      value={typed ? 'custom' : preset}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setTypedRole((prev) => {
+                          const next = new Set(prev)
+                          if (value === 'custom') next.add(signer.id)
+                          else next.delete(signer.id)
+                          return next
+                        })
+                        patch(signer.id, { role: value === 'custom' ? (signerRoleKey(signer.role) ? '' : signer.role) : value })
+                      }}
+                    >
+                      <option value="">{t('profile.signerRoleNone')}</option>
+                      {SIGNER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {t(`pdf.${signerRoleKey(role)}`)}
+                        </option>
+                      ))}
+                      <option value="custom">{t('profile.signerRoleCustom')}</option>
+                    </Select>
+                    {typed ? (
+                      <input
+                        aria-label={t('profile.signerRole')}
+                        value={signer.role || ''}
+                        placeholder={t('profile.signerRolePh')}
+                        onChange={(e) => patch(signer.id, { role: e.target.value })}
+                        className="-mt-2.5 w-full rounded-xl border border-brand-ink/10 bg-white px-4 py-3 text-sm outline-none placeholder:text-brand-ink/35 focus:border-brand focus:ring-2 focus:ring-brand/15"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="mb-4">
+                    <Select label={t('profile.signerUser')} value={signer.userId || ''} onChange={(e) => patch(signer.id, { userId: e.target.value })}>
+                      <option value="">{t('profile.signerUserNone')}</option>
+                      {signer.userId && !members.some((member) => member.id === signer.userId) ? <option value={signer.userId}>{signer.userId}</option> : null}
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.email}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/8 pt-3">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold">
+                  <input type="radio" name="default-signer" checked={isDefault} onChange={() => onChange(signers, signer.id)} className="h-4 w-4 accent-[#2C6E7F]" />
+                  {isDefault ? (
+                    <span className="inline-flex items-center gap-1 text-brand">
+                      <Star className="h-3.5 w-3.5 fill-current" />
+                      {t('profile.signerDefault')}
+                    </span>
+                  ) : (
+                    <span className="text-brand-ink/60">{t('profile.signerMakeDefault')}</span>
+                  )}
+                </label>
+                <button type="button" onClick={() => remove(signer.id)} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-[#C0503A] hover:bg-[#F8E8E4]">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {t('profile.signerRemove')}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={add}
+        className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-dashed border-brand-ink/20 px-3.5 py-2 text-sm font-semibold text-brand hover:border-brand/40 hover:bg-brand/5"
+      >
+        <Plus className="h-4 w-4" />
+        {t('profile.signerAdd')}
+      </button>
+    </div>
+  )
+}
+
 /** Which part of the settings to show: the company's own page, or one tab of the invoice settings. */
 export type ProfilePart = 'company' | 'templates' | 'defaults'
 
 export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
   const { user, logout } = useAuth()
-  const { profile, saveProfile, downloadBackup, restoreBackup } = useAppData()
+  const { profile, invoices, saveProfile, downloadBackup, restoreBackup } = useAppData()
   const { t, dict, lang } = useI18n()
   const navigate = useNavigate()
   // A plain user of the company sees its settings but cannot change them.
@@ -210,7 +372,23 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [restoreBusy, setRestoreBusy] = useState(false)
-  const [imageBusy, setImageBusy] = useState<ImageField | null>(null)
+  // The image field, or the id of the signer, whose picture is being read.
+  const [imageBusy, setImageBusy] = useState<string | null>(null)
+  // The company's users, to say which of them each signer is.
+  const [members, setMembers] = useState<TeamMember[]>([])
+  const signedIds = useMemo(() => new Set(invoices.map((inv) => inv.signerId || '').filter(Boolean)), [invoices])
+  useEffect(() => {
+    if (part !== 'defaults') return undefined
+    let live = true
+    api<Team>('/api/team')
+      .then((team) => {
+        if (live) setMembers(team.members)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [part])
   const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateId | null>(null)
   // Kept as typed text so "18." or an empty box can be typed; the form holds the parsed rate.
   const [taxInput, setTaxInput] = useState(() => String(baseline?.defaultTaxRate ?? 0))
@@ -275,6 +453,19 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
     }
   }
 
+  async function onPickSignature(id: string, file: File) {
+    setImageBusy(id)
+    setError('')
+    try {
+      const image = await fileToBrandImage(file, 520)
+      setForm((prev) => (prev ? { ...prev, signers: (prev.signers || []).map((item) => (item.id === id ? { ...item, signatureData: image } : item)) } : prev))
+    } catch {
+      setError(t('profile.imageError'))
+    } finally {
+      setImageBusy(null)
+    }
+  }
+
   async function onImport(file: File | undefined) {
     if (!file) return
     setImporting(true)
@@ -327,6 +518,8 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
       payload.language = lang
       payload.defaultTaxRate = form.defaultTaxRate ?? 0
       payload.showContract = Boolean(form.showContract)
+      payload.signers = (form.signers || []).map((item) => ({ ...item, name: item.name.trim(), role: String(item.role || '').trim() }))
+      payload.defaultSignerId = form.defaultSignerId || ''
       const saved = await saveProfile(payload)
       setForm(toForm(saved))
       setNotice(t('profile.saveSuccess'))
@@ -464,16 +657,16 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
   )
   const signatureSection = (
     <SettingsSection title={t('profile.sectionSignature')} hint={t('profile.signatureHint')}>
-      <div className="grid gap-6 sm:grid-cols-2">
-        <ImageSlot
-          label={t('profile.signature')}
-          value={form.signatureData}
-          wide
-          busy={imageBusy === 'signatureData'}
-          {...imageLabels}
-          onPick={(file) => void onPickImage('signatureData', file)}
-          onRemove={() => setField('signatureData', '')}
-        />
+      <SignersEditor
+        signers={form.signers || []}
+        defaultId={form.defaultSignerId || ''}
+        usedIds={signedIds}
+        members={members}
+        busyId={imageBusy || ''}
+        onChange={(signers, defaultSignerId) => setForm((prev) => (prev ? { ...prev, signers, defaultSignerId } : prev))}
+        onPickImage={(id, file) => void onPickSignature(id, file)}
+      />
+      <div className="mt-6 border-t border-brand-ink/8 pt-5">
         <ImageSlot
           label={t('profile.stamp')}
           value={form.stampData}
@@ -482,6 +675,7 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
           onPick={(file) => void onPickImage('stampData', file)}
           onRemove={() => setField('stampData', '')}
         />
+        <p className="mt-2 text-xs text-brand-ink/45">{t('profile.stampHint')}</p>
       </div>
     </SettingsSection>
   )

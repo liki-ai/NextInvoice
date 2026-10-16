@@ -30,6 +30,44 @@ const TEXT_FIELDS = {
 // Images travel as data URLs. The web client downsizes them first; this is the backstop.
 const IMAGE_FIELDS = ['logoData', 'signatureData', 'stampData'];
 const MAX_IMAGE_CHARS = 1_500_000;
+// Removed signers stay stored for the invoices they signed, so the list holds a few more than are shown.
+const MAX_SIGNERS = 30;
+
+function checkedImage(raw) {
+  const value = String(raw ?? '');
+  if (value && !/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value)) {
+    const err = new Error('Image must be a PNG, JPG, WEBP or GIF.');
+    err.status = 400;
+    throw err;
+  }
+  if (value.length > MAX_IMAGE_CHARS) {
+    const err = new Error('Image is too large.');
+    err.status = 413;
+    throw err;
+  }
+  return value;
+}
+
+/** The people who may sign the company's invoices: name, role, the app user they are, their signature. */
+function sanitizeSigners(list) {
+  const seen = new Set();
+  const signers = [];
+  for (const item of list.slice(0, MAX_SIGNERS)) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String(item.id || '').trim().slice(0, 64);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    signers.push({
+      id,
+      name: String(item.name || '').trim().slice(0, 120),
+      role: String(item.role || '').trim().slice(0, 120),
+      userId: String(item.userId || '').trim().slice(0, 64),
+      signatureData: checkedImage(item.signatureData),
+      ...(item.removed === true ? { removed: true } : {}),
+    });
+  }
+  return signers;
+}
 
 function sanitizeProfile(body) {
   const partial = {};
@@ -40,18 +78,12 @@ function sanitizeProfile(body) {
   }
   for (const key of IMAGE_FIELDS) {
     if (src[key] === undefined || src[key] === null) continue;
-    const value = String(src[key]);
-    if (value && !/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value)) {
-      const err = new Error('Image must be a PNG, JPG, WEBP or GIF.');
-      err.status = 400;
-      throw err;
-    }
-    if (value.length > MAX_IMAGE_CHARS) {
-      const err = new Error('Image is too large.');
-      err.status = 413;
-      throw err;
-    }
-    partial[key] = value;
+    partial[key] = checkedImage(src[key]);
+  }
+  // The signature of the whole company follows from the signers (the default one's); see the store.
+  if (Array.isArray(src.signers)) {
+    partial.signers = sanitizeSigners(src.signers);
+    partial.defaultSignerId = String(src.defaultSignerId || '').slice(0, 64);
   }
   if (['sq', 'en', 'it'].includes(src.language)) partial.language = src.language;
   if (INDUSTRIES.includes(src.industry)) partial.industry = src.industry;

@@ -17,6 +17,8 @@ const {
   clientSnapshot,
   parseLooseDate,
   vatFreeClientIds,
+  defaultSignerId,
+  migrateSigners,
 } = require('./domain')
 const { sanitizeProfile } = require('./routes/profile')
 
@@ -134,6 +136,43 @@ describe('company profile', () => {
   it('rejects images that are not image data URLs', () => {
     assert.throws(() => sanitizeProfile({ logoData: 'javascript:alert(1)' }))
     assert.throws(() => sanitizeProfile({ logoData: 'data:image/svg+xml;base64,AAAA' }))
+  })
+
+  it('keeps the signers, each with their own checked signature', () => {
+    const ink = 'data:image/png;base64,AAAA'
+    const saved = sanitizeProfile({
+      signers: [
+        { id: 's1', name: ' Lirim Sulejmani ', role: 'managingDirector', userId: 'u1', signatureData: ink, extra: 'x' },
+        { id: 's1', name: 'Twice' },
+        { name: 'No id' },
+        { id: 's2', name: 'Besmir Sejdiu', removed: true },
+      ],
+      defaultSignerId: 's1',
+    })
+    assert.deepEqual(saved.signers, [
+      { id: 's1', name: 'Lirim Sulejmani', role: 'managingDirector', userId: 'u1', signatureData: ink },
+      { id: 's2', name: 'Besmir Sejdiu', role: '', userId: '', signatureData: '', removed: true },
+    ])
+    assert.equal(saved.defaultSignerId, 's1')
+    assert.throws(() => sanitizeProfile({ signers: [{ id: 's1', signatureData: 'javascript:alert(1)' }] }))
+  })
+
+  it('moves the one company signature to a first, default signer', () => {
+    const profile = { contactPerson: 'Lirim Sulejmani', signatureData: 'data:image/png;base64,AAAA' }
+    const invoices = [{ id: 'a' }, { id: 'b', signerId: 'other' }]
+    assert.equal(migrateSigners(profile, invoices, { id: 's1', userId: 'owner' }), true)
+    assert.deepEqual(profile.signers, [{ id: 's1', name: 'Lirim Sulejmani', role: '', userId: 'owner', signatureData: 'data:image/png;base64,AAAA' }])
+    assert.equal(profile.defaultSignerId, 's1')
+    assert.deepEqual(invoices.map((inv) => inv.signerId), ['s1', 'other'])
+    assert.equal(migrateSigners(profile, invoices, { id: 's2', userId: 'owner' }), false)
+    assert.equal(migrateSigners({ contactPerson: 'X' }, [], { id: 's3' }), false)
+  })
+
+  it('falls back to the first signer still listed when the default is gone', () => {
+    const signers = [{ id: 'a', removed: true }, { id: 'b' }, { id: 'c' }]
+    assert.equal(defaultSignerId({ signers, defaultSignerId: 'c' }), 'c')
+    assert.equal(defaultSignerId({ signers, defaultSignerId: 'a' }), 'b')
+    assert.equal(defaultSignerId({}), '')
   })
 
   it('snapshots legal fields but not images', () => {

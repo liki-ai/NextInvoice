@@ -5,6 +5,9 @@ const {
   clientSnapshot,
   vatFreeClientIds,
   companySnapshot,
+  activeSigners,
+  defaultSignerId,
+  migrateSigners,
   hydrateInvoice,
   hydrateObligation,
   similarClient,
@@ -97,7 +100,7 @@ function clientIdentityKey(client) {
 }
 
 // Per-user data version; see MIGRATIONS.md.
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 
 function markVatFreeClients(db, userId) {
   const ids = new Set(vatFreeClientIds(db.invoices[userId], db.clients[userId]));
@@ -113,6 +116,7 @@ function migrateUserData(userId) {
   if (version >= DATA_VERSION) return;
   if (version < 1) migrateToV1(db, userId);
   if (version < 2) markVatFreeClients(db, userId);
+  if (version < 3) migrateSigners(db.profiles[userId], db.invoices[userId], { id: crypto.randomUUID(), userId });
   db.migrations[userId] = { v: DATA_VERSION, at: nowIso() };
   writeDb(db);
 }
@@ -542,9 +546,26 @@ function updateProfile(userId, partial) {
   migrateUserData(userId);
   const db = readDb();
   const current = db.profiles[userId] || { ...DEFAULT_COMPANY_PROFILE, language: 'sq' };
-  db.profiles[userId] = { ...current, ...partial, updatedAt: nowIso() };
+  db.profiles[userId] = withSigners(current, partial);
   writeDb(db);
   return db.profiles[userId];
+}
+
+/**
+ * The profile after a change, with the signers and the one company signature in step: the signature
+ * older apps read and write is the default signer's, so a change from such an app goes to that signer.
+ */
+function withSigners(current, partial) {
+  const next = { ...current, ...partial, updatedAt: nowIso() };
+  if (partial.signers === undefined && partial.signatureData !== undefined && Array.isArray(current.signers)) {
+    const id = defaultSignerId(current);
+    if (id) next.signers = current.signers.map((item) => (item.id === id ? { ...item, signatureData: partial.signatureData } : item));
+  }
+  if (Array.isArray(next.signers)) {
+    next.defaultSignerId = defaultSignerId(next);
+    next.signatureData = (activeSigners(next).find((item) => item.id === next.defaultSignerId) || {}).signatureData || '';
+  }
+  return next;
 }
 
 function listInvoices(userId) {
@@ -649,6 +670,8 @@ function attachInvoiceSnapshots(userId, invoice, { issued } = {}) {
       currency: profile.currency || 'EUR',
       snapshotSource: 'issued',
       issuedAt: invoice.issuedAt || nowIso(),
+      // Who signs it stays on the invoice, so a later change of the default does not re-sign it.
+      signerId: invoice.signerId || defaultSignerId(profile) || undefined,
     };
   }
   return {
@@ -727,6 +750,8 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
       ...(partial.sent !== undefined ? { sent: partial.sent } : {}),
       // Printing without signature and stamp changes no figure, so an issued invoice may change it.
       ...(partial.unsigned !== undefined ? { unsigned: Boolean(partial.unsigned) } : {}),
+      // So may which of the company's signers signs it.
+      ...(partial.signerId !== undefined ? { signerId: String(partial.signerId || '') } : {}),
       // The contract the invoice bills under changes no figure either.
       ...(partial.contractName !== undefined ? { contractName: String(partial.contractName || '') } : {}),
       ...(partial.contractNumber !== undefined ? { contractNumber: String(partial.contractNumber || '') } : {}),
@@ -1341,6 +1366,14 @@ function sharedInvoiceOwner(token) {
   return null;
 }
 
+/** The company as a share link shows it: of the signers, only the one who signs this invoice. */
+function sharedProfile(profile, invoice) {
+  if (!profile) return null;
+  if (!Array.isArray(profile.signers)) return profile;
+  const id = invoice.signerId || defaultSignerId(profile);
+  return { ...profile, signers: profile.signers.filter((item) => item.id === id) };
+}
+
 /** What a recipient may see through a share link: the invoice as printed, nothing internal. */
 function sharedInvoice(token) {
   const code = String(token || '');
@@ -1364,6 +1397,7 @@ function sharedInvoice(token) {
         taxRate: invoice.taxRate,
         notes: invoice.notes || '',
         unsigned: Boolean(invoice.unsigned),
+        signerId: invoice.signerId || '',
         contractName: invoice.contractName || '',
         contractNumber: invoice.contractNumber || '',
         subtotal: invoice.subtotal,
@@ -1382,7 +1416,7 @@ function sharedInvoice(token) {
           fiscalNumber: client.fiscalNumber || '',
         },
       },
-      profile: db.profiles[userId] || null,
+      profile: sharedProfile(db.profiles[userId], invoice),
     };
   }
   return null;

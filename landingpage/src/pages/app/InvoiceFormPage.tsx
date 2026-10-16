@@ -28,6 +28,9 @@ import { localizeCompanyProfile } from '../../lib/companySamples'
 import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemplates'
 import { TemplateSwitch } from '../../components/TemplateSwitch'
 import { UnsignedToggle } from '../../components/UnsignedToggle'
+import { SignerPicker } from '../../components/SignerPicker'
+import { useAuth } from '../../context/AuthContext'
+import { proposedSigner } from '../../lib/signers'
 import { clientDisplayName, clientMatchesQuery, composeClient, findMatchingClient, frequentClients } from '../../lib/client'
 import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catalog'
 import { fileToSupportedImageDataUrl } from '../../lib/proof'
@@ -63,6 +66,7 @@ export function InvoiceFormPage() {
   const { invoiceId } = useParams()
   const { invoices, clients, items: catalogItems, profile, createInvoice, updateInvoice, issueInvoice, correctInvoice, createClient } = useAppData()
   const { t, dict } = useI18n()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const existing = invoiceId ? invoices.find((inv) => inv.id === invoiceId) : null
@@ -84,6 +88,7 @@ export function InvoiceFormPage() {
     taxRate: String(existing?.taxRate ?? '0'),
     pricesIncludeTax: Boolean(existing?.pricesIncludeTax),
     unsigned: Boolean(existing?.unsigned),
+    signerId: existing?.signerId || '',
     contractName: existing?.contractName || '',
     contractNumber: existing?.contractNumber || '',
     notes: existing?.notes || '',
@@ -102,6 +107,13 @@ export function InvoiceFormPage() {
   const [items, setItems] = useState<InvoiceItem[]>(() => (existing?.items?.length ? formItems(existing) : [emptyItem()]))
   // Prices typed with VAT included: the total is what was typed and the subtotal is worked back from it.
   const [unsigned, setUnsigned] = useState(() => Boolean(existing?.unsigned))
+  // A new invoice proposes the signature of the person making it, when they sign for the company; otherwise the default signer's.
+  const proposedSignerId = proposedSigner(profile, user?.accountId || user?.id)?.id || ''
+  const [signerId, setSignerId] = useState(() => (existing ? existing.signerId || '' : proposedSignerId))
+  const signerTouched = useRef(Boolean(existing))
+  useEffect(() => {
+    if (!signerTouched.current) setSignerId(proposedSignerId)
+  }, [proposedSignerId])
   const [contractName, setContractName] = useState(existing?.contractName || '')
   const [contractNumber, setContractNumber] = useState(existing?.contractNumber || '')
   const [contractOpen, setContractOpen] = useState(true)
@@ -153,6 +165,8 @@ export function InvoiceFormPage() {
     setItems(existing.items?.length ? formItems(existing) : [emptyItem()])
     setPricesIncludeTax(Boolean(existing.pricesIncludeTax))
     setUnsigned(Boolean(existing.unsigned))
+    signerTouched.current = true
+    setSignerId(existing.signerId || '')
     setContractName(existing.contractName || '')
     setContractNumber(existing.contractNumber || '')
     setDiscount(String(existing.discount ?? '0'))
@@ -248,6 +262,7 @@ export function InvoiceFormPage() {
     items: netItems,
     pricesIncludeTax,
     unsigned,
+    signerId,
     contractName,
     contractNumber,
     discount,
@@ -279,6 +294,7 @@ export function InvoiceFormPage() {
         items: validItems,
         pricesIncludeTax: snap.pricesIncludeTax,
         unsigned: snap.unsigned,
+        signerId: snap.signerId,
         contractName: snap.contractName.trim(),
         contractNumber: snap.contractNumber.trim(),
         discount: snap.discount,
@@ -310,7 +326,7 @@ export function InvoiceFormPage() {
       void persistDraft()
     }, 700)
     return () => window.clearTimeout(timer)
-  }, [canSaveOnly, clientId, client, items, pricesIncludeTax, unsigned, contractName, contractNumber, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
+  }, [canSaveOnly, clientId, client, items, pricesIncludeTax, unsigned, signerId, contractName, contractNumber, discount, taxRate, notes, invoiceNumber, date, dueDate, persistDraft])
 
   const draft = useMemo(
     () => ({
@@ -323,12 +339,13 @@ export function InvoiceFormPage() {
       taxRate: appliedTaxRate,
       notes,
       unsigned,
+      signerId,
       contractName,
       contractNumber,
       subtotal,
       total,
     }),
-    [invoiceNumber, date, dueDate, client, netItems, discount, appliedTaxRate, notes, unsigned, contractName, contractNumber, subtotal, total],
+    [invoiceNumber, date, dueDate, client, netItems, discount, appliedTaxRate, notes, unsigned, signerId, contractName, contractNumber, subtotal, total],
   )
 
   const [templateChoice, setTemplateChoice] = useState<InvoiceTemplateId | null>(null)
@@ -344,6 +361,11 @@ export function InvoiceFormPage() {
       template,
     })
   }, [preview, profile, client, draft, template, dict.pdf, t])
+
+  function pickSigner(id: string) {
+    signerTouched.current = true
+    setSignerId(id)
+  }
 
   function updateItem(id: string, field: keyof InvoiceItem, value: string) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)))
@@ -463,6 +485,7 @@ export function InvoiceFormPage() {
       items: validItems,
       pricesIncludeTax,
       unsigned,
+      signerId,
       contractName: contractName.trim(),
       contractNumber: contractNumber.trim(),
       discount,
@@ -547,6 +570,7 @@ export function InvoiceFormPage() {
         })
         // A correction carries the figures only; printing without signature and stamp is set apart.
         if (Boolean(existing?.unsigned) !== payload.unsigned) await updateInvoice(invoiceId, { unsigned: payload.unsigned })
+        if ((existing?.signerId || '') !== payload.signerId) await updateInvoice(invoiceId, { signerId: payload.signerId })
         if ((existing?.contractName || '') !== payload.contractName || (existing?.contractNumber || '') !== payload.contractNumber) {
           await updateInvoice(invoiceId, { contractName: payload.contractName, contractNumber: payload.contractNumber })
         }
@@ -928,6 +952,7 @@ export function InvoiceFormPage() {
             </div>
             <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
             <UnsignedToggle checked={unsigned} onChange={setUnsigned} />
+            {unsigned ? null : <SignerPicker value={signerId} onChange={pickSigner} className="mt-4" />}
           </Card>
           <Card>
             <div className="space-y-2 text-sm">
@@ -1073,6 +1098,7 @@ export function InvoiceFormPage() {
         >
           <TemplateSwitch value={template} onChange={setTemplateChoice} />
           <UnsignedToggle checked={unsigned} onChange={setUnsigned} className="border-b border-brand-ink/8 bg-white px-5 py-3" />
+          {unsigned ? null : <SignerPicker value={signerId} onChange={pickSigner} className="border-b border-brand-ink/8 bg-white px-5 py-3" />}
           <iframe title="preview" className="h-[70vh] w-full bg-white" srcDoc={previewHtml} />
         </Modal>
       ) : null}

@@ -1,5 +1,6 @@
 import { parseLooseDate, paymentStatus, remainingOf } from './document'
 import { computeTotals, currencySymbol, resolveExportNote, toNumber, type Client, type CompanyProfile, type Invoice } from './invoice'
+import { invoiceSigner, signerRoleText } from './signers'
 
 export const INVOICE_TEMPLATES = ['classic', 'corporate', 'minimal'] as const
 export type InvoiceTemplateId = (typeof INVOICE_TEMPLATES)[number]
@@ -26,7 +27,7 @@ export function resolveAccent(template: InvoiceTemplateId, accentColor?: string 
 
 type PdfInvoice = Pick<
   Invoice,
-  'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'taxRate' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency' | 'unsigned' | 'contractName' | 'contractNumber'
+  'number' | 'date' | 'dueDate' | 'items' | 'discount' | 'taxRate' | 'notes' | 'amountDue' | 'amountPaid' | 'payments' | 'lifecycle' | 'status' | 'companySnapshot' | 'clientSnapshot' | 'currency' | 'unsigned' | 'signerId' | 'contractName' | 'contractNumber'
 >
 
 export type InvoiceHtmlInput = {
@@ -93,6 +94,7 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
   const symbol = currencySymbol(invoice.currency || company.currency)
   const money = (value: number) => `${grouped(value)} ${symbol}`
   const cityLine = [company.state, company.zipCode].map((part) => String(part || '').trim()).filter(Boolean).join(', ')
+  const signer = invoiceSigner(company, invoice.signerId)
 
   return {
     templateId,
@@ -125,8 +127,11 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
     exportNote: resolveExportNote(company),
     logo: imageSrc(company.logoData),
     // Printed to be signed and stamped by hand: neither image goes on the page.
-    signature: invoice.unsigned ? '' : imageSrc(company.signatureData),
+    signature: invoice.unsigned ? '' : imageSrc(signer?.signatureData),
     stamp: invoice.unsigned ? '' : imageSrc(company.stampData),
+    // Who signs, printed under the signature line (also when it is signed by hand).
+    signerName: signer?.name || company.contactPerson || '',
+    signerRole: signer ? signerRoleText(signer.role, pdfLabels) : '',
     hasPayment: Boolean(company.bankName || company.iban || company.swift),
   }
 }
@@ -307,6 +312,7 @@ function classicTemplate(v: View) {
     .sign .ink { height: 46px; display: flex; align-items: flex-end; justify-content: center; }
     .sign .ink img { max-height: 46px; max-width: 160px; }
     .sign .line { border-top: 1px solid #999; padding-top: 6px; }
+    .sign .role { display: block; font-size: 10.5px; color: #888; }
     .stamp { width: 20%; text-align: center; }
     .stamp img { max-height: 96px; max-width: 110px; }
     ${contractCss(accent)}
@@ -380,16 +386,25 @@ function classicTemplate(v: View) {
     <div class="signs keep">
       <div class="sign">
         <div class="ink">${v.signature ? `<img src="${v.signature}" alt="" />` : ''}</div>
-        <div class="line">${esc(company.contactPerson)}<br/>${esc(L.issuedBy)}</div>
+        <div class="line">${esc(v.signerName)}${signerRoleLine(v) || '<br/>'}${esc(L.issuedBy)}</div>
       </div>
       <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ''}</div>
       <div class="sign">
         <div class="ink"></div>
-        <div class="line">${esc(client.fullName)}<br/>${esc(L.receivedBy)}</div>
+        <div class="line">${esc(client.fullName)}${signerRoleLine(v, true) || '<br/>'}${esc(L.receivedBy)}</div>
       </div>
     </div>
   `
   return shell(v, `-apple-system, "Segoe UI", Helvetica, Arial, sans-serif`, css, body)
+}
+
+/**
+ * The signer's role as a small line of its own under their name. With `blank`, an empty line of the
+ * same height for the client's side, so both signature lines stay level.
+ */
+function signerRoleLine(v: View, blank = false) {
+  if (!v.signerRole) return ''
+  return `<span class="role">${blank ? '&nbsp;' : esc(v.signerRole)}</span>`
 }
 
 /* ---------------------------------------------------------------- corporate */
@@ -445,6 +460,7 @@ function corporateTemplate(v: View) {
     .sign b { display: block; margin-bottom: 8px; }
     .sign .ink { display: flex; align-items: flex-end; gap: 10px; min-height: 48px; border-bottom: 1.5px solid #1D2B2E; padding-bottom: 4px; }
     .sign .ink img { max-height: 44px; max-width: 120px; }
+    .sign .role { display: block; margin-top: 4px; color: #555; }
     .stamp { width: 24%; text-align: center; }
     .stamp img { max-height: 110px; max-width: 120px; }
     .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #555; }
@@ -539,12 +555,14 @@ function corporateTemplate(v: View) {
     <div class="signs keep">
       <div class="sign">
         <b>${esc(L.signature || 'Signature')} (${esc(company.companyName)}):</b>
-        <div class="ink"><span>${esc(company.contactPerson)}</span>${v.signature ? `<img src="${v.signature}" alt="" />` : ''}</div>
+        <div class="ink"><span>${esc(v.signerName)}</span>${v.signature ? `<img src="${v.signature}" alt="" />` : ''}</div>
+        ${signerRoleLine(v)}
       </div>
       <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ''}</div>
       <div class="sign">
         <b>${esc(L.signature || 'Signature')}:</b>
         <div class="ink"></div>
+        ${signerRoleLine(v, true)}
       </div>
     </div>
     ${v.exportNote ? `<div class="foot"><b>${esc(v.exportNote)}</b></div>` : ''}
@@ -595,6 +613,7 @@ function minimalTemplate(v: View) {
     .sign .ink img { max-height: 46px; max-width: 150px; }
     .sign .line { border-top: 1px solid #B9C1C3; padding-top: 6px; }
     .sign .line b { display: block; color: #1D2B2E; font-weight: 600; }
+    .sign .role { display: block; }
     .stamp { width: 22%; text-align: center; }
     .stamp img { max-height: 96px; max-width: 110px; }
     .foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid ${hair}; text-align: center; font-size: 11px; color: ${muted}; }
@@ -677,12 +696,12 @@ function minimalTemplate(v: View) {
     <div class="signs keep">
       <div class="sign">
         <div class="ink">${v.signature ? `<img src="${v.signature}" alt="" />` : ''}</div>
-        <div class="line"><b>${esc(company.contactPerson)}</b>${esc(L.issuedBy)}</div>
+        <div class="line"><b>${esc(v.signerName)}</b>${signerRoleLine(v)}${esc(L.issuedBy)}</div>
       </div>
       <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ''}</div>
       <div class="sign">
         <div class="ink"></div>
-        <div class="line"><b>${esc(client.fullName)}</b>${esc(L.receivedBy)}</div>
+        <div class="line"><b>${esc(client.fullName)}</b>${signerRoleLine(v, true)}${esc(L.receivedBy)}</div>
       </div>
     </div>
     <div class="foot">${esc(L.thankYou)}${v.exportNote ? `<b>${esc(v.exportNote)}</b>` : ''}</div>
