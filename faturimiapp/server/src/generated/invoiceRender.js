@@ -1350,7 +1350,9 @@ const sq$2 = {
 	spendTitle: "Ku shkojnë paratë",
 	by: {
 		groups: "Sipas kategorisë",
-		vendors: "Sipas furnitorit"
+		vendors: "Sipas furnitorit",
+		products: "Sipas produktit",
+		payers: "Sipas paguesit"
 	},
 	group: {
 		card: "Blerje me kartelë",
@@ -1359,7 +1361,7 @@ const sq$2 = {
 	},
 	perMonthRecent: "{amount} / muaj tani",
 	vsBefore: "krahasuar me 3 muajt para",
-	ipacientiNote: "Të gjitha hyrjet në Mercury llogariten si të hyra të iPacienti (te Projektet, në euro me kursin e ditës). Transferet mes llogarive tuaja nuk llogariten.",
+	ipacientiNote: "Çdo hyrje i jepet produktit që e emërton përshkrimi i Stripe (IPACIENTI, Timey, TeamPlaner…) ose shënimi në Mercury; pagesat e vjetra të Stripe pa emër janë të iPacienti. Te Projektet llogariten në euro me kursin e ditës. Transferet mes llogarive tuaja nuk llogariten.",
 	recurringTitle: "Pagesat e përsëritura",
 	recurringTotal: "gjithsej {amount} / muaj",
 	perMonth: "{amount} / muaj",
@@ -1373,7 +1375,6 @@ const sq$2 = {
 	none: "Asgjë për të shfaqur.",
 	more: "Shfaq edhe ({count})",
 	internal: "transfer mes llogarive",
-	ipacienti: "iPacienti",
 	pending: "në pritje",
 	openInMercury: "Hape në Mercury",
 	token: "API token (Read Only)",
@@ -1443,7 +1444,9 @@ const en$2 = {
 	spendTitle: "Where the money goes",
 	by: {
 		groups: "By category",
-		vendors: "By vendor"
+		vendors: "By vendor",
+		products: "By product",
+		payers: "By payer"
 	},
 	group: {
 		card: "Card purchases",
@@ -1452,7 +1455,7 @@ const en$2 = {
 	},
 	perMonthRecent: "{amount} / month now",
 	vsBefore: "vs the 3 months before",
-	ipacientiNote: "All money coming into Mercury counts as iPacienti income (on Projects, in euros at the day’s rate). Transfers between your own accounts are left out.",
+	ipacientiNote: "Each payment goes to the product its Stripe descriptor (IPACIENTI, Timey, TeamPlaner…) or its Mercury note names; older Stripe payouts naming none are iPacienti’s. On Projects they count in euros at the day’s rate. Transfers between your own accounts are left out.",
 	recurringTitle: "Recurring payments",
 	recurringTotal: "{amount} / month in all",
 	perMonth: "{amount} / month",
@@ -1466,7 +1469,6 @@ const en$2 = {
 	none: "Nothing to show.",
 	more: "Show more ({count})",
 	internal: "between your accounts",
-	ipacienti: "iPacienti",
 	pending: "pending",
 	openInMercury: "Open in Mercury",
 	token: "API token (Read Only)",
@@ -1518,7 +1520,9 @@ const mercuryTexts = {
 		spendTitle: "Dove vanno i soldi",
 		by: {
 			groups: "Per categoria",
-			vendors: "Per fornitore"
+			vendors: "Per fornitore",
+			products: "Per prodotto",
+			payers: "Per pagatore"
 		},
 		group: {
 			card: "Acquisti con carta",
