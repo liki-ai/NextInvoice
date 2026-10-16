@@ -2813,6 +2813,8 @@ const translations = {
 			taxFromClient: "Sipas cilësimit të këtij klienti. Mund ta ndryshosh për këtë faturë.",
 			pricesIncludeTax: "Çmimet përfshijnë TVSH-në",
 			pricesIncludeTaxHint: "Shkruaj çmimin përfundimtar; nëntotali pa TVSH llogaritet vetë.",
+			unsigned: "Pa nënshkrim dhe vulë",
+			unsignedHint: "Fatura del pa nënshkrimin dhe vulën, që t’i vendosësh me dorë pasi ta printosh.",
 			withTax: "me TVSH",
 			tax: "TVSH",
 			noMatchingClients: "Nuk u gjet asnjë klient",
@@ -3753,6 +3755,8 @@ const translations = {
 			taxFromClient: "From this client’s setting. You can change it for this invoice.",
 			pricesIncludeTax: "Prices include VAT",
 			pricesIncludeTaxHint: "Type the final price; the subtotal without VAT is worked out for you.",
+			unsigned: "Without signature and stamp",
+			unsignedHint: "The invoice comes out without the signature and stamp, to add by hand once printed.",
 			withTax: "incl. VAT",
 			tax: "VAT",
 			noMatchingClients: "No matching clients",
@@ -4693,6 +4697,8 @@ const translations = {
 			taxFromClient: "Dall’impostazione di questo cliente. Puoi cambiarla per questa fattura.",
 			pricesIncludeTax: "I prezzi includono l’IVA",
 			pricesIncludeTaxHint: "Scrivi il prezzo finale; l’imponibile senza IVA viene calcolato da solo.",
+			unsigned: "Senza firma e timbro",
+			unsignedHint: "La fattura esce senza firma e timbro, da apporre a mano dopo la stampa.",
 			withTax: "IVA inclusa",
 			tax: "IVA",
 			noMatchingClients: "Nessun cliente trovato",
@@ -5463,8 +5469,8 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
 		dueText: invoice.dueDate || pdfLabels.onReceipt || "",
 		exportNote: resolveExportNote(company),
 		logo: imageSrc(company.logoData),
-		signature: imageSrc(company.signatureData),
-		stamp: imageSrc(company.stampData),
+		signature: invoice.unsigned ? "" : imageSrc(company.signatureData),
+		stamp: invoice.unsigned ? "" : imageSrc(company.stampData),
 		hasPayment: Boolean(company.bankName || company.iban || company.swift)
 	};
 }
