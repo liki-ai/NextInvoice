@@ -77,6 +77,8 @@ export type MercuryReport = {
   runway: number | null
   months: MonthFlow[]
   sources: PartyTotal[]
+  /** Income by the product it was for, when the products are known. */
+  products: PartyTotal[]
   vendors: PartyTotal[]
   groups: PartyTotal[]
   recurring: Recurring[]
@@ -125,7 +127,7 @@ function byName(list: MercuryTransaction[], name: (tx: MercuryTransaction) => st
     .sort((a, b) => b.total - a.total)
 }
 
-export function buildMercuryReport(accounts: MercuryAccount[], transactions: MercuryTransaction[], year: number, now = new Date()): MercuryReport {
+export function buildMercuryReport(accounts: MercuryAccount[], transactions: MercuryTransaction[], year: number, now = new Date(), productOf?: (tx: MercuryTransaction) => string): MercuryReport {
   const flows = transactions.filter((tx) => !isInternal(tx))
   const inYear = flows.filter((tx) => tx.date.startsWith(`${year}-`))
   const income = round(inYear.filter((tx) => tx.amount > 0).reduce((sum, tx) => sum + tx.amount, 0))
@@ -157,6 +159,7 @@ export function buildMercuryReport(accounts: MercuryAccount[], transactions: Mer
   const outgoing = inYear.filter((tx) => tx.amount < 0)
   const recentFlows = flows.filter((tx) => six.includes(monthOf(tx.date)))
   const sources = byName(incoming, partyName, recent, before)
+  const products = productOf ? byName(incoming, productOf, recent, before) : []
   const vendors = byName(outgoing, partyName, recent, before)
   const groups = byName(outgoing, spendGroup, recent, before)
 
@@ -216,6 +219,7 @@ export function buildMercuryReport(accounts: MercuryAccount[], transactions: Mer
     runway,
     months,
     sources,
+    products,
     vendors,
     groups,
     recurring,
@@ -225,11 +229,46 @@ export function buildMercuryReport(accounts: MercuryAccount[], transactions: Mer
   }
 }
 
-/** Every dollar that came in counts for iPacienti: the payments as bank credits in euros, for the Projects tab. */
-export function ipacientiCredits(transactions: MercuryTransaction[]) {
+/** Where Stripe payouts went before each product had its own statement descriptor. */
+export const DEFAULT_PRODUCT = 'iPacienti'
+
+const squash = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+/**
+ * The product a payment into Mercury is for. Stripe now pays each product out under its own
+ * statement descriptor (IPACIENTI, Timey, TeamPlaner…); older payouts carry the product in the
+ * note. A product or project named anywhere in the payment wins; a Stripe payout naming none was
+ * iPacienti's; any other payer stands for itself, to be given to a project by hand.
+ */
+export function mercuryProduct(tx: MercuryTransaction, names: string[]) {
+  const text = squash(`${tx.counterparty} ${tx.description} ${tx.note}`)
+  const named = names
+    .filter((name) => squash(name).length >= 3)
+    .sort((a, b) => squash(b).length - squash(a).length)
+    .find((name) => text.includes(squash(name)))
+  if (named) return named
+  if (!tx.counterparty || /stripe/i.test(`${tx.counterparty} ${tx.description}`)) {
+    // A short note on a Stripe payout is the product it was for, even one with no project yet.
+    const note = tx.note.trim()
+    if (note && note.length <= 40) return note
+    return names.find((name) => squash(name) === squash(DEFAULT_PRODUCT)) || DEFAULT_PRODUCT
+  }
+  return tx.counterparty
+}
+
+/**
+ * The money that came into Mercury, as bank credits in euros for the Projects tab, each one
+ * naming its product so the project of that name gets it.
+ */
+export function productCredits(transactions: MercuryTransaction[], names: string[]) {
   return transactions
     .filter((tx) => tx.amount > 0 && !isInternal(tx) && tx.eur !== null)
-    .map((tx) => ({ date: tx.date, amount: tx.eur as number, text: `iPacienti Mercury ${tx.counterparty} ${tx.note}`.trim(), origin: 'llc' as const }))
+    .map((tx) => ({ date: tx.date, amount: tx.eur as number, text: `${mercuryProduct(tx, names)} Mercury`, origin: 'llc' as const }))
 }
 
 export function mercuryYears(transactions: MercuryTransaction[], now = new Date()) {

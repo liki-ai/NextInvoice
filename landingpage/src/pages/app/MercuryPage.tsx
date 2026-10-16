@@ -5,7 +5,8 @@ import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal } from '../../components/ui'
 import { api, apiBase } from '../../lib/api'
 import { cn } from '../../lib/cn'
-import { buildMercuryReport, isInternal, mercuryYears, partyName, spendGroup, type Insight, type MercuryTransaction, type MercuryView, type PartyTotal } from '../../lib/mercury'
+import { buildMercuryReport, isInternal, mercuryProduct, mercuryYears, partyName, spendGroup, type Insight, type MercuryTransaction, type MercuryView, type PartyTotal } from '../../lib/mercury'
+import type { TimesheetView } from '../../lib/timesheet'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
@@ -120,6 +121,9 @@ export function MercuryPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [spendBy, setSpendBy] = useState<'groups' | 'vendors'>('groups')
+  const [incomeBy, setIncomeBy] = useState<'products' | 'payers'>('products')
+  // The company's projects (from the Projects tab), for telling which product a payment was for.
+  const [projects, setProjects] = useState<string[]>([])
   const [filter, setFilter] = useState<'all' | 'in' | 'out'>('all')
   const [query, setQuery] = useState('')
   const [shown, setShown] = useState(40)
@@ -133,6 +137,8 @@ export function MercuryPage() {
     } catch (err) {
       setError(errorText(t, err))
     }
+    const timesheet = await api<TimesheetView>('/api/finance/projects').then((data) => data.timesheet).catch(() => null)
+    if (timesheet) setProjects([...new Set(timesheet.entries.map((entry) => entry.project))].filter((name) => !timesheet.projects[name]?.internal))
   }, [t])
 
   useEffect(() => {
@@ -148,7 +154,8 @@ export function MercuryPage() {
 
   const connected = view?.connected ? view : null
   const transactions = useMemo(() => connected?.transactions || [], [connected])
-  const report = useMemo(() => (connected ? buildMercuryReport(connected.accounts, transactions, year) : null), [connected, transactions, year])
+  const productOf = useCallback((tx: MercuryTransaction) => mercuryProduct(tx, projects), [projects])
+  const report = useMemo(() => (connected ? buildMercuryReport(connected.accounts, transactions, year, new Date(), productOf) : null), [connected, transactions, year, productOf])
   const years = useMemo(() => mercuryYears(transactions), [transactions])
   const listed = useMemo(() => {
     const words = query.trim().toLowerCase()
@@ -338,11 +345,26 @@ export function MercuryPage() {
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             <section aria-labelledby="mercury-sources">
-              <SectionTitle>
+              <SectionTitle
+                action={
+                  <span className="inline-flex rounded-lg border border-brand-ink/10 bg-white p-0.5 text-[11px] font-semibold">
+                    {(['products', 'payers'] as const).map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setIncomeBy(key)}
+                        className={cn('rounded-md px-2 py-1 transition', incomeBy === key ? 'bg-brand-dark text-white' : 'text-brand-ink/55 hover:text-brand-ink')}
+                      >
+                        {t(`mercury.by.${key}`)}
+                      </button>
+                    ))}
+                  </span>
+                }
+              >
                 <span id="mercury-sources">{t('mercury.sourcesTitle')}</span>
               </SectionTitle>
               <Card className="px-5 py-2">
-                <Ranked items={report.sources} label={(name) => name} t={t} />
+                <Ranked items={incomeBy === 'products' ? report.products : report.sources} label={(name) => name} t={t} />
               </Card>
               <p className="mt-2 text-[11px] text-brand-ink/45">{t('mercury.ipacientiNote')}</p>
             </section>
@@ -426,7 +448,7 @@ export function MercuryPage() {
               ) : (
                 <ul className="divide-y divide-brand-ink/5">
                   {listed.slice(0, shown).map((tx) => (
-                    <TransactionRow key={tx.id} tx={tx} t={t} />
+                    <TransactionRow key={tx.id} tx={tx} t={t} product={productOf(tx)} />
                   ))}
                 </ul>
               )}
@@ -457,7 +479,7 @@ export function MercuryPage() {
   )
 }
 
-function TransactionRow({ tx, t }: { tx: MercuryTransaction; t: T }) {
+function TransactionRow({ tx, t, product }: { tx: MercuryTransaction; t: T; product: string }) {
   const incoming = tx.amount > 0
   const internal = isInternal(tx)
   return (
@@ -468,7 +490,7 @@ function TransactionRow({ tx, t }: { tx: MercuryTransaction; t: T }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-semibold">{partyName(tx)}</p>
         <p className="truncate text-[11px] text-brand-ink/50">
-          {shortDay(tx.date)} · {internal ? t('mercury.internal') : incoming ? t('mercury.ipacienti') : groupLabel(t, spendGroup(tx))}
+          {shortDay(tx.date)} · {internal ? t('mercury.internal') : incoming ? product : groupLabel(t, spendGroup(tx))}
           {tx.status === 'pending' ? ` · ${t('mercury.pending')}` : ''}
           {tx.note ? ` · ${tx.note}` : ''}
         </p>

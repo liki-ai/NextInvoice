@@ -12,7 +12,7 @@ import { cn } from '../../lib/cn'
 import { currencySymbol, type Invoice } from '../../lib/invoice'
 import { currentDocuments, monthlyFigures, payrollFullCost, runningCosts, type FinanceDoc, type FinanceView } from '../../lib/finance'
 import { readAnyWorkbook } from '../../lib/serverFinance'
-import { ipacientiCredits, type MercuryTransaction, type MercuryView } from '../../lib/mercury'
+import { productCredits, type MercuryTransaction, type MercuryView } from '../../lib/mercury'
 import {
   MONTH_HOURS_LIMIT,
   buildProjectsReport,
@@ -214,7 +214,9 @@ export function ProjectsPage() {
   const docs = useMemo(() => finance?.documents || [], [finance])
   const monthCosts = useMemo(() => (timesheet ? costsByMonth(docs, invoices, timesheet.months, currency) : {}), [docs, invoices, timesheet, currency])
   const ownClients = useMemo(() => ownClientIds(clients, profile?.companyName), [clients, profile?.companyName])
-  const bankCredits = useMemo(() => [...(bank?.lines || []).map((line) => ({ date: line.date, amount: line.rest, text: line.text })), ...ipacientiCredits(mercury)], [bank, mercury])
+  // Every project that can take money, so a Mercury payment naming one goes to it.
+  const projectNames = useMemo(() => [...new Set((timesheet?.entries || []).map((entry) => entry.project))].filter((name) => !timesheet?.projects[name]?.internal), [timesheet])
+  const bankCredits = useMemo(() => [...(bank?.lines || []).map((line) => ({ date: line.date, amount: line.rest, text: line.text })), ...productCredits(mercury, projectNames)], [bank, mercury, projectNames])
   const report = useMemo(
     () => (timesheet && timesheet.entries.length ? buildProjectsReport({ timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct, bankCredits }) : null),
     [timesheet, months, invoices, clients, currency, ownClients, monthCosts, correct, bankCredits],
