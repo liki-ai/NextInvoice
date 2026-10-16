@@ -3151,6 +3151,9 @@ const translations = {
 			pricesIncludeTaxHint: "Shkruaj çmimin përfundimtar; nëntotali pa TVSH llogaritet vetë.",
 			unsigned: "Pa nënshkrim dhe vulë",
 			unsignedHint: "Fatura del pa nënshkrimin dhe vulën, që t’i vendosësh me dorë pasi ta printosh.",
+			signer: "Nënshkruan",
+			signerHint: "Nënshkrimi i kujt del në këtë faturë.",
+			signerNoImage: "pa nënshkrim të ngarkuar",
 			contractName: "Emri i kontratës",
 			contractNumber: "Numri i kontratës",
 			contractHint: "Jo e detyrueshme. Del në një rresht mbi artikujt e faturës.",
@@ -3431,6 +3434,22 @@ const translations = {
 			signatureHint: "Opsionale. Dalin në fund të faturës, te vendi i nënshkrimit.",
 			signature: "Nënshkrimi",
 			stamp: "Vula",
+			signersTitle: "Përfaqësuesit e autorizuar",
+			signersHint: "Kush i nënshkruan faturat, secili me nënshkrimin e vet. Fatura e re merr nënshkrimin e përdoruesit që e bën, nëse është në këtë listë, përndryshe të përfaqësuesit të paracaktuar; mund ta ndryshoni te fatura.",
+			signerName: "Emri dhe mbiemri",
+			signerRole: "Roli",
+			signerRoleNone: "Pa rol",
+			signerRoleCustom: "Tjetër (shkruaje)",
+			signerRolePh: "p.sh. Drejtor ekzekutiv",
+			signerUser: "Përdoruesi në aplikacion",
+			signerUserNone: "Asnjë",
+			signerDefault: "I paracaktuar",
+			signerMakeDefault: "Bëje të paracaktuar",
+			signerAdd: "Shto përfaqësues",
+			signerRemove: "Hiq përfaqësuesin",
+			signerUnnamed: "Përfaqësues pa emër",
+			signersEmpty: "Ende asnjë përfaqësues. Shtoni atë që i nënshkruan faturat.",
+			stampHint: "Një vulë për të gjithë kompaninë.",
 			sectionData: "Të dhënat",
 			defaultTaxRate: "TVSH e paracaktuar (%)",
 			defaultTaxRateHint: "Plotësohet vetë në çdo faturë të re; mund ta ndryshosh për secilën faturë.",
@@ -3717,7 +3736,6 @@ const translations = {
 		},
 		pdf: {
 			invoiceTitle: "Faturë",
-			monthNames: "janar,shkurt,mars,prill,maj,qershor,korrik,gusht,shtator,tetor,nëntor,dhjetor",
 			contractName: "Emri i kontratës",
 			contractNumber: "Numri i kontratës",
 			invoiceLabel: "Faturë",
@@ -3734,14 +3752,16 @@ const translations = {
 			issuedBy: "Faturoi",
 			receivedBy: "Pranoi",
 			thankYou: "Faleminderit!",
-			dueDateLabel: "Afati",
+			dueDateLabel: "Afati për pagesë",
 			onReceipt: "Me pranim",
 			paymentInfo: "Pagesa",
 			bankName: "Banka",
 			ibanLabel: "IBAN",
 			fullNameLabel: "Full Name",
 			addressLabel: "Adresa",
-			phoneLabel: "Phone No",
+			phoneLabel: "Nr Tel",
+			emailLabel: "Email",
+			websiteLabel: "Website",
 			statementTitle: "PREVENTIVI",
 			billedTo: "FATURUAR PËR",
 			order: "POROSIA",
@@ -3755,6 +3775,11 @@ const translations = {
 			vatLabel: "Nr. TVSH",
 			swiftLabel: "SWIFT (BIC)",
 			beneficiary: "Përfituesi",
+			roleManagingDirector: "Drejtor menaxhues",
+			roleAdministrationDirector: "Drejtor i Administratës",
+			roleDirector: "Drejtor",
+			roleOwner: "Pronar",
+			roleAuthorizedPerson: "Person i autorizuar",
 			signature: "Nënshkrimi",
 			paymentDetails: "Detajet e pagesës",
 			vat: "TVSH",
@@ -4103,6 +4128,9 @@ const translations = {
 			pricesIncludeTaxHint: "Type the final price; the subtotal without VAT is worked out for you.",
 			unsigned: "Without signature and stamp",
 			unsignedHint: "The invoice comes out without the signature and stamp, to add by hand once printed.",
+			signer: "Signed by",
+			signerHint: "Whose signature goes on this invoice.",
+			signerNoImage: "no signature uploaded",
 			contractName: "Contract name",
 			contractNumber: "Contract number",
 			contractHint: "Optional. Shown in one line above the invoice items.",
@@ -4383,6 +4411,22 @@ const translations = {
 			signatureHint: "Optional. Printed at the bottom of the invoice, in the signature area.",
 			signature: "Signature",
 			stamp: "Stamp",
+			signersTitle: "Authorized representatives",
+			signersHint: "Who signs the invoices, each with their own signature. A new invoice takes the signature of the user making it if they are on this list, otherwise the default representative’s; you can change it on the invoice.",
+			signerName: "Full name",
+			signerRole: "Role",
+			signerRoleNone: "No role",
+			signerRoleCustom: "Other (type it)",
+			signerRolePh: "e.g. Executive Director",
+			signerUser: "App user",
+			signerUserNone: "None",
+			signerDefault: "Default",
+			signerMakeDefault: "Make default",
+			signerAdd: "Add representative",
+			signerRemove: "Remove representative",
+			signerUnnamed: "Unnamed representative",
+			signersEmpty: "No representatives yet. Add the person who signs the invoices.",
+			stampHint: "One stamp for the whole company.",
 			sectionData: "Data",
 			defaultTaxRate: "Default VAT (%)",
 			defaultTaxRateHint: "Pre-filled on every new invoice; you can change it per invoice.",
@@ -4669,7 +4713,6 @@ const translations = {
 		},
 		pdf: {
 			invoiceTitle: "Invoice",
-			monthNames: "",
 			contractName: "Contract name",
 			contractNumber: "Contract number",
 			invoiceLabel: "Invoice",
@@ -4686,7 +4729,7 @@ const translations = {
 			issuedBy: "Issued by",
 			receivedBy: "Received by",
 			thankYou: "Thank you!",
-			dueDateLabel: "Due",
+			dueDateLabel: "Payment due",
 			onReceipt: "On receipt",
 			paymentInfo: "Payment",
 			bankName: "Bank",
@@ -4694,6 +4737,8 @@ const translations = {
 			fullNameLabel: "Full Name",
 			addressLabel: "Address",
 			phoneLabel: "Phone No",
+			emailLabel: "Email",
+			websiteLabel: "Website",
 			statementTitle: "UNPAID INVOICES",
 			billedTo: "BILLED TO",
 			order: "ORDER",
@@ -4707,6 +4752,11 @@ const translations = {
 			vatLabel: "VAT Number",
 			swiftLabel: "SWIFT (BIC)",
 			beneficiary: "Beneficiary",
+			roleManagingDirector: "Managing Director",
+			roleAdministrationDirector: "Head of Administration",
+			roleDirector: "Director",
+			roleOwner: "Owner",
+			roleAuthorizedPerson: "Authorized representative",
 			signature: "Signature",
 			paymentDetails: "Payment details",
 			vat: "VAT",
@@ -5055,6 +5105,9 @@ const translations = {
 			pricesIncludeTaxHint: "Scrivi il prezzo finale; l’imponibile senza IVA viene calcolato da solo.",
 			unsigned: "Senza firma e timbro",
 			unsignedHint: "La fattura esce senza firma e timbro, da apporre a mano dopo la stampa.",
+			signer: "Firma di",
+			signerHint: "Di chi è la firma su questa fattura.",
+			signerNoImage: "nessuna firma caricata",
 			contractName: "Nome del contratto",
 			contractNumber: "Numero del contratto",
 			contractHint: "Facoltativo. Compare in una riga sopra le voci della fattura.",
@@ -5335,6 +5388,22 @@ const translations = {
 			signatureHint: "Facoltativi. Compaiono in fondo alla fattura, nell’area della firma.",
 			signature: "Firma",
 			stamp: "Timbro",
+			signersTitle: "Rappresentanti autorizzati",
+			signersHint: "Chi firma le fatture, ognuno con la propria firma. Una nuova fattura prende la firma dell’utente che la crea se è in questo elenco, altrimenti quella del rappresentante predefinito; si può cambiare sulla fattura.",
+			signerName: "Nome e cognome",
+			signerRole: "Ruolo",
+			signerRoleNone: "Nessun ruolo",
+			signerRoleCustom: "Altro (scrivilo)",
+			signerRolePh: "es. Direttore esecutivo",
+			signerUser: "Utente dell’app",
+			signerUserNone: "Nessuno",
+			signerDefault: "Predefinito",
+			signerMakeDefault: "Rendi predefinito",
+			signerAdd: "Aggiungi rappresentante",
+			signerRemove: "Rimuovi rappresentante",
+			signerUnnamed: "Rappresentante senza nome",
+			signersEmpty: "Ancora nessun rappresentante. Aggiungi chi firma le fatture.",
+			stampHint: "Un solo timbro per tutta l’azienda.",
 			sectionData: "Dati",
 			defaultTaxRate: "IVA predefinita (%)",
 			defaultTaxRateHint: "Precompilata in ogni nuova fattura; puoi cambiarla per singola fattura.",
@@ -5621,7 +5690,6 @@ const translations = {
 		},
 		pdf: {
 			invoiceTitle: "Fattura",
-			monthNames: "gennaio,febbraio,marzo,aprile,maggio,giugno,luglio,agosto,settembre,ottobre,novembre,dicembre",
 			contractName: "Contratto",
 			contractNumber: "N. contratto",
 			invoiceLabel: "Fattura",
@@ -5638,14 +5706,16 @@ const translations = {
 			issuedBy: "Emessa da",
 			receivedBy: "Ricevuta da",
 			thankYou: "Grazie!",
-			dueDateLabel: "Scadenza",
+			dueDateLabel: "Scadenza pagamento",
 			onReceipt: "Alla consegna",
 			paymentInfo: "Pagamento",
 			bankName: "Banca",
 			ibanLabel: "IBAN",
 			fullNameLabel: "Full Name",
 			addressLabel: "Indirizzo",
-			phoneLabel: "Phone No",
+			phoneLabel: "Tel.",
+			emailLabel: "Email",
+			websiteLabel: "Sito web",
 			statementTitle: "PREVENTIVI",
 			billedTo: "FATTURARE A",
 			order: "ORDINE",
@@ -5659,6 +5729,11 @@ const translations = {
 			vatLabel: "P.IVA",
 			swiftLabel: "SWIFT (BIC)",
 			beneficiary: "Beneficiario",
+			roleManagingDirector: "Amministratore delegato",
+			roleAdministrationDirector: "Direttore amministrativo",
+			roleDirector: "Direttore",
+			roleOwner: "Titolare",
+			roleAuthorizedPerson: "Rappresentante autorizzato",
 			signature: "Firma",
 			paymentDetails: "Dati di pagamento",
 			vat: "IVA",
@@ -5744,6 +5819,81 @@ function remainingOf(doc) {
 	if (status === "paid") return 0;
 	return documentTotals(doc).amountDue;
 }
+const MONTH_ABBR = [
+	"JAN",
+	"FEB",
+	"MAR",
+	"APR",
+	"MAY",
+	"JUN",
+	"JUL",
+	"AUG",
+	"SEP",
+	"OCT",
+	"NOV",
+	"DEC"
+];
+function parseLooseDate(value) {
+	if (!value) return null;
+	const raw = String(value).trim();
+	const isoDay = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+	if (isoDay) return new Date(Number(isoDay[1]), Number(isoDay[2]) - 1, Number(isoDay[3]));
+	const dmy = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+	if (dmy) {
+		const monthFirst = Number(dmy[2]) > 12 && Number(dmy[1]) <= 12;
+		return new Date(Number(dmy[3]), Number(dmy[monthFirst ? 1 : 2]) - 1, Number(dmy[monthFirst ? 2 : 1]));
+	}
+	const mdy = raw.match(/^([A-Z]{3})\s+(\d{1,2}),\s*(\d{4})$/i);
+	if (mdy) {
+		const month = MONTH_ABBR.indexOf(mdy[1].toUpperCase());
+		if (month >= 0) return new Date(Number(mdy[3]), month, Number(mdy[2]));
+	}
+	const iso = Date.parse(raw);
+	if (Number.isFinite(iso)) return new Date(iso);
+	return null;
+}
+//#endregion
+//#region src/lib/signers.ts
+const ROLE_LABELS = {
+	managingDirector: "roleManagingDirector",
+	administrationDirector: "roleAdministrationDirector",
+	director: "roleDirector",
+	owner: "roleOwner",
+	authorizedPerson: "roleAuthorizedPerson"
+};
+/** The id a company's one signature goes by while its profile still predates signers. */
+const COMPANY_SIGNER_ID = "company";
+/** Every signer, removed ones too. A profile from before signers, with one signature, counts as one signer. */
+function companySigners(company) {
+	if (Array.isArray(company?.signers)) return company.signers;
+	return company?.signatureData ? [{
+		id: COMPANY_SIGNER_ID,
+		name: company.contactPerson || "",
+		signatureData: company.signatureData
+	}] : [];
+}
+/** The signers still on the list. */
+function activeSigners(company) {
+	return companySigners(company).filter((item) => !item.removed);
+}
+/** The signer an invoice gets when nobody picked one: the default, or else the first. */
+function defaultSigner(company) {
+	const active = activeSigners(company);
+	return active.find((item) => item.id === company?.defaultSignerId) || active[0] || null;
+}
+/** Who signs an invoice: the one saved on it (even if since removed from the list), or the default. */
+function invoiceSigner(company, signerId) {
+	return (signerId ? companySigners(company).find((item) => item.id === signerId) : void 0) || defaultSigner(company);
+}
+/** The key of a known role's label among the invoice texts, or '' for a title typed by hand. */
+function signerRoleKey(role) {
+	return ROLE_LABELS[String(role || "")] || "";
+}
+/** The role as printed: a known one in the language of the given texts, a typed one as typed. */
+function signerRoleText(role, labels) {
+	const key = signerRoleKey(role);
+	return key ? labels[key] || "" : String(role || "").trim();
+}
 //#endregion
 //#region src/lib/invoiceTemplates.ts
 const INVOICE_TEMPLATES = [
@@ -5805,6 +5955,7 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
 	const symbol = currencySymbol(invoice.currency || company.currency);
 	const money = (value) => `${grouped(value)} ${symbol}`;
 	const cityLine = [company.state, company.zipCode].map((part) => String(part || "").trim()).filter(Boolean).join(", ");
+	const signer = invoiceSigner(company, invoice.signerId);
 	return {
 		templateId,
 		accent,
@@ -5831,12 +5982,14 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
 		paid,
 		due,
 		showBalance: due > 0 && due < total,
-		date: localDate(invoice.date, pdfLabels),
-		dueText: localDate(invoice.dueDate, pdfLabels) || pdfLabels.onReceipt || "",
+		date: numericDate(invoice.date),
+		dueText: numericDate(invoice.dueDate) || pdfLabels.onReceipt || "",
 		exportNote: resolveExportNote(company),
 		logo: imageSrc(company.logoData),
-		signature: invoice.unsigned ? "" : imageSrc(company.signatureData),
+		signature: invoice.unsigned ? "" : imageSrc(signer?.signatureData),
 		stamp: invoice.unsigned ? "" : imageSrc(company.stampData),
+		signerName: signer?.name || company.contactPerson || "",
+		signerRole: signer ? signerRoleText(signer.role, pdfLabels) : "",
 		hasPayment: Boolean(company.bankName || company.iban || company.swift)
 	};
 }
@@ -5908,28 +6061,39 @@ function clientRows(v) {
 		["", client.email]
 	].filter(([, value]) => String(value || "").trim());
 }
-const MONTH_ABBR = [
-	"JAN",
-	"FEB",
-	"MAR",
-	"APR",
-	"MAY",
-	"JUN",
-	"JUL",
-	"AUG",
-	"SEP",
-	"OCT",
-	"NOV",
-	"DEC"
-];
-/** "OCT 19, 2026", as invoices store their dates, written in the invoice's language ("19 tetor 2026"); other dates as typed. */
-function localDate(value, L) {
+/** Every date on the invoice in numbers, day first ("OCT 19, 2026" prints as 19.10.2026); a date that cannot be read stays as typed. */
+function numericDate(value) {
 	const raw = String(value || "").trim();
-	const names = String(L.monthNames || "").split(",");
-	const mdy = raw.match(/^([A-Z]{3})\s+(\d{1,2}),\s*(\d{4})$/i);
-	const month = mdy ? MONTH_ABBR.indexOf(mdy[1].toUpperCase()) : -1;
-	if (!mdy || month < 0 || names.length !== 12) return raw;
-	return `${Number(mdy[2])} ${names[month]} ${mdy[3]}`;
+	const date = raw ? parseLooseDate(raw) : null;
+	if (!date || Number.isNaN(date.getTime())) return raw;
+	const two = (n) => String(n).padStart(2, "0");
+	return `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()}`;
+}
+/**
+* The issuer's details as labelled lines in the invoice's language: "Adresa:" over the street and the
+* city, then NUI, VAT, phone, email and website, each as "label: value". A line with no value is left out.
+*/
+function companyLines(v) {
+	const { company, L } = v;
+	const labelled = (label, value) => {
+		const text = String(value || "").trim();
+		return text ? [[label, text]] : [];
+	};
+	return {
+		address: [company.streetAddress, v.cityLine].map((part) => String(part || "").trim()).filter(Boolean),
+		ids: [...labelled(L.nuiLabel || "NUI", company.nui), ...labelled(L.vatLabel || "VAT", company.vatNumber)],
+		contact: [
+			...labelled(L.phoneLabel || "Phone", company.phone),
+			...labelled(L.emailLabel || "Email", company.email),
+			...labelled(L.websiteLabel || "Website", company.website)
+		]
+	};
+}
+/** companyLines as one column of paragraphs, for the templates that stack them under the company name. */
+function companyBlock(v) {
+	const { address, ids, contact } = companyLines(v);
+	const label = (text) => `<span class="ik">${esc(text)}:</span>`;
+	return [...address.length ? [label(v.L.addressLabel || "Address"), ...address.map(esc)] : [], ...[...ids, ...contact].map(([key, value]) => `${label(key)} ${esc(value)}`)].map((line) => `<p>${line}</p>`).join("");
 }
 /** The contract the invoice bills under, as one quiet line above the items; nothing when neither field is filled. */
 function contractRow(v) {
@@ -5956,6 +6120,7 @@ function classicTemplate(v) {
     .logo { height: 64px; max-width: 150px; object-fit: contain; flex-shrink: 0; }
     .brand h1 { margin: 0 0 6px; font-size: 20px; color: ${dark}; }
     .brand p, .client p { margin: 2px 0; color: #444; }
+    .brand .ik { font-weight: 600; color: #1D2B2E; }
     .meta { text-align: right; flex-shrink: 0; }
     .meta h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: 2px; text-transform: uppercase; color: ${accent}; }
     .meta p { margin: 2px 0; }
@@ -5979,6 +6144,7 @@ function classicTemplate(v) {
     .sign .ink { height: 46px; display: flex; align-items: flex-end; justify-content: center; }
     .sign .ink img { max-height: 46px; max-width: 160px; }
     .sign .line { border-top: 1px solid #999; padding-top: 6px; }
+    .sign .role { display: block; font-size: 10.5px; color: #888; }
     .stamp { width: 20%; text-align: center; }
     .stamp img { max-height: 96px; max-width: 110px; }
     ${contractCss(accent)}
@@ -5988,13 +6154,7 @@ function classicTemplate(v) {
         ${v.logo ? `<img class="logo" src="${v.logo}" alt="" />` : ""}
         <div>
           <h1>${esc(company.companyName)}</h1>
-          ${company.nui ? `<p>${esc(L.nuiLabel)}: ${esc(company.nui)}</p>` : ""}
-          ${company.vatNumber ? `<p>${esc(L.vatLabel || "VAT")}: ${esc(company.vatNumber)}</p>` : ""}
-          ${company.streetAddress ? `<p>${esc(company.streetAddress)}</p>` : ""}
-          ${v.cityLine ? `<p>${esc(v.cityLine)}</p>` : ""}
-          ${company.email ? `<p>${esc(company.email)}</p>` : ""}
-          ${company.phone ? `<p>${esc(company.phone)}</p>` : ""}
-          ${company.website ? `<p>${esc(company.website)}</p>` : ""}
+          ${companyBlock(v)}
         </div>
       </div>
       <div class="meta">
@@ -6047,15 +6207,23 @@ function classicTemplate(v) {
     <div class="signs keep">
       <div class="sign">
         <div class="ink">${v.signature ? `<img src="${v.signature}" alt="" />` : ""}</div>
-        <div class="line">${esc(company.contactPerson)}<br/>${esc(L.issuedBy)}</div>
+        <div class="line">${esc(v.signerName)}${signerRoleLine(v) || "<br/>"}${esc(L.issuedBy)}</div>
       </div>
       <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ""}</div>
       <div class="sign">
         <div class="ink"></div>
-        <div class="line">${esc(client.fullName)}<br/>${esc(L.receivedBy)}</div>
+        <div class="line">${esc(client.fullName)}${signerRoleLine(v, true) || "<br/>"}${esc(L.receivedBy)}</div>
       </div>
     </div>
   `);
+}
+/**
+* The signer's role as a small line of its own under their name. With `blank`, an empty line of the
+* same height for the client's side, so both signature lines stay level.
+*/
+function signerRoleLine(v, blank = false) {
+	if (!v.signerRole) return "";
+	return `<span class="role">${blank ? "&nbsp;" : esc(v.signerRole)}</span>`;
 }
 const CORPORATE_MIN_ROWS = 6;
 function corporateTemplate(v) {
@@ -6075,6 +6243,7 @@ function corporateTemplate(v) {
     .sub { display: flex; gap: 24px; justify-content: space-between; background: ${mid}; padding: 14px 32px 14px 64px; font-size: 10.5px; font-weight: 700; }
     .sub td { padding: 1px 0; vertical-align: top; }
     .sub td.k { text-align: right; padding-right: 28px; white-space: nowrap; }
+    .sub .ln + .ln { margin-top: 3px; }
     .parties { display: flex; justify-content: space-between; gap: 32px; margin: 26px 0 22px; font-size: 10.5px; }
     .parties td { padding: 4px 0; vertical-align: top; font-weight: 700; }
     .parties td.k { padding-right: 16px; white-space: nowrap; }
@@ -6105,6 +6274,7 @@ function corporateTemplate(v) {
     .sign b { display: block; margin-bottom: 8px; }
     .sign .ink { display: flex; align-items: flex-end; gap: 10px; min-height: 48px; border-bottom: 1.5px solid #1D2B2E; padding-bottom: 4px; }
     .sign .ink img { max-height: 44px; max-width: 120px; }
+    .sign .role { display: block; margin-top: 4px; color: #555; }
     .stamp { width: 24%; text-align: center; }
     .stamp img { max-height: 110px; max-width: 120px; }
     .foot { margin-top: 22px; text-align: center; font-size: 11px; color: #555; }
@@ -6113,6 +6283,7 @@ function corporateTemplate(v) {
     .parties + .contract { margin-top: -8px; }
   `;
 	const pay = paymentRows(v);
+	const issuer = companyLines(v);
 	return shell(v, `Calibri, Carlito, "Segoe UI", -apple-system, Helvetica, Arial, sans-serif`, css, `
     <div class="band">
       <div class="band-brand">
@@ -6123,17 +6294,13 @@ function corporateTemplate(v) {
     </div>
     <div class="sub">
       <div>
-        ${company.streetAddress ? `<div>${esc(company.streetAddress)}</div>` : ""}
-        ${v.cityLine ? `<div style="margin-top:4px">${esc(v.cityLine)}</div>` : ""}
+        ${issuer.address.length ? [`${esc(L.addressLabel || "Address")}:`, ...issuer.address.map(esc)].map((line) => `<div class="ln">${line}</div>`).join("") : ""}
       </div>
       <table>
-        ${company.nui ? `<tr><td class="k">${esc(L.businessNumber || L.nuiLabel)}:</td><td>${esc(company.nui)}</td></tr>` : ""}
-        ${company.vatNumber ? `<tr><td class="k">${esc(L.vatLabel || "VAT")}:</td><td>${esc(company.vatNumber)}</td></tr>` : ""}
+        ${issuer.ids.map(([label, value]) => `<tr><td class="k">${esc(label)}:</td><td>${esc(value)}</td></tr>`).join("")}
       </table>
       <div>
-        ${company.phone ? `<div>${esc(company.phone)}</div>` : ""}
-        ${company.email ? `<div style="margin-top:4px">${esc(company.email)}</div>` : ""}
-        ${company.website ? `<div style="margin-top:4px">${esc(company.website)}</div>` : ""}
+        ${issuer.contact.map(([label, value]) => `<div class="ln">${esc(label)}: ${esc(value)}</div>`).join("")}
       </div>
     </div>
     <div class="parties">
@@ -6188,12 +6355,14 @@ function corporateTemplate(v) {
     <div class="signs keep">
       <div class="sign">
         <b>${esc(L.signature || "Signature")} (${esc(company.companyName)}):</b>
-        <div class="ink"><span>${esc(company.contactPerson)}</span>${v.signature ? `<img src="${v.signature}" alt="" />` : ""}</div>
+        <div class="ink"><span>${esc(v.signerName)}</span>${v.signature ? `<img src="${v.signature}" alt="" />` : ""}</div>
+        ${signerRoleLine(v)}
       </div>
       <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ""}</div>
       <div class="sign">
         <b>${esc(L.signature || "Signature")}:</b>
         <div class="ink"></div>
+        ${signerRoleLine(v, true)}
       </div>
     </div>
     ${v.exportNote ? `<div class="foot"><b>${esc(v.exportNote)}</b></div>` : ""}
@@ -6217,6 +6386,7 @@ function minimalTemplate(v) {
     .cap { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; color: ${muted}; margin-bottom: 8px; }
     .cols p { margin: 2px 0; color: #444; }
     .cols p.lead { font-weight: 700; font-size: 13px; color: #1D2B2E; }
+    .cols .ik { color: ${muted}; }
     .kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
     .kv span:first-child { color: ${muted}; }
     .items { width: 100%; }
@@ -6239,6 +6409,7 @@ function minimalTemplate(v) {
     .sign .ink img { max-height: 46px; max-width: 150px; }
     .sign .line { border-top: 1px solid #B9C1C3; padding-top: 6px; }
     .sign .line b { display: block; color: #1D2B2E; font-weight: 600; }
+    .sign .role { display: block; }
     .stamp { width: 22%; text-align: center; }
     .stamp img { max-height: 96px; max-width: 110px; }
     .foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid ${hair}; text-align: center; font-size: 11px; color: ${muted}; }
@@ -6260,13 +6431,7 @@ function minimalTemplate(v) {
       <div>
         <div class="cap">${esc(L.issuedBy)}</div>
         <p class="lead">${esc(company.companyName)}</p>
-        ${company.streetAddress ? `<p>${esc(company.streetAddress)}</p>` : ""}
-        ${v.cityLine ? `<p>${esc(v.cityLine)}</p>` : ""}
-        ${company.nui ? `<p>${esc(L.nuiLabel)}: ${esc(company.nui)}</p>` : ""}
-        ${company.vatNumber ? `<p>${esc(L.vatLabel || "VAT")}: ${esc(company.vatNumber)}</p>` : ""}
-        ${company.phone ? `<p>${esc(company.phone)}</p>` : ""}
-        ${company.email ? `<p>${esc(company.email)}</p>` : ""}
-        ${company.website ? `<p>${esc(company.website)}</p>` : ""}
+        ${companyBlock(v)}
       </div>
       <div>
         <div class="cap">${esc(L.billedTo || L.clientLabel)}</div>
@@ -6315,12 +6480,12 @@ function minimalTemplate(v) {
     <div class="signs keep">
       <div class="sign">
         <div class="ink">${v.signature ? `<img src="${v.signature}" alt="" />` : ""}</div>
-        <div class="line"><b>${esc(company.contactPerson)}</b>${esc(L.issuedBy)}</div>
+        <div class="line"><b>${esc(v.signerName)}</b>${signerRoleLine(v)}${esc(L.issuedBy)}</div>
       </div>
       <div class="stamp">${v.stamp ? `<img src="${v.stamp}" alt="" />` : ""}</div>
       <div class="sign">
         <div class="ink"></div>
-        <div class="line"><b>${esc(client.fullName)}</b>${esc(L.receivedBy)}</div>
+        <div class="line"><b>${esc(client.fullName)}</b>${signerRoleLine(v, true)}${esc(L.receivedBy)}</div>
       </div>
     </div>
     <div class="foot">${esc(L.thankYou)}${v.exportNote ? `<b>${esc(v.exportNote)}</b>` : ""}</div>
@@ -6481,6 +6646,8 @@ function companyForPdf(invoice, profile, t) {
 		industry: snapshot.industry ?? live.industry,
 		logoData: live.logoData,
 		signatureData: live.signatureData,
+		signers: live.signers,
+		defaultSignerId: live.defaultSignerId,
 		stampData: live.stampData,
 		invoiceTemplate: live.invoiceTemplate,
 		accentColor: live.accentColor
