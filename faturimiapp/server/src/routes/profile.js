@@ -61,6 +61,7 @@ function sanitizeProfile(body) {
     if (color === '' || /^#[0-9a-fA-F]{6}$/.test(color)) partial.accentColor = color;
   }
   if (src.defaultTaxRate !== undefined && src.defaultTaxRate !== null) partial.defaultTaxRate = normalizeTaxRate(src.defaultTaxRate);
+  if (typeof src.showContract === 'boolean') partial.showContract = src.showContract;
   if (partial.currency !== undefined) partial.currency = partial.currency.toUpperCase() || 'EUR';
   return partial;
 }
