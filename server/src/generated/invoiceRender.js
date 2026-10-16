@@ -484,7 +484,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$3 = {
+const sq$4 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -748,7 +748,7 @@ const sq$3 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$3 = {
+const en$4 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -1012,8 +1012,8 @@ const en$3 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$3 = {
-	...en$3,
+const it$4 = {
+	...en$4,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1279,17 +1279,17 @@ const it$3 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$3,
+		...sq$4,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$3,
+		...en$4,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$3,
+		...it$4,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1301,7 +1301,7 @@ const financeNav = {
 };
 //#endregion
 //#region src/i18nMercury.ts
-const sq$2 = {
+const sq$3 = {
 	tab: "Mercury",
 	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
 	settings: "Lidhja me Mercury",
@@ -1395,7 +1395,7 @@ const sq$2 = {
 		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
 	}
 };
-const en$2 = {
+const en$3 = {
 	tab: "Mercury",
 	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
 	settings: "Mercury connection",
@@ -1490,10 +1490,10 @@ const en$2 = {
 	}
 };
 const mercuryTexts = {
-	sq: sq$2,
-	en: en$2,
+	sq: sq$3,
+	en: en$3,
 	it: {
-		...en$2,
+		...en$3,
 		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
 		settings: "Collegamento Mercury",
 		syncNow: "Aggiorna",
@@ -1544,7 +1544,7 @@ const mercuryTexts = {
 };
 //#endregion
 //#region src/i18nProjectDetail.ts
-const sq$1 = {
+const sq$2 = {
 	back: "Të gjitha projektet",
 	addProject: "Shto projekt",
 	projectName: "Emri, p.sh. TeamPlaner",
@@ -1607,7 +1607,7 @@ const sq$1 = {
 		costPerHour: "Kosto / orë"
 	}
 };
-const en$1 = {
+const en$2 = {
 	back: "All projects",
 	addProject: "Add project",
 	projectName: "Name, e.g. TeamPlaner",
@@ -1671,10 +1671,10 @@ const en$1 = {
 	}
 };
 const projectDetailTexts = {
-	sq: sq$1,
-	en: en$1,
+	sq: sq$2,
+	en: en$2,
 	it: {
-		...en$1,
+		...en$2,
 		back: "Tutti i progetti",
 		addProject: "Aggiungi progetto",
 		projectName: "Nome, es. TeamPlaner",
@@ -1696,7 +1696,7 @@ const projectDetailTexts = {
 		monthlyTitle: "Mese per mese: ricavi contro costi",
 		teamTitle: "Squadra ({count})",
 		col: {
-			...en$1.col,
+			...en$2.col,
 			month: "Mese",
 			hours: "Ore",
 			cost: "Costo",
@@ -2362,6 +2362,116 @@ const recurringNav = {
 	en: "Recurring",
 	it: "Ricorrenti"
 };
+const slackTexts = {
+	sq: {
+		title: "Slack",
+		intro: "Njoftimet e rëndësishme shkojnë në një kanal të Slack-ut: kujtesat e dërguara, faturat e dërguara dhe faturat e paguara.",
+		stepsTitle: "Si lidhet",
+		step1: "Në Slack hap api.slack.com/apps → Create New App → From scratch, dhe zgjidh workspace-in.",
+		step2: "Te \"Incoming Webhooks\" ndize opsionin, kliko \"Add New Webhook to Workspace\" dhe zgjidh kanalin (p.sh. #menaxhimi-faturave).",
+		step3: "Kopjo \"Webhook URL\" dhe ngjite këtu.",
+		openSlack: "Hap Slack API",
+		webhook: "Webhook URL",
+		webhookPlaceholder: "https://hooks.slack.com/services/…",
+		channel: "Kanali",
+		channelPlaceholder: "menaxhimi-faturave",
+		connect: "Lidhe dhe dërgo një mesazh prove",
+		connecting: "Po lidhet…",
+		connected: "E lidhur me #{channel}",
+		connectedNoChannel: "E lidhur me Slack",
+		webhookHint: "Webhook {hint}",
+		events: "Çka dërgohet në kanal",
+		eventSent: "Fatura u dërgua me email",
+		eventReminder: "Kujtesë pagese u dërgua",
+		eventPaid: "Fatura u pagua (edhe nga ekstrakti i bankës)",
+		test: "Dërgo mesazh prove",
+		testing: "Po dërgohet…",
+		tested: "Mesazhi i provës u dërgua. Shiko kanalin në Slack.",
+		disconnect: "Shkëpute",
+		disconnectConfirm: "Të shkëputet Slack? Njoftimet nuk do të shkojnë më në kanal.",
+		lastAt: "Mesazhi i fundit: {date}",
+		err: {
+			SLACK_WEBHOOK: "Ky nuk është link i Slack-ut. Ngjite \"Webhook URL\" që fillon me https://hooks.slack.com/.",
+			SLACK_NOT_CONNECTED: "Lidhe fillimisht një kanal të Slack-ut.",
+			SLACK_404: "Slack nuk e gjen më këtë webhook. Ndoshta u fshi: krijo një të ri dhe ngjite këtu.",
+			SLACK_403: "Slack e refuzoi mesazhin. Kontrollo që aplikacioni ka ende qasje në kanal.",
+			SLACK_410: "Kanali është arkivuar ose fshirë në Slack.",
+			SLACK_FAILED: "Slack nuk u arrit. Provo përsëri pas pak."
+		}
+	},
+	en: {
+		title: "Slack",
+		intro: "Important notices go to a Slack channel: reminders sent, invoices sent and invoices paid.",
+		stepsTitle: "How to connect",
+		step1: "In Slack, open api.slack.com/apps → Create New App → From scratch, and pick the workspace.",
+		step2: "Under \"Incoming Webhooks\" switch it on, click \"Add New Webhook to Workspace\" and pick the channel (e.g. #invoices).",
+		step3: "Copy the \"Webhook URL\" and paste it here.",
+		openSlack: "Open Slack API",
+		webhook: "Webhook URL",
+		webhookPlaceholder: "https://hooks.slack.com/services/…",
+		channel: "Channel",
+		channelPlaceholder: "invoices",
+		connect: "Connect and send a test message",
+		connecting: "Connecting…",
+		connected: "Connected to #{channel}",
+		connectedNoChannel: "Connected to Slack",
+		webhookHint: "Webhook {hint}",
+		events: "What is posted to the channel",
+		eventSent: "An invoice was emailed",
+		eventReminder: "A payment reminder was sent",
+		eventPaid: "An invoice was paid (also from a bank statement)",
+		test: "Send a test message",
+		testing: "Sending…",
+		tested: "The test message was sent. Look at the channel in Slack.",
+		disconnect: "Disconnect",
+		disconnectConfirm: "Disconnect Slack? Notices will no longer go to the channel.",
+		lastAt: "Last message: {date}",
+		err: {
+			SLACK_WEBHOOK: "This is not a Slack link. Paste the \"Webhook URL\" that starts with https://hooks.slack.com/.",
+			SLACK_NOT_CONNECTED: "Connect a Slack channel first.",
+			SLACK_404: "Slack no longer knows this webhook. It may have been removed: create a new one and paste it here.",
+			SLACK_403: "Slack refused the message. Check that the app still has access to the channel.",
+			SLACK_410: "The channel was archived or deleted in Slack.",
+			SLACK_FAILED: "Slack could not be reached. Try again in a moment."
+		}
+	},
+	it: {
+		title: "Slack",
+		intro: "Gli avvisi importanti vanno in un canale Slack: promemoria inviati, fatture inviate e fatture pagate.",
+		stepsTitle: "Come collegarlo",
+		step1: "In Slack apri api.slack.com/apps → Create New App → From scratch, e scegli il workspace.",
+		step2: "In \"Incoming Webhooks\" attivalo, clicca \"Add New Webhook to Workspace\" e scegli il canale (es. #fatture).",
+		step3: "Copia il \"Webhook URL\" e incollalo qui.",
+		openSlack: "Apri Slack API",
+		webhook: "Webhook URL",
+		webhookPlaceholder: "https://hooks.slack.com/services/…",
+		channel: "Canale",
+		channelPlaceholder: "fatture",
+		connect: "Collega e invia un messaggio di prova",
+		connecting: "Collegamento…",
+		connected: "Collegato a #{channel}",
+		connectedNoChannel: "Collegato a Slack",
+		webhookHint: "Webhook {hint}",
+		events: "Cosa viene inviato al canale",
+		eventSent: "Una fattura è stata inviata per email",
+		eventReminder: "È stato inviato un promemoria di pagamento",
+		eventPaid: "Una fattura è stata pagata (anche da un estratto conto)",
+		test: "Invia un messaggio di prova",
+		testing: "Invio…",
+		tested: "Il messaggio di prova è stato inviato. Guarda il canale in Slack.",
+		disconnect: "Scollega",
+		disconnectConfirm: "Scollegare Slack? Gli avvisi non andranno più nel canale.",
+		lastAt: "Ultimo messaggio: {date}",
+		err: {
+			SLACK_WEBHOOK: "Questo non è un link di Slack. Incolla il \"Webhook URL\" che inizia con https://hooks.slack.com/.",
+			SLACK_NOT_CONNECTED: "Collega prima un canale Slack.",
+			SLACK_404: "Slack non riconosce più questo webhook. Forse è stato rimosso: creane uno nuovo e incollalo qui.",
+			SLACK_403: "Slack ha rifiutato il messaggio. Controlla che l'app abbia ancora accesso al canale.",
+			SLACK_410: "Il canale è stato archiviato o eliminato in Slack.",
+			SLACK_FAILED: "Slack non è raggiungibile. Riprova tra poco."
+		}
+	}
+};
 //#endregion
 //#region src/i18nCore.ts
 const LANGS = [
@@ -2390,6 +2500,7 @@ const translations = {
 		mercury: mercuryTexts.sq,
 		projectDetail: projectDetailTexts.sq,
 		recurring: recurringTexts.sq,
+		slack: slackTexts.sq,
 		nav: {
 			finance: financeNav.sq,
 			recurring: recurringNav.sq,
@@ -3329,6 +3440,7 @@ const translations = {
 		mercury: mercuryTexts.en,
 		projectDetail: projectDetailTexts.en,
 		recurring: recurringTexts.en,
+		slack: slackTexts.en,
 		nav: {
 			finance: financeNav.en,
 			recurring: recurringNav.en,
@@ -4268,6 +4380,7 @@ const translations = {
 		mercury: mercuryTexts.it,
 		projectDetail: projectDetailTexts.it,
 		recurring: recurringTexts.it,
+		slack: slackTexts.it,
 		nav: {
 			finance: financeNav.it,
 			recurring: recurringNav.it,
