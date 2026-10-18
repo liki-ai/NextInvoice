@@ -12,9 +12,23 @@ import SwipeableRow, { useLockRowPress } from '../components/SwipeableRow';
 import PdfPreviewModal from '../components/PdfPreviewModal';
 import PaymentModal from '../components/PaymentModal';
 import SentButton from '../components/SentButton';
-import { daysOverdue, documentTotals, isInvoiceSent, isOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
+import { daysOverdue, documentTotals, isInvoiceSent, isOverdue, parseLooseDate, paymentStatus, pdfClient, pdfCompany, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
 import { clientInvoiceSummary, invoiceClientGroups, isOwed, matchClientGroups } from '../utils/clientInvoices';
+
+// Newest first by invoice date, not in the server's order: the server puts the last saved invoice on top,
+// so an old invoice that reaches the account later would sit above this month's.
+function invoiceTime(inv) {
+  return parseLooseDate(inv.date)?.getTime() || Date.parse(inv.createdAt || '') || 0;
+}
+
+function sortNewestFirst(invoices) {
+  return [...(invoices || [])].sort(
+    (a, b) =>
+      invoiceTime(b) - invoiceTime(a) ||
+      String(b.number || '').localeCompare(String(a.number || ''), undefined, { numeric: true })
+  );
+}
 
 function PaidChip({ status, late, paidAmount, remaining, t, loading, onToggle }) {
   const { lock } = useLockRowPress();
@@ -186,6 +200,7 @@ export default function InvoiceListScreen({ navigation, route }) {
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
   const clientGroups = useMemo(() => invoiceClientGroups(invoices, clients), [invoices, clients]);
+  const sortedInvoices = useMemo(() => sortNewestFirst(invoices), [invoices]);
   const client = clientKey ? clientGroups.find((group) => group.key === clientKey) : null;
   const suggestions = useMemo(() => (client ? [] : matchClientGroups(clientGroups, query)), [client, clientGroups, query]);
   // A list for one client holds what the chosen tab shows: what is still owed, or everything.
@@ -204,9 +219,6 @@ export default function InvoiceListScreen({ navigation, route }) {
     setClientKey(null);
     setQuery('');
     setPulseId(id);
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
-    });
     const timer = setTimeout(() => {
       setPulseId(null);
       navigation.setParams({ highlightId: undefined });
@@ -219,14 +231,24 @@ export default function InvoiceListScreen({ navigation, route }) {
     // Typing finds invoices by number as well as by client.
     const q = query.trim().toLowerCase();
     const list = q
-      ? invoices.filter((inv) => `${inv.number || ''} ${inv.client?.fullName || ''}`.toLowerCase().includes(q))
-      : invoices;
+      ? sortedInvoices.filter((inv) => `${inv.number || ''} ${inv.client?.fullName || ''}`.toLowerCase().includes(q))
+      : sortedInvoices;
     if (statusFilter === 'all') return list;
     if (statusFilter === 'paid') return list.filter((inv) => paymentStatus(inv) === 'paid');
     if (statusFilter === 'overdue') return list.filter((inv) => isOverdue(inv));
     return list.filter(isOwed);
-  }, [invoices, statusFilter, client, clientTab, query]);
+  }, [sortedInvoices, statusFilter, client, clientTab, query]);
   const clientSummary = useMemo(() => (client ? clientInvoiceSummary(filtered) : null), [client, filtered]);
+
+  useEffect(() => {
+    if (!pulseId) return;
+    // A new invoice dated in the past sits further down the list, not at the top.
+    const index = filtered.findIndex((inv) => inv.id === pulseId);
+    requestAnimationFrame(() => {
+      if (index > 0) listRef.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true });
+      else listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+  }, [pulseId]);
 
   const pickClient = (group) => {
     Keyboard.dismiss();
@@ -455,6 +477,9 @@ export default function InvoiceListScreen({ navigation, route }) {
         ref={listRef}
         data={filtered}
         keyExtractor={(item) => item.id}
+        onScrollToIndexFailed={({ index, averageItemLength }) =>
+          listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: true })
+        }
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={Keyboard.dismiss}
