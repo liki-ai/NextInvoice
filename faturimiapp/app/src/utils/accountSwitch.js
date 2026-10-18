@@ -9,17 +9,18 @@ export function profileIsCustom(profile) {
  * What happens to the data on this phone when someone signs in. The server is where data lives;
  * the phone keeps a copy, and may hold changes the server has not confirmed yet.
  *
- *  'keep'    – the same account as before: the copy is already this account's.
- *  'replace' – show the account's data from the server (nothing local needs saving).
- *  'upload'  – first sign-in on a phone that was used without an account: its data joins the account.
- *  'ask'     – a different account while the phone holds changes the server never took. Uploading
- *              them or dropping them is the owner's call, never a silent one.
+ *  'keep'    – the same account as before: the copy is already this account's, and its waiting
+ *              changes go up with the next sync.
+ *  'replace' – show the account's data from the server. Signing in to an account that already
+ *              exists never brings the phone's own invoices along: those were tries, and the
+ *              account is what was built on the web.
+ *  'ask'     – a new account on a phone that was used before signing up: whether what was made
+ *              there joins the account or was only a test is the owner's call.
  */
-export function signInPlan({ migratedUserId, nextUserId, hasLocalData, hasUnsyncedChanges }) {
+export function signInPlan({ migratedUserId, nextUserId, hasLocalData, isNewAccount }) {
   if (migratedUserId && migratedUserId === nextUserId) return 'keep';
-  if (!hasLocalData) return 'replace';
-  if (!migratedUserId) return 'upload';
-  return hasUnsyncedChanges ? 'ask' : 'replace';
+  if (isNewAccount && hasLocalData) return 'ask';
+  return 'replace';
 }
 
 /**

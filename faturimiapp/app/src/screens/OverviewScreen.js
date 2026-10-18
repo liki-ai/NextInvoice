@@ -140,7 +140,6 @@ export default function OverviewScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View style={{ flex: 1, marginRight: spacing.sm }}>
-            <Text style={typography.title}>{t('overview.title')}</Text>
             <Text style={styles.meta}>
               {label} · {t('overview.asOf', { date: report.period.endIso })}
             </Text>

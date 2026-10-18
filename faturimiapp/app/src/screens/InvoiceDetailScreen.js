@@ -91,7 +91,10 @@ export default function InvoiceDetailScreen({ route, navigation }) {
   };
 
   const handleDelete = () => {
-    if (status !== 'draft') return;
+    if (status !== 'draft') {
+      Alert.alert(t('common.delete'), invoice.lifecycle === 'cancelled' ? t('sync.deleteCancelled') : t('sync.deleteIssued'));
+      return;
+    }
     Alert.alert(t('invoiceList.deleteConfirmTitle'), t('invoiceList.deleteConfirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {

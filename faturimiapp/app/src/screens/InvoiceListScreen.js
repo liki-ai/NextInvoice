@@ -295,7 +295,6 @@ export default function InvoiceListScreen({ navigation, route }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={typography.title}>{t('invoiceList.title')}</Text>
         {filtered.length > 0 ? (
           <Pressable style={styles.headerCta} onPress={() => setPreviewVisible(true)}>
             <Ionicons name="send-outline" size={16} color={colors.primary} />
@@ -529,7 +528,10 @@ export default function InvoiceListScreen({ navigation, route }) {
               }
               onEdit={() => navigation.navigate(status === 'draft' ? 'EditInvoice' : 'InvoiceDetail', { invoiceId: item.id })}
               onDelete={() => {
-                if (status !== 'draft') return;
+                if (status !== 'draft') {
+                  Alert.alert(t('common.delete'), item.lifecycle === 'cancelled' ? t('sync.deleteCancelled') : t('sync.deleteIssued'));
+                  return;
+                }
                 Alert.alert(t('invoiceList.deleteConfirmTitle'), t('invoiceList.deleteConfirmMessage'), [
                   { text: t('common.cancel'), style: 'cancel' },
                   {
@@ -625,11 +627,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     gap: spacing.sm,
   },
   headerCta: {

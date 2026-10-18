@@ -23,6 +23,8 @@ export default function ProfileScreen({ navigation }) {
   const [form, setForm] = useState(() => stripSampleCompanyFields(companyProfile));
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(settings.apiBaseUrl);
   const [importing, setImporting] = useState(false);
+  // A company already set up shows as a short summary; one still to fill in opens as the form.
+  const [expanded, setExpanded] = useState(() => !stripSampleCompanyFields(companyProfile).companyName);
 
   useEffect(() => {
     setForm(stripSampleCompanyFields(companyProfile));
@@ -30,6 +32,14 @@ export default function ProfileScreen({ navigation }) {
 
   const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
   const logo = form.logoUri || form.logoData || companyProfile.logoUri || companyProfile.logoData;
+  const address = [form.streetAddress, [form.zipCode, form.state].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const summaryLines = [
+    { label: 'NUI', value: form.nui },
+    { label: t('profile.streetAddress'), value: address },
+    { label: 'Email', value: form.email },
+    { label: t('profile.phone'), value: form.phone },
+    { label: 'IBAN', value: [form.iban, form.bankName].filter(Boolean).join(' · ') },
+  ].filter((line) => String(line.value || '').trim());
 
   const handleImport = async () => {
     try {
@@ -72,13 +82,11 @@ export default function ProfileScreen({ navigation }) {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: spacing.md, paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + 120 }}
+      contentContainerStyle={{ padding: spacing.md, paddingBottom: insets.bottom + 120 }}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       automaticallyAdjustKeyboardInsets
     >
-      <Text style={typography.title}>{t('more.title')}</Text>
-
       {token && user ? (
         <View style={styles.accountRow}>
           <Ionicons name="cloud-done-outline" size={18} color={colors.primary} />
@@ -118,6 +126,7 @@ export default function ProfileScreen({ navigation }) {
           onPress={async () => {
             const picked = await pickImageFile(t);
             if (!picked) return;
+            setExpanded(true);
             setForm((prev) => ({
               ...prev,
               logoUri: picked.proofUri,
@@ -135,12 +144,24 @@ export default function ProfileScreen({ navigation }) {
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.company}>{form.companyName || t('profile.companyName')}</Text>
-          <Text style={typography.muted}>{form.contactPerson}</Text>
-          <Text style={typography.muted}>{form.phone}</Text>
           <Text style={styles.industry}>{t(`industry.${normalizeIndustry(form.industry)}`)}</Text>
         </View>
       </View>
+      <View style={styles.summary}>
+        {summaryLines.map((line) => (
+          <View key={line.label} style={styles.summaryLine}>
+            <Text style={styles.summaryLabel}>{line.label}</Text>
+            <Text style={styles.summaryValue} numberOfLines={2}>{line.value}</Text>
+          </View>
+        ))}
+        <Pressable style={styles.expand} onPress={() => setExpanded((open) => !open)} hitSlop={8}>
+          <Text style={styles.expandText}>{expanded ? t('profile.showLess') : t('profile.showAll')}</Text>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} />
+        </Pressable>
+      </View>
 
+      {expanded ? (
+      <>
       <Section title={t('profile.importSectionTitle')} style={{ marginTop: spacing.md }}>
         <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.importDescription')}</Text>
         <Button
@@ -202,6 +223,8 @@ export default function ProfileScreen({ navigation }) {
       ) : null}
 
       <Button title={t('common.save')} onPress={handleSave} />
+      </>
+      ) : null}
 
       <Section title={t('profile.languageSectionTitle')} style={{ marginTop: spacing.lg }}>
         <View style={styles.langLine}>
@@ -284,6 +307,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   logo: { width: 72, height: 72 },
+  summary: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  summaryLine: { flexDirection: 'row', gap: spacing.sm, paddingVertical: 4 },
+  summaryLabel: { width: 72, fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  summaryValue: { flex: 1, fontSize: 13, color: colors.text },
+  expand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: spacing.sm },
+  expandText: { fontWeight: '700', color: colors.primary },
   company: { fontSize: 18, fontWeight: '800', color: colors.text },
   industry: { marginTop: 4, fontSize: 12, fontWeight: '700', color: colors.primary },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },

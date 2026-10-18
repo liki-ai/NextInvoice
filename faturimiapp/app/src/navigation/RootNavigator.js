@@ -129,11 +129,11 @@ function OverviewStackNavigator() {
 function ProfileStackNavigator() {
   const { t } = useTranslation();
   return (
-    <ProfileStack.Navigator>
+    <ProfileStack.Navigator screenOptions={{ headerBackTitle: t('more.title') }}>
       <ProfileStack.Screen
         name="ProfileHome"
         component={ProfileScreen}
-        options={{ title: t('more.title'), headerShown: false }}
+        options={{ title: t('more.title') }}
       />
       <ProfileStack.Screen name="ClientList" component={ClientListScreen} options={{ title: t('clients.title') }} />
       <ProfileStack.Screen

@@ -124,7 +124,6 @@ export default function ObligationListScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={typography.title}>{t('obligations.title')}</Text>
           <Text style={styles.subtitle}>{t('obligations.subtitle')}</Text>
         </View>
         {filtered.length > 0 ? (

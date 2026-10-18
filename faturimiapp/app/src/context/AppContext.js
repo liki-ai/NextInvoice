@@ -12,6 +12,11 @@ import { shouldUploadProfile, signInPlan, profileIsCustom } from '../utils/accou
 
 const AppContext = createContext(null);
 
+// The server answered and said no; anything else (offline, timeouts, a lapsed session) is retried.
+function isRefusal(err) {
+  return err.status >= 400 && err.status < 500 && ![401, 408, 429].includes(err.status);
+}
+
 function normalizePlan(raw) {
   const next = { ...DEFAULT_PLAN, ...(raw || {}) };
   if (next.plan === 'premium' && next.expiresAt) {
@@ -138,12 +143,22 @@ export function AppProvider({ children }) {
     flushing.current = true;
     try {
       let queue = [...syncQueue];
+      const refused = [];
       while (queue.length) {
         const item = queue[0];
-        const res = await apiRequest(settings.apiBaseUrl, token, '/api/sync', {
-          method: 'POST',
-          body: { opId: item.opId, changes: [item] },
-        });
+        let res = null;
+        try {
+          res = await apiRequest(settings.apiBaseUrl, token, '/api/sync', {
+            method: 'POST',
+            body: { opId: item.opId, changes: [item] },
+          });
+        } catch (err) {
+          // A change the server turns down (an issued invoice deleted, say) would be turned down on
+          // every retry and hold back everything queued after it. It is dropped, the server's
+          // version comes back with the snapshot below, and the owner is told why.
+          if (!isRefusal(err)) throw err;
+          refused.push(err);
+        }
         queue = queue.slice(1);
         setSyncQueue(queue);
         await setJson(KEYS.SYNC_QUEUE, queue);
@@ -152,6 +167,11 @@ export function AppProvider({ children }) {
       const snap = await apiRequest(settings.apiBaseUrl, token, '/api/sync');
       await applySnapshot(snap);
       await persistSync({ status: 'synced', lastSyncedAt: new Date().toISOString(), error: null });
+      if (refused.length) {
+        const copy = (translations[settings.language] || translations.sq).sync;
+        const reasons = [...new Set(refused.map((err) => copy[err.code] || err.message))];
+        Alert.alert(copy.refusedTitle, reasons.join('\n\n'));
+      }
     } catch (err) {
       await persistSync({ status: 'error', lastSyncedAt: syncState.lastSyncedAt, error: err.message });
       if (err.status === 401) {
@@ -163,7 +183,7 @@ export function AppProvider({ children }) {
     } finally {
       flushing.current = false;
     }
-  }, [token, syncQueue, settings.apiBaseUrl, applySnapshot, persistSync, syncState.lastSyncedAt]);
+  }, [token, syncQueue, settings.apiBaseUrl, settings.language, applySnapshot, persistSync, syncState.lastSyncedAt]);
 
   useEffect(() => {
     if (!loading && token) void flushQueue();
@@ -215,14 +235,14 @@ export function AppProvider({ children }) {
 
   // Hands the phone's copy of the data over to the account that just signed in. Returns how many
   // changes are still waiting to reach the server.
-  const adoptAccount = useCallback(async (nextUser, nextToken) => {
+  const adoptAccount = useCallback(async (nextUser, nextToken, isNewAccount) => {
     const serverState = await apiRequest(settings.apiBaseUrl, nextToken, '/api/sync');
     const hasLocalData = invoices.length + clients.length + catalogItems.length + obligations.length > 0 || profileIsCustom(companyProfile);
     let plan = signInPlan({
       migratedUserId,
       nextUserId: nextUser.id,
       hasLocalData,
-      hasUnsyncedChanges: syncQueue.length > 0 || syncState.status === 'error',
+      isNewAccount,
     });
     if (plan === 'keep') return syncQueue.length;
     if (plan === 'ask') plan = await askAboutLocalData();
@@ -242,10 +262,10 @@ export function AppProvider({ children }) {
     return waiting.length;
   }, [migratedUserId, companyProfile, clients, catalogItems, invoices, obligations, syncQueue, syncState.status, settings.apiBaseUrl, applySnapshot, askAboutLocalData, uploadLocalData]);
 
-  const startSession = useCallback(async (res) => {
+  const startSession = useCallback(async (res, { isNewAccount = false } = {}) => {
     // The data is settled before the session becomes visible, so the background sync cannot
     // send the previous account's queue to this one in the meantime.
-    const waiting = await adoptAccount(res.user, res.token);
+    const waiting = await adoptAccount(res.user, res.token, isNewAccount);
     if (res.user?.plan === 'premium') {
       const next = normalizePlan({
         plan: 'premium',
@@ -280,12 +300,12 @@ export function AppProvider({ children }) {
       method: 'POST',
       body: { email, password, language: settings.language, industry: extras.industry },
     });
-    await startSession(res);
+    await startSession(res, { isNewAccount: true });
   }, [settings.apiBaseUrl, settings.language, startSession]);
 
   // Signing out leaves the phone as a fresh install: the account's data stays on the server and
-  // comes back on the next sign-in, and anything made in the meantime joins whichever account
-  // signs in next. Changes the server has not taken yet are only dropped after asking.
+  // comes back on the next sign-in; anything made in the meantime is offered to a new account
+  // only. Changes the server has not taken yet are only dropped after asking.
   const logout = useCallback(async () => {
     await flushQueue();
     const pending = await getJson(KEYS.SYNC_QUEUE, []);
