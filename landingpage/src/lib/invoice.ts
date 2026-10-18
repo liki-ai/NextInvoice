@@ -99,6 +99,8 @@ export type CompanyProfile = {
   currency: string
   bankName?: string
   iban?: string
+  /** The local account number, which clients paying inside the country use instead of the IBAN. */
+  accountNumber?: string
   swift?: string
   /** Legal footer on PDF. Empty string = hidden. Missing = use default. Never printed for service businesses. */
   exportNote?: string

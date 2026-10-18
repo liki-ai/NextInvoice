@@ -137,6 +137,7 @@ export function pdfCompany(invoice, liveProfile) {
     // Added after the first snapshots were taken; older invoices fall back to the profile.
     vatNumber: snapshot.vatNumber ?? liveProfile?.vatNumber,
     swift: snapshot.swift ?? liveProfile?.swift,
+    accountNumber: snapshot.accountNumber ?? liveProfile?.accountNumber,
     website: snapshot.website ?? liveProfile?.website,
     industry: snapshot.industry ?? liveProfile?.industry,
     logoData: liveProfile?.logoData,

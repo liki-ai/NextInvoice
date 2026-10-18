@@ -132,7 +132,7 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
     // Who signs, printed under the signature line (also when it is signed by hand).
     signerName: signer?.name || company.contactPerson || '',
     signerRole: signer ? signerRoleText(signer.role, pdfLabels) : '',
-    hasPayment: Boolean(company.bankName || company.iban || company.swift),
+    hasPayment: Boolean(company.bankName || company.iban || company.accountNumber || company.swift),
   }
 }
 
@@ -175,14 +175,42 @@ function shell(v: View, font: string, css: string, body: string) {
 </html>`
 }
 
+/**
+ * The bank details as lines of what belongs together: who is paid and at which bank, the local
+ * account number for clients paying inside the country, then IBAN with SWIFT for payments from
+ * abroad. Each line keeps its pairs side by side, so five details take three lines, not five.
+ */
+function paymentLines(v: View) {
+  const { company, L } = v
+  const lines = [
+    [company.bankName ? [L.bankName, company.bankName] : null],
+    [company.accountNumber ? [L.accountLabel || 'Account No.', company.accountNumber] : null],
+    [company.iban ? [L.ibanLabel, company.iban] : null, company.swift ? [L.swiftLabel || 'SWIFT (BIC)', company.swift] : null],
+  ]
+  return lines
+    .map((line) => line.filter(Boolean) as string[][])
+    .filter((line) => line.length)
+    .map((line) => `<div class="pl">${line.map(([label, value]) => `<span><span class="pk">${esc(label)}:</span> ${esc(value)}</span>`).join('')}</div>`)
+    .join('')
+}
+
+/** The look of `paymentLines`: pairs on one line, wrapping whole when the line runs out of room. */
+const PAYMENT_LINE_CSS = `.pl { display: flex; flex-wrap: wrap; column-gap: 22px; }`
+
+/** The bank details one per row, in the order a client copies them: who is paid, the bank, the account, IBAN, SWIFT. */
 function paymentRows(v: View) {
   const { company, L } = v
   return [
+    [L.beneficiary || 'Beneficiary', company.companyName],
     company.bankName ? [L.bankName, company.bankName] : null,
-    company.swift ? [L.swiftLabel || 'SWIFT (BIC)', company.swift] : null,
+    company.accountNumber ? [L.accountLabel || 'Account No.', company.accountNumber] : null,
     company.iban ? [L.ibanLabel, company.iban] : null,
+    company.swift ? [L.swiftLabel || 'SWIFT (BIC)', company.swift] : null,
   ].filter(Boolean) as string[][]
 }
+
+// A bank building, drawn in the text colour, for the heading of the bank details.
+const BANK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 4l9 5.5"/><path d="M4 9.5h16"/><path d="M6 10v7.5M10 10v7.5M14 10v7.5M18 10v7.5"/><path d="M3.5 20h17"/></svg>`
 
 function clientLines(v: View) {
   const { client, L } = v
@@ -304,7 +332,8 @@ function classicTemplate(v: View) {
     .totals .grand { font-weight: 700; font-size: 16px; border-top: 2px solid ${accent}; margin-top: 4px; padding-top: 8px; color: ${dark}; }
     .notes { margin-top: 20px; color: #555; }
     .payment { margin-top: 20px; color: #444; }
-    .payment p { margin: 2px 0; }
+    ${PAYMENT_LINE_CSS}
+    .payment .pl { margin: 2px 0; }
     .thanks { text-align: center; margin-top: 30px; font-size: 13px; color: ${accent}; font-weight: 600; }
     .law { text-align: center; margin-top: 8px; font-size: 13px; font-weight: 700; }
     .signs { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 48px; }
@@ -376,9 +405,7 @@ function classicTemplate(v: View) {
     ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ''}
     ${
       v.hasPayment
-        ? `<div class="payment keep"><div class="label">${esc(L.paymentInfo)}</div>${paymentRows(v)
-            .map(([label, value]) => `<p>${esc(label)}: ${esc(value)}</p>`)
-            .join('')}</div>`
+        ? `<div class="payment keep"><div class="label">${esc(L.paymentInfo)}</div>${paymentLines(v)}</div>`
         : ''
     }
     <div class="thanks">${esc(L.thankYou)}</div>
@@ -446,8 +473,14 @@ function corporateTemplate(v: View) {
     .items .t { width: 17%; }
     .amount { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
     .bottom { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
-    .pay { flex: 1; margin-top: 22px; background: ${soft}; padding: 10px 16px; text-align: center; font-size: 12.5px; line-height: 1.6; }
-    .pay strong { display: block; }
+    .pay { flex: 1; margin-top: 14px; border: 1px solid ${line}; border-radius: 6px; overflow: hidden; font-size: 11px; }
+    .pay-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1.5px solid ${accent}; color: ${accent}; font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
+    .pay-head svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .pay table { width: 100%; }
+    .pay td { padding: 4px 12px; vertical-align: top; }
+    .pay tr:nth-child(even) td { background: ${soft}; }
+    .pay td.pk { width: 1%; padding-right: 40px; color: #5F6F73; white-space: nowrap; }
+    .pay td.pv { font-weight: 700; color: #1D2B2E; letter-spacing: 0.2px; word-break: break-all; }
     .totals { width: 26%; min-width: 190px; }
     .totals td { padding: 4px 8px; font-size: 11px; border: 1px solid ${line}; }
     .totals td.k { text-align: right; border-left: 0; border-top: 0; border-bottom: 0; }
@@ -468,7 +501,6 @@ function corporateTemplate(v: View) {
     ${contractCss(accent)}
     .parties + .contract { margin-top: -8px; }
   `
-  const pay = paymentRows(v)
   const issuer = companyLines(v)
   const body = `
     <div class="band">
@@ -531,9 +563,11 @@ function corporateTemplate(v: View) {
     <div class="bottom keep">
       ${
         v.hasPayment
-          ? `<div class="pay"><strong>${esc(L.paymentDetails || L.paymentInfo)}:</strong>
-              <div>${esc(L.beneficiary || 'Beneficiary')}: ${esc(company.companyName)}</div>
-              ${pay.map(([label, value]) => `<div>${esc(label)}: ${esc(value)}</div>`).join('')}
+          ? `<div class="pay">
+              <div class="pay-head">${BANK_ICON}<span>${esc(L.bankDetails || L.paymentDetails || L.paymentInfo)}</span></div>
+              <table>${paymentRows(v)
+                .map(([label, value]) => `<tr><td class="pk">${esc(label)}</td><td class="pv">${esc(value)}</td></tr>`)
+                .join('')}</table>
             </div>`
           : '<div style="flex:1"></div>'
       }
@@ -602,6 +636,9 @@ function minimalTemplate(v: View) {
     .after { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-top: 18px; }
     .side { flex: 1; min-width: 0; color: #444; }
     .side .block { margin-bottom: 16px; }
+    ${PAYMENT_LINE_CSS}
+    .side .pl { padding: 2px 0; }
+    .side .pk { color: ${muted}; }
     .totals { width: 44%; min-width: 230px; }
     .totals .kv { padding: 5px 0; }
     .totals .grand { margin-top: 8px; padding: 12px 0 0; border-top: 1.5px solid #1D2B2E; font-size: 19px; font-weight: 700; }
@@ -621,7 +658,6 @@ function minimalTemplate(v: View) {
     ${contractCss(accent)}
     .cols + .contract { margin-top: -14px; margin-bottom: 18px; }
   `
-  const pay = paymentRows(v)
   const body = `
     <div class="head">
       ${v.logo ? `<img class="logo" src="${v.logo}" alt="" />` : `<div class="name">${esc(company.companyName)}</div>`}
@@ -678,9 +714,7 @@ function minimalTemplate(v: View) {
       <div class="side">
         ${
           v.hasPayment
-            ? `<div class="block"><div class="cap">${esc(L.paymentDetails || L.paymentInfo)}</div>${pay
-                .map(([label, value]) => `<div class="kv" style="justify-content:flex-start"><span>${esc(label)}</span><span>${esc(value)}</span></div>`)
-                .join('')}</div>`
+            ? `<div class="block"><div class="cap">${esc(L.paymentDetails || L.paymentInfo)}</div>${paymentLines(v)}</div>`
             : ''
         }
         ${invoice.notes ? `<div class="block pre">${esc(invoice.notes)}</div>` : ''}

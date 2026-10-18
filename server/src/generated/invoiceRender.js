@@ -3430,8 +3430,10 @@ const translations = {
 			phCurrency: "EUR",
 			bankName: "Banka",
 			iban: "IBAN",
+			accountNumber: "Numri i llogarisë",
 			phBankName: "p.sh. TEB, Raiffeisen",
 			phIban: "p.sh. XK05 ...",
+			phAccountNumber: "p.sh. 1110000000000000",
 			paymentHint: "Këto dalin në fund të faturës, që klienti të dijë ku të paguajë.",
 			exportNote: "Shënimi i eksportit (PDF)",
 			phExportNote: "Eksport ne bazë te Ligjit (05-L-037 Neni 33)",
@@ -3815,6 +3817,7 @@ const translations = {
 			paymentInfo: "Pagesa",
 			bankName: "Banka",
 			ibanLabel: "IBAN",
+			accountLabel: "Nr. i llogarisë",
 			fullNameLabel: "Full Name",
 			addressLabel: "Adresa",
 			phoneLabel: "Nr Tel",
@@ -3833,6 +3836,7 @@ const translations = {
 			vatLabel: "Nr. TVSH",
 			swiftLabel: "SWIFT (BIC)",
 			beneficiary: "Përfituesi",
+			bankDetails: "Të dhënat bankare",
 			roleManagingDirector: "Drejtor menaxhues",
 			roleAdministrationDirector: "Drejtor i Administratës",
 			roleDirector: "Drejtor",
@@ -4414,8 +4418,10 @@ const translations = {
 			phCurrency: "EUR",
 			bankName: "Bank",
 			iban: "IBAN",
+			accountNumber: "Account number",
 			phBankName: "e.g. TEB, Raiffeisen",
 			phIban: "e.g. XK05 ...",
+			phAccountNumber: "e.g. 1110000000000000",
 			paymentHint: "These appear at the bottom of every invoice so the client knows where to pay.",
 			exportNote: "Export note (PDF)",
 			phExportNote: "Eksport ne bazë te Ligjit (05-L-037 Neni 33)",
@@ -4799,6 +4805,7 @@ const translations = {
 			paymentInfo: "Payment",
 			bankName: "Bank",
 			ibanLabel: "IBAN",
+			accountLabel: "Account No.",
 			fullNameLabel: "Full Name",
 			addressLabel: "Address",
 			phoneLabel: "Phone No",
@@ -4817,6 +4824,7 @@ const translations = {
 			vatLabel: "VAT Number",
 			swiftLabel: "SWIFT (BIC)",
 			beneficiary: "Beneficiary",
+			bankDetails: "Bank details",
 			roleManagingDirector: "Managing Director",
 			roleAdministrationDirector: "Head of Administration",
 			roleDirector: "Director",
@@ -5398,8 +5406,10 @@ const translations = {
 			phCurrency: "EUR",
 			bankName: "Banca",
 			iban: "IBAN",
+			accountNumber: "Numero di conto",
 			phBankName: "es. TEB, Raiffeisen",
 			phIban: "es. XK05 ...",
+			phAccountNumber: "es. 1110000000000000",
 			paymentHint: "Compaiono in fondo a ogni fattura, così il cliente sa dove pagare.",
 			exportNote: "Nota di esportazione (PDF)",
 			phExportNote: "Eksport ne bazë te Ligjit (05-L-037 Neni 33)",
@@ -5783,6 +5793,7 @@ const translations = {
 			paymentInfo: "Pagamento",
 			bankName: "Banca",
 			ibanLabel: "IBAN",
+			accountLabel: "N. conto",
 			fullNameLabel: "Full Name",
 			addressLabel: "Indirizzo",
 			phoneLabel: "Tel.",
@@ -5801,6 +5812,7 @@ const translations = {
 			vatLabel: "P.IVA",
 			swiftLabel: "SWIFT (BIC)",
 			beneficiary: "Beneficiario",
+			bankDetails: "Coordinate bancarie",
 			roleManagingDirector: "Amministratore delegato",
 			roleAdministrationDirector: "Direttore amministrativo",
 			roleDirector: "Direttore",
@@ -6062,7 +6074,7 @@ function buildView({ company, client, invoice, pdfLabels, template, accentColor 
 		stamp: invoice.unsigned ? "" : imageSrc(company.stampData),
 		signerName: signer?.name || company.contactPerson || "",
 		signerRole: signer ? signerRoleText(signer.role, pdfLabels) : "",
-		hasPayment: Boolean(company.bankName || company.iban || company.swift)
+		hasPayment: Boolean(company.bankName || company.iban || company.accountNumber || company.swift)
 	};
 }
 function baseCss(font) {
@@ -6102,14 +6114,33 @@ function shell(v, font, css, body) {
 <body><table class="sheet"><thead><tr><td class="sheet-gap"></td></tr></thead><tfoot><tr><td class="sheet-gap"></td></tr></tfoot><tbody><tr><td><div class="page">${body}</div></td></tr></tbody></table></body>
 </html>`;
 }
+/**
+* The bank details as lines of what belongs together: who is paid and at which bank, the local
+* account number for clients paying inside the country, then IBAN with SWIFT for payments from
+* abroad. Each line keeps its pairs side by side, so five details take three lines, not five.
+*/
+function paymentLines(v) {
+	const { company, L } = v;
+	return [
+		[company.bankName ? [L.bankName, company.bankName] : null],
+		[company.accountNumber ? [L.accountLabel || "Account No.", company.accountNumber] : null],
+		[company.iban ? [L.ibanLabel, company.iban] : null, company.swift ? [L.swiftLabel || "SWIFT (BIC)", company.swift] : null]
+	].map((line) => line.filter(Boolean)).filter((line) => line.length).map((line) => `<div class="pl">${line.map(([label, value]) => `<span><span class="pk">${esc(label)}:</span> ${esc(value)}</span>`).join("")}</div>`).join("");
+}
+/** The look of `paymentLines`: pairs on one line, wrapping whole when the line runs out of room. */
+const PAYMENT_LINE_CSS = `.pl { display: flex; flex-wrap: wrap; column-gap: 22px; }`;
+/** The bank details one per row, in the order a client copies them: who is paid, the bank, the account, IBAN, SWIFT. */
 function paymentRows(v) {
 	const { company, L } = v;
 	return [
+		[L.beneficiary || "Beneficiary", company.companyName],
 		company.bankName ? [L.bankName, company.bankName] : null,
-		company.swift ? [L.swiftLabel || "SWIFT (BIC)", company.swift] : null,
-		company.iban ? [L.ibanLabel, company.iban] : null
+		company.accountNumber ? [L.accountLabel || "Account No.", company.accountNumber] : null,
+		company.iban ? [L.ibanLabel, company.iban] : null,
+		company.swift ? [L.swiftLabel || "SWIFT (BIC)", company.swift] : null
 	].filter(Boolean);
 }
+const BANK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 4l9 5.5"/><path d="M4 9.5h16"/><path d="M6 10v7.5M10 10v7.5M14 10v7.5M18 10v7.5"/><path d="M3.5 20h17"/></svg>`;
 function clientLines(v) {
 	const { client, L } = v;
 	return [
@@ -6208,7 +6239,8 @@ function classicTemplate(v) {
     .totals .grand { font-weight: 700; font-size: 16px; border-top: 2px solid ${accent}; margin-top: 4px; padding-top: 8px; color: ${dark}; }
     .notes { margin-top: 20px; color: #555; }
     .payment { margin-top: 20px; color: #444; }
-    .payment p { margin: 2px 0; }
+    ${PAYMENT_LINE_CSS}
+    .payment .pl { margin: 2px 0; }
     .thanks { text-align: center; margin-top: 30px; font-size: 13px; color: ${accent}; font-weight: 600; }
     .law { text-align: center; margin-top: 8px; font-size: 13px; font-weight: 700; }
     .signs { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 48px; }
@@ -6273,7 +6305,7 @@ function classicTemplate(v) {
       ${v.showBalance ? `<div><span>${esc(L.amountPaid || "")}</span><span>${money(v.paid)}</span></div><div class="grand"><span>${esc(L.amountDue || L.total)}</span><span>${money(v.due)}</span></div>` : ""}
     </div>
     ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ""}
-    ${v.hasPayment ? `<div class="payment keep"><div class="label">${esc(L.paymentInfo)}</div>${paymentRows(v).map(([label, value]) => `<p>${esc(label)}: ${esc(value)}</p>`).join("")}</div>` : ""}
+    ${v.hasPayment ? `<div class="payment keep"><div class="label">${esc(L.paymentInfo)}</div>${paymentLines(v)}</div>` : ""}
     <div class="thanks">${esc(L.thankYou)}</div>
     ${v.exportNote ? `<div class="law">${esc(v.exportNote)}</div>` : ""}
     <div class="signs keep">
@@ -6332,8 +6364,14 @@ function corporateTemplate(v) {
     .items .t { width: 17%; }
     .amount { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
     .bottom { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
-    .pay { flex: 1; margin-top: 22px; background: ${soft}; padding: 10px 16px; text-align: center; font-size: 12.5px; line-height: 1.6; }
-    .pay strong { display: block; }
+    .pay { flex: 1; margin-top: 14px; border: 1px solid ${line}; border-radius: 6px; overflow: hidden; font-size: 11px; }
+    .pay-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1.5px solid ${accent}; color: ${accent}; font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
+    .pay-head svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .pay table { width: 100%; }
+    .pay td { padding: 4px 12px; vertical-align: top; }
+    .pay tr:nth-child(even) td { background: ${soft}; }
+    .pay td.pk { width: 1%; padding-right: 40px; color: #5F6F73; white-space: nowrap; }
+    .pay td.pv { font-weight: 700; color: #1D2B2E; letter-spacing: 0.2px; word-break: break-all; }
     .totals { width: 26%; min-width: 190px; }
     .totals td { padding: 4px 8px; font-size: 11px; border: 1px solid ${line}; }
     .totals td.k { text-align: right; border-left: 0; border-top: 0; border-bottom: 0; }
@@ -6354,7 +6392,6 @@ function corporateTemplate(v) {
     ${contractCss(accent)}
     .parties + .contract { margin-top: -8px; }
   `;
-	const pay = paymentRows(v);
 	const issuer = companyLines(v);
 	return shell(v, `Calibri, Carlito, "Segoe UI", -apple-system, Helvetica, Arial, sans-serif`, css, `
     <div class="band">
@@ -6409,9 +6446,9 @@ function corporateTemplate(v) {
       </tbody>
     </table>
     <div class="bottom keep">
-      ${v.hasPayment ? `<div class="pay"><strong>${esc(L.paymentDetails || L.paymentInfo)}:</strong>
-              <div>${esc(L.beneficiary || "Beneficiary")}: ${esc(company.companyName)}</div>
-              ${pay.map(([label, value]) => `<div>${esc(label)}: ${esc(value)}</div>`).join("")}
+      ${v.hasPayment ? `<div class="pay">
+              <div class="pay-head">${BANK_ICON}<span>${esc(L.bankDetails || L.paymentDetails || L.paymentInfo)}</span></div>
+              <table>${paymentRows(v).map(([label, value]) => `<tr><td class="pk">${esc(label)}</td><td class="pv">${esc(value)}</td></tr>`).join("")}</table>
             </div>` : "<div style=\"flex:1\"></div>"}
       <table class="totals">
         <tr><td class="k">${esc(L.subtotal)}</td><td class="v"><div class="amount">${cell(v.subtotal)}</div></td></tr>
@@ -6444,7 +6481,7 @@ function minimalTemplate(v) {
 	const { company, client, invoice, L, accent, money } = v;
 	const hair = "#E3E7E8";
 	const muted = "#6B7A7D";
-	const css = `
+	return shell(v, `"Helvetica Neue", Helvetica, "Segoe UI", -apple-system, Arial, sans-serif`, `
     .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
     .logo { height: 56px; max-width: 180px; object-fit: contain; }
     .name { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; }
@@ -6470,6 +6507,9 @@ function minimalTemplate(v) {
     .after { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-top: 18px; }
     .side { flex: 1; min-width: 0; color: #444; }
     .side .block { margin-bottom: 16px; }
+    ${PAYMENT_LINE_CSS}
+    .side .pl { padding: 2px 0; }
+    .side .pk { color: ${muted}; }
     .totals { width: 44%; min-width: 230px; }
     .totals .kv { padding: 5px 0; }
     .totals .grand { margin-top: 8px; padding: 12px 0 0; border-top: 1.5px solid #1D2B2E; font-size: 19px; font-weight: 700; }
@@ -6488,9 +6528,7 @@ function minimalTemplate(v) {
     .foot b { display: block; margin-top: 4px; color: #1D2B2E; }
     ${contractCss(accent)}
     .cols + .contract { margin-top: -14px; margin-bottom: 18px; }
-  `;
-	const pay = paymentRows(v);
-	return shell(v, `"Helvetica Neue", Helvetica, "Segoe UI", -apple-system, Arial, sans-serif`, css, `
+  `, `
     <div class="head">
       ${v.logo ? `<img class="logo" src="${v.logo}" alt="" />` : `<div class="name">${esc(company.companyName)}</div>`}
       <div class="title">
@@ -6538,7 +6576,7 @@ function minimalTemplate(v) {
     </table>
     <div class="after keep">
       <div class="side">
-        ${v.hasPayment ? `<div class="block"><div class="cap">${esc(L.paymentDetails || L.paymentInfo)}</div>${pay.map(([label, value]) => `<div class="kv" style="justify-content:flex-start"><span>${esc(label)}</span><span>${esc(value)}</span></div>`).join("")}</div>` : ""}
+        ${v.hasPayment ? `<div class="block"><div class="cap">${esc(L.paymentDetails || L.paymentInfo)}</div>${paymentLines(v)}</div>` : ""}
         ${invoice.notes ? `<div class="block pre">${esc(invoice.notes)}</div>` : ""}
       </div>
       <div class="totals">
@@ -6710,6 +6748,7 @@ function companyForPdf(invoice, profile, t) {
 		"website",
 		"bankName",
 		"iban",
+		"accountNumber",
 		"swift"
 	]) if ((SAMPLE_FIELDS.includes(key) && isSampleCompanyValue(key, snapshot[key]) || !String(snapshot[key] ?? "").trim()) && String(live[key] ?? "").trim()) filled[key] = live[key];
 	return {

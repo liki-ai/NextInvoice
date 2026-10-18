@@ -40,6 +40,7 @@ const EDITABLE = [
   'currency',
   'bankName',
   'iban',
+  'accountNumber',
   'swift',
   'exportNote',
   'industry',
@@ -839,6 +840,7 @@ export function ProfilePage({ part = 'company' }: { part?: ProfilePart }) {
           <SettingsSection title={t('profile.sectionPayment')} hint={t('profile.paymentHint')}>
             <div className="grid gap-x-4 sm:grid-cols-2">
               <Field label={t('profile.bankName')} value={form.bankName || ''} placeholder={t('profile.phBankName')} onChange={(e) => setField('bankName', e.target.value)} />
+              <Field label={`${t('profile.accountNumber')} (${t('common.optional')})`} value={form.accountNumber || ''} placeholder={t('profile.phAccountNumber')} className="font-mono tracking-wide" spellCheck={false} inputMode="numeric" maxLength={40} onChange={(e) => setField('accountNumber', e.target.value)} />
               <Field label={t('profile.iban')} value={form.iban || ''} placeholder={t('profile.phIban')} className="font-mono tracking-wide" spellCheck={false} onChange={(e) => setField('iban', e.target.value.toUpperCase())} />
               <Field label={`${t('profile.swift')} (${t('common.optional')})`} value={form.swift || ''} placeholder={t('profile.phSwift')} className="font-mono tracking-wide" spellCheck={false} maxLength={11} onChange={(e) => setField('swift', e.target.value.toUpperCase())} />
             </div>

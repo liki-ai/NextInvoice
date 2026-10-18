@@ -70,8 +70,15 @@ export function RemindPaymentModal({ invoice, onClose }: { invoice: Invoice; onC
   const drafted = useMemo(() => {
     const company = displayCompanyValue('companyName', profile?.companyName)
     const person = displayCompanyValue('contactPerson', profile?.contactPerson)
-    const bank = [profile?.bankName, profile?.iban ? `IBAN ${profile.iban}` : '', profile?.swift ? `SWIFT ${profile.swift}` : ''].filter(Boolean).join(', ')
     const say = (key: string, params?: Record<string, string | number>) => translateIn(messageLang, key, params)
+    const bank = [
+      profile?.bankName,
+      profile?.accountNumber ? `${say('pdf.accountLabel')} ${profile.accountNumber}` : '',
+      profile?.iban ? `IBAN ${profile.iban}` : '',
+      profile?.swift ? `SWIFT ${profile.swift}` : '',
+    ]
+      .filter(Boolean)
+      .join(', ')
     // One short line per invoice, and no links: the client has the invoices already.
     const lines = chosen
       .map((item) => say('remind.line', { number: item.number, date: letterDate(item.date), amount: formatMoney(remainingOf(item), item.currency || fallbackCurrency) }))

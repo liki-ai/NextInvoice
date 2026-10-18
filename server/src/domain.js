@@ -162,6 +162,7 @@ function companySnapshot(profile) {
     currency: String(profile.currency || 'EUR'),
     bankName: String(profile.bankName || ''),
     iban: String(profile.iban || ''),
+    accountNumber: String(profile.accountNumber || ''),
     swift: String(profile.swift || ''),
     website: String(profile.website || ''),
     industry: INDUSTRIES.includes(profile.industry) ? profile.industry : 'other',

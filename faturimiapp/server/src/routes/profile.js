@@ -20,6 +20,7 @@ const TEXT_FIELDS = {
   currency: 3,
   bankName: 120,
   iban: 48,
+  accountNumber: 40,
   swift: 16,
   exportNote: 400,
   logoUri: 600,
