@@ -178,14 +178,13 @@ export default function SubscribeScreen({ navigation }) {
     setBusy(true);
     setStatus(t('billing.restoring'));
     try {
-      if (!token) {
-        Alert.alert(t('billing.restoreTitle'), t('billing.restoreNeedLogin'));
-        return;
-      }
-      const account = await refreshAccountPlan();
-      if (account?.plan === 'premium') {
-        Alert.alert(t('billing.restoreTitle'), t('billing.success'));
-        return;
+      // A web subscription is found through the account; an App Store one works without signing in.
+      if (token) {
+        const account = await refreshAccountPlan();
+        if (account?.plan === 'premium') {
+          Alert.alert(t('billing.restoreTitle'), t('billing.success'));
+          return;
+        }
       }
       const purchases = await getAvailablePurchases();
       const owned = (purchases || []).filter((p) => IAP_PRODUCT_IDS.includes(p.productId));

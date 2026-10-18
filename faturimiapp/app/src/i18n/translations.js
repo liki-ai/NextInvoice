@@ -240,6 +240,13 @@ export const translations = {
       localDataBody: 'Ky telefon ka fatura ose ndryshime që nuk janë ruajtur në server. Dëshiron t’i ngarkosh te kjo llogari?',
       localDataUpload: 'Ngarko te kjo llogari',
       localDataDiscard: 'Mos i ngarko',
+      logoutPendingTitle: 'Ndryshime të padërguara',
+      logoutPendingBody: 'Disa ndryshime në këtë telefon nuk kanë arritur ende në server. Nëse del tani, ato humbin.',
+    },
+    account: {
+      pitch: 'Hyr me llogarinë e web-it që faturat të jenë njësoj në telefon dhe në web. App-in mund ta provosh edhe pa llogari.',
+      expired: 'Sesioni ka skaduar. Hyr përsëri që ndryshimet të arrijnë në web.',
+      signedIn: 'Hyrë si {email}',
     },
     profile: {
       title: 'Cilësimet',
@@ -731,6 +738,13 @@ export const translations = {
       localDataBody: 'This phone holds invoices or changes that were never saved to the server. Upload them to this account?',
       localDataUpload: 'Upload to this account',
       localDataDiscard: 'Do not upload',
+      logoutPendingTitle: 'Changes not sent',
+      logoutPendingBody: 'Some changes on this phone have not reached the server yet. If you log out now they will be lost.',
+    },
+    account: {
+      pitch: 'Log in with your web account to have the same invoices on the phone and on the web. You can try the app without an account.',
+      expired: 'Your session has expired. Log in again so your changes reach the web.',
+      signedIn: 'Logged in as {email}',
     },
     profile: {
       title: 'Settings',
@@ -1222,6 +1236,13 @@ export const translations = {
       localDataBody: 'Questo telefono contiene fatture o modifiche mai salvate sul server. Vuoi caricarle in questo account?',
       localDataUpload: 'Carica in questo account',
       localDataDiscard: 'Non caricare',
+      logoutPendingTitle: 'Modifiche non inviate',
+      logoutPendingBody: 'Alcune modifiche su questo telefono non sono ancora arrivate al server. Se esci ora andranno perse.',
+    },
+    account: {
+      pitch: 'Accedi con il tuo account web per avere le stesse fatture sul telefono e sul web. Puoi provare l’app anche senza account.',
+      expired: 'La sessione è scaduta. Accedi di nuovo perché le modifiche arrivino sul web.',
+      signedIn: 'Accesso come {email}',
     },
     profile: {
       title: 'Impostazioni',

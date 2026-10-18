@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,30 +12,17 @@ import { stripSampleCompanyFields } from '../storage/companySamples';
 import { INDUSTRIES, normalizeIndustry } from '../utils/client';
 import { pickImageFile, proofSource } from '../utils/proof';
 import { DEFAULT_EXPORT_NOTE, usesExportNote } from '../utils/company';
-import { INVOICE_TEMPLATES, normalizeTemplate } from '../pdf/invoiceTemplates';
 
-const TEMPLATE_LABELS = {
-  classic: 'profile.templateClassic',
-  corporate: 'profile.templateCorporate',
-  minimal: 'profile.templateMinimal',
-};
-
+// Kept minimal on the phone: the invoice template, VAT number and SWIFT are set on the web and
+// still printed on the phone's invoices.
 export default function ProfileScreen({ navigation }) {
-  const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl, plan, user, token, login, signup, logout } = useApp();
+  const { companyProfile, updateCompanyProfile, settings, setLanguage, setApiBaseUrl, plan, user, token, accountLinked, logout } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   const [form, setForm] = useState(() => stripSampleCompanyFields(companyProfile));
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(settings.apiBaseUrl);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [authBusy, setAuthBusy] = useState(false);
   const [importing, setImporting] = useState(false);
-  const scrollRef = useRef(null);
-
-  const scrollLoginIntoView = () => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-  };
 
   useEffect(() => {
     setForm(stripSampleCompanyFields(companyProfile));
@@ -84,7 +71,6 @@ export default function ProfileScreen({ navigation }) {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView
-      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={{ padding: spacing.md, paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + 120 }}
       keyboardShouldPersistTaps="handled"
@@ -92,6 +78,28 @@ export default function ProfileScreen({ navigation }) {
       automaticallyAdjustKeyboardInsets
     >
       <Text style={typography.title}>{t('more.title')}</Text>
+
+      {token && user ? (
+        <View style={styles.accountRow}>
+          <Ionicons name="cloud-done-outline" size={18} color={colors.primary} />
+          <Text style={[typography.muted, { flex: 1 }]} numberOfLines={1}>
+            {t('account.signedIn', { email: user.email || '' })}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.accountCard}>
+          <Text style={typography.body}>{accountLinked ? t('account.expired') : t('account.pitch')}</Text>
+          <View style={styles.accountButtons}>
+            <Button title={t('docs.login')} onPress={() => navigation.navigate('Account', { mode: 'login' })} style={{ flex: 1 }} />
+            <Button
+              title={t('docs.signup')}
+              variant="secondary"
+              onPress={() => navigation.navigate('Account', { mode: 'signup' })}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      )}
 
       <View style={styles.shortcutRow}>
         <Pressable style={styles.shortcut} onPress={() => navigation.navigate('ClientList')}>
@@ -161,7 +169,6 @@ export default function ProfileScreen({ navigation }) {
         <FormField label={t('profile.companyName')} value={form.companyName} placeholder={t('profile.phCompanyName')} onChangeText={(v) => setField('companyName', v)} />
         <FormField label={t('profile.contactPerson')} value={form.contactPerson} placeholder={t('profile.phContactPerson')} onChangeText={(v) => setField('contactPerson', v)} />
         <FormField label={t('profile.nui')} value={form.nui} placeholder={t('profile.phNui')} onChangeText={(v) => setField('nui', v)} autoCapitalize="characters" />
-        <FormField label={t('profile.vatNumber')} value={form.vatNumber || ''} placeholder={t('profile.phVatNumber')} onChangeText={(v) => setField('vatNumber', v)} autoCapitalize="characters" />
         <FormField label={t('profile.streetAddress')} value={form.streetAddress} placeholder={t('profile.phStreetAddress')} onChangeText={(v) => setField('streetAddress', v)} />
         <FormField label={t('profile.state')} value={form.state} placeholder={t('profile.phState')} onChangeText={(v) => setField('state', v)} />
         <FormField label={t('profile.zipCode')} value={form.zipCode} placeholder={t('profile.phZipCode')} onChangeText={(v) => setField('zipCode', v)} />
@@ -170,7 +177,6 @@ export default function ProfileScreen({ navigation }) {
         <FormField label={t('profile.currency')} value={form.currency} placeholder={t('profile.phCurrency')} onChangeText={(v) => setField('currency', v.toUpperCase())} autoCapitalize="characters" maxLength={3} />
         <FormField label={t('profile.bankName')} value={form.bankName || ''} placeholder={t('profile.phBankName')} onChangeText={(v) => setField('bankName', v)} />
         <FormField label={t('profile.iban')} value={form.iban || ''} placeholder={t('profile.phIban')} onChangeText={(v) => setField('iban', v)} autoCapitalize="characters" />
-        <FormField label={t('profile.swift')} value={form.swift || ''} placeholder={t('profile.phSwift')} onChangeText={(v) => setField('swift', v.toUpperCase())} autoCapitalize="characters" maxLength={11} />
         {usesExportNote(form) ? (
           <FormField
             label={t('profile.exportNote')}
@@ -181,20 +187,6 @@ export default function ProfileScreen({ navigation }) {
             numberOfLines={2}
           />
         ) : null}
-      </Section>
-
-      <Section title={t('profile.sectionInvoice')}>
-        <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.invoiceHint')}</Text>
-        <View style={styles.chipRow}>
-          {INVOICE_TEMPLATES.map((value) => {
-            const active = normalizeTemplate(form.invoiceTemplate) === value;
-            return (
-              <Pressable key={value} style={[styles.chip, active && styles.chipActive]} onPress={() => setField('invoiceTemplate', value)}>
-                <Text style={active ? styles.chipTextActive : styles.chipText}>{t(TEMPLATE_LABELS[value])}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
       </Section>
 
       {__DEV__ ? (
@@ -239,57 +231,11 @@ export default function ProfileScreen({ navigation }) {
         />
       </Section>
 
-      <Section title={token && user ? t('docs.logout') : t('docs.login')} style={{ marginTop: spacing.lg }}>
-        {token && user ? (
+      {token && user ? (
+        <Section title={t('docs.logout')} style={{ marginTop: spacing.lg }}>
           <Button title={t('docs.logout')} variant="secondary" onPress={() => void logout()} />
-        ) : (
-          <>
-            <FormField
-              label={t('docs.email')}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              onFocus={scrollLoginIntoView}
-            />
-            <FormField
-              label={t('docs.password')}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              onFocus={scrollLoginIntoView}
-            />
-            <Button
-              title={authBusy ? t('common.loading') : t('docs.login')}
-              onPress={async () => {
-                setAuthBusy(true);
-                try {
-                  await login(email.trim(), password);
-                } catch (err) {
-                  Alert.alert(t('common.error'), err.message);
-                } finally {
-                  setAuthBusy(false);
-                }
-              }}
-            />
-            <Button
-              title={t('docs.signup')}
-              variant="secondary"
-              onPress={async () => {
-                setAuthBusy(true);
-                try {
-                  await signup(email.trim(), password, { industry: form.industry });
-                } catch (err) {
-                  Alert.alert(t('common.error'), err.message);
-                } finally {
-                  setAuthBusy(false);
-                }
-              }}
-              style={{ marginTop: spacing.sm }}
-            />
-          </>
-        )}
-      </Section>
+        </Section>
+      ) : null}
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -297,6 +243,14 @@ export default function ProfileScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  accountCard: {
+    marginTop: spacing.md,
+    backgroundColor: '#EEF5F7',
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  accountButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm },
   shortcutRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   shortcut: {
     flex: 1,

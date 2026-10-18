@@ -14,6 +14,7 @@ import OverviewDrillScreen from '../screens/OverviewDrillScreen';
 import StatementScreen from '../screens/StatementScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SubscribeScreen from '../screens/SubscribeScreen';
+import AuthScreen from '../screens/AuthScreen';
 import ClientListScreen from '../screens/ClientListScreen';
 import ClientFormScreen from '../screens/ClientFormScreen';
 import ItemListScreen from '../screens/ItemListScreen';
@@ -151,6 +152,7 @@ function ProfileStackNavigator() {
         component={SubscribeScreen}
         options={{ title: t('billing.title'), presentation: 'modal' }}
       />
+      <ProfileStack.Screen name="Account" component={AuthScreen} options={{ headerShown: false, presentation: 'modal' }} />
     </ProfileStack.Navigator>
   );
 }

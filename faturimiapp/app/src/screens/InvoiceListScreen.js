@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
@@ -152,12 +152,13 @@ function sendCopy(filter, t) {
 }
 
 export default function InvoiceListScreen({ navigation, route }) {
-  const { invoices, companyProfile, usage, deleteInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice } = useApp();
+  const { invoices, companyProfile, usage, deleteInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, token, flushQueue } = useApp();
   const { t } = useTranslation();
   const listRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [previewVisible, setPreviewVisible] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [payId, setPayId] = useState(null);
   const [sendingId, setSendingId] = useState(null);
   const [payingId, setPayingId] = useState(null);
@@ -335,6 +336,23 @@ export default function InvoiceListScreen({ navigation, route }) {
         data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          token ? (
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={colors.primary}
+              onRefresh={async () => {
+                // Sends the phone's changes and brings in what was done on the web.
+                setRefreshing(true);
+                try {
+                  await flushQueue();
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+            />
+          ) : undefined
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={48} color={colors.textMuted} />

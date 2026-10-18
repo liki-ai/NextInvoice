@@ -5,12 +5,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './src/context/AppContext';
 import RootNavigator from './src/navigation/RootNavigator';
-import AuthScreen from './src/screens/AuthScreen';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { colors } from './src/theme';
 
 function AppContent() {
-  const { loading, token } = useApp();
+  const { loading } = useApp();
 
   if (loading) {
     return (
@@ -23,7 +22,7 @@ function AppContent() {
   return (
     <>
       <StatusBar style="dark" />
-      {token ? <RootNavigator /> : <AuthScreen />}
+      <RootNavigator />
     </>
   );
 }

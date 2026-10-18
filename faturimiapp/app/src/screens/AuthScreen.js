@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { colors, radius, spacing, typography } from '../theme';
@@ -14,12 +15,13 @@ const ERROR_KEYS = {
   EMAIL_TAKEN: 'auth.emailTaken',
 };
 
-// Shown whenever nobody is signed in: invoices live in the account, so there is no app without one.
-export default function AuthScreen() {
-  const { login, signup, settings, setLanguage } = useApp();
+// The app works without an account. Signing in (the same account as on the web) keeps the
+// phone's invoices and the web's in step; whatever was made on the phone before joins the account.
+export default function AuthScreen({ navigation, route }) {
+  const { login, signup, settings, setLanguage, companyProfile } = useApp();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState(route?.params?.mode === 'signup' ? 'signup' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,7 +41,8 @@ export default function AuthScreen() {
     setError('');
     try {
       if (mode === 'login') await login(address, password);
-      else await signup(address, password);
+      else await signup(address, password, { industry: companyProfile?.industry });
+      navigation?.goBack();
     } catch (err) {
       // No status means the request never reached the server.
       setError(ERROR_KEYS[err.code] ? t(ERROR_KEYS[err.code]) : err.status ? err.message : t('auth.offline'));
@@ -54,6 +57,11 @@ export default function AuthScreen() {
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: spacing.lg, paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }}
         keyboardShouldPersistTaps="handled"
       >
+        {navigation ? (
+          <Pressable onPress={() => navigation.goBack()} style={styles.close} hitSlop={12} accessibilityLabel={t('common.close')}>
+            <Ionicons name="close" size={26} color={colors.text} />
+          </Pressable>
+        ) : null}
         <Text style={styles.brand}>Next Invoice</Text>
         <Text style={[typography.muted, { marginTop: spacing.xs }]}>{t('auth.subtitle')}</Text>
 
@@ -124,6 +132,7 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  close: { alignSelf: 'flex-end', padding: 4, marginBottom: spacing.sm },
   brand: { fontSize: 30, fontWeight: '800', color: colors.primaryDark },
   langLine: { flexDirection: 'row', gap: 8, marginTop: spacing.lg },
   lang: {

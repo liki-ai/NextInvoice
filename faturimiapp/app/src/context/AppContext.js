@@ -38,6 +38,9 @@ export function AppProvider({ children }) {
   const [syncState, setSyncState] = useState({ status: 'pending', lastSyncedAt: null, error: null });
   const [migratedUserId, setMigratedUserId] = useState(null);
   const flushing = useRef(false);
+  // The phone's data belongs to an account even while its session has expired, so changes made
+  // then are queued and reach the web once the owner signs in again.
+  const linked = Boolean(token || migratedUserId);
 
   useEffect(() => {
     (async () => {
@@ -280,12 +283,51 @@ export function AppProvider({ children }) {
     await startSession(res);
   }, [settings.apiBaseUrl, settings.language, startSession]);
 
+  // Signing out leaves the phone as a fresh install: the account's data stays on the server and
+  // comes back on the next sign-in, and anything made in the meantime joins whichever account
+  // signs in next. Changes the server has not taken yet are only dropped after asking.
   const logout = useCallback(async () => {
+    await flushQueue();
+    const pending = await getJson(KEYS.SYNC_QUEUE, []);
+    if (Array.isArray(pending) && pending.length > 0) {
+      const copy = translations[settings.language] || translations.sq;
+      const confirmed = await new Promise((resolve) => {
+        Alert.alert(copy.auth.logoutPendingTitle, copy.auth.logoutPendingBody, [
+          { text: copy.common.cancel, style: 'cancel', onPress: () => resolve(false) },
+          { text: copy.docs.logout, style: 'destructive', onPress: () => resolve(true) },
+        ]);
+      });
+      if (!confirmed) return;
+    }
+    const emptySync = { status: 'pending', lastSyncedAt: null, error: null };
     setToken(null);
     setUser(null);
-    await setJson(KEYS.AUTH_TOKEN, null);
-    await setJson(KEYS.AUTH_USER, null);
-  }, []);
+    setMigratedUserId(null);
+    setSyncQueue([]);
+    setSyncState(emptySync);
+    setInvoices([]);
+    setObligations([]);
+    setClients([]);
+    setCatalogItems([]);
+    setCompanyProfile(DEFAULT_COMPANY_PROFILE);
+    await Promise.all([
+      setJson(KEYS.AUTH_TOKEN, null),
+      setJson(KEYS.AUTH_USER, null),
+      setJson(KEYS.MIGRATED_USER_ID, null),
+      setJson(KEYS.SYNC_QUEUE, []),
+      setJson(KEYS.SYNC_STATE, emptySync),
+      setJson(KEYS.INVOICES, []),
+      setJson(KEYS.OBLIGATIONS, []),
+      setJson(KEYS.CLIENTS, []),
+      setJson(KEYS.ITEMS, []),
+      setJson(KEYS.COMPANY_PROFILE, DEFAULT_COMPANY_PROFILE),
+    ]);
+    // A store subscription belongs to this phone; a plan bought on the web belongs to the account.
+    if (!['iap', 'ios', 'apple', 'android', 'google'].includes(plan?.platform)) {
+      setPlan(DEFAULT_PLAN);
+      await setJson(KEYS.PLAN, DEFAULT_PLAN);
+    }
+  }, [flushQueue, settings.language, plan?.platform]);
 
   const updateCompanyProfile = useCallback(async (partial) => {
     let next = null;
@@ -294,8 +336,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.COMPANY_PROFILE, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'profile', op: 'upsert', id: 'profile', body: next });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'profile', op: 'upsert', id: 'profile', body: next });
+  }, [linked, enqueue]);
 
   const updateSettings = useCallback(async (partial) => {
     setSettings((prev) => {
@@ -372,10 +414,10 @@ export function AppProvider({ children }) {
         setJson(KEYS.INVOICES, next);
         return next;
       });
-      if (token) await enqueue({ collection: 'invoices', op: 'upsert', id: withId.id, body: withId });
+      if (linked) await enqueue({ collection: 'invoices', op: 'upsert', id: withId.id, body: withId });
       return withId;
     },
-    [plan, invoices, token, enqueue],
+    [plan, invoices, linked, enqueue],
   );
 
   const updateInvoice = useCallback(async (id, partial) => {
@@ -386,8 +428,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.INVOICES, next);
       return next;
     });
-    if (token && saved) await enqueue({ collection: 'invoices', op: 'upsert', id, body: partial, baseUpdatedAt: saved.updatedAt });
-  }, [token, enqueue]);
+    if (linked && saved) await enqueue({ collection: 'invoices', op: 'upsert', id, body: partial, baseUpdatedAt: saved.updatedAt });
+  }, [linked, enqueue]);
 
   const deleteInvoice = useCallback(async (id) => {
     setInvoices((prev) => {
@@ -400,8 +442,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.OBLIGATIONS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'invoices', op: 'delete', id });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'invoices', op: 'delete', id });
+  }, [linked, enqueue]);
 
   const issueInvoice = useCallback(async (id) => {
     setInvoices((prev) => {
@@ -413,8 +455,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.INVOICES, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'invoices', op: 'issue', id, body: {} });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'invoices', op: 'issue', id, body: {} });
+  }, [linked, enqueue]);
 
   const correctInvoice = useCallback(async (id, body) => {
     setInvoices((prev) => {
@@ -440,7 +482,7 @@ export function AppProvider({ children }) {
       setJson(KEYS.INVOICES, next);
       return next;
     });
-    if (token) {
+    if (linked) {
       await enqueue({
         collection: 'invoices',
         op: 'correct',
@@ -454,7 +496,7 @@ export function AppProvider({ children }) {
         },
       });
     }
-  }, [token, enqueue]);
+  }, [linked, enqueue]);
 
   const cancelInvoice = useCallback(async (id, reason) => {
     setInvoices((prev) => {
@@ -466,8 +508,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.INVOICES, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'invoices', op: 'cancel', id, body: { reason } });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'invoices', op: 'cancel', id, body: { reason } });
+  }, [linked, enqueue]);
 
   const addInvoicePayment = useCallback(async (id, payment) => {
     const saved = { ...payment, id: payment.id || generateId(), opId: payment.opId || generateId() };
@@ -476,8 +518,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.INVOICES, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'invoices', op: 'payment', id, body: saved, opId: saved.opId });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'invoices', op: 'payment', id, body: saved, opId: saved.opId });
+  }, [linked, enqueue]);
 
   const voidInvoicePayment = useCallback(async (id, paymentId, reason) => {
     setInvoices((prev) => {
@@ -494,8 +536,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.INVOICES, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'invoices', op: 'voidPayment', id, body: { paymentId, reason } });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'invoices', op: 'voidPayment', id, body: { paymentId, reason } });
+  }, [linked, enqueue]);
 
   const addObligation = useCallback(async (obligation) => {
     const withId = { ...obligation, id: obligation.id || generateId(), createdAt: new Date().toISOString() };
@@ -504,9 +546,9 @@ export function AppProvider({ children }) {
       setJson(KEYS.OBLIGATIONS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'obligations', op: 'upsert', id: withId.id, body: withId });
+    if (linked) await enqueue({ collection: 'obligations', op: 'upsert', id: withId.id, body: withId });
     return withId;
-  }, [token, enqueue]);
+  }, [linked, enqueue]);
 
   const updateObligation = useCallback(async (id, partial) => {
     setObligations((prev) => {
@@ -514,8 +556,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.OBLIGATIONS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'obligations', op: 'upsert', id, body: partial });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'obligations', op: 'upsert', id, body: partial });
+  }, [linked, enqueue]);
 
   const deleteObligation = useCallback(async (id) => {
     setObligations((prev) => {
@@ -523,8 +565,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.OBLIGATIONS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'obligations', op: 'delete', id });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'obligations', op: 'delete', id });
+  }, [linked, enqueue]);
 
   const addObligationPayment = useCallback(async (id, payment) => {
     const saved = { ...payment, id: payment.id || generateId(), opId: payment.opId || generateId() };
@@ -533,8 +575,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.OBLIGATIONS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'obligations', op: 'payment', id, body: saved, opId: saved.opId });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'obligations', op: 'payment', id, body: saved, opId: saved.opId });
+  }, [linked, enqueue]);
 
   const voidObligationPayment = useCallback(async (id, paymentId, reason) => {
     setObligations((prev) => {
@@ -551,8 +593,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.OBLIGATIONS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'obligations', op: 'voidPayment', id, body: { paymentId, reason } });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'obligations', op: 'voidPayment', id, body: { paymentId, reason } });
+  }, [linked, enqueue]);
 
   const addClient = useCallback(async (client) => {
     const saved = { ...client, id: client.id || generateId(), createdAt: new Date().toISOString() };
@@ -561,9 +603,9 @@ export function AppProvider({ children }) {
       setJson(KEYS.CLIENTS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'clients', op: 'upsert', id: saved.id, body: saved });
+    if (linked) await enqueue({ collection: 'clients', op: 'upsert', id: saved.id, body: saved });
     return saved;
-  }, [token, enqueue]);
+  }, [linked, enqueue]);
 
   const updateClient = useCallback(async (id, partial) => {
     let saved = null;
@@ -573,9 +615,9 @@ export function AppProvider({ children }) {
       setJson(KEYS.CLIENTS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'clients', op: 'upsert', id, body: partial });
+    if (linked) await enqueue({ collection: 'clients', op: 'upsert', id, body: partial });
     return saved;
-  }, [token, enqueue]);
+  }, [linked, enqueue]);
 
   const deleteClient = useCallback(async (id) => {
     setClients((prev) => {
@@ -583,8 +625,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.CLIENTS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'clients', op: 'delete', id });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'clients', op: 'delete', id });
+  }, [linked, enqueue]);
 
   const addCatalogItem = useCallback(async (item) => {
     const saved = { ...item, id: item.id || generateId(), createdAt: new Date().toISOString() };
@@ -593,9 +635,9 @@ export function AppProvider({ children }) {
       setJson(KEYS.ITEMS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'items', op: 'upsert', id: saved.id, body: saved });
+    if (linked) await enqueue({ collection: 'items', op: 'upsert', id: saved.id, body: saved });
     return saved;
-  }, [token, enqueue]);
+  }, [linked, enqueue]);
 
   const updateCatalogItem = useCallback(async (id, partial) => {
     let saved = null;
@@ -605,9 +647,9 @@ export function AppProvider({ children }) {
       setJson(KEYS.ITEMS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'items', op: 'upsert', id, body: partial });
+    if (linked) await enqueue({ collection: 'items', op: 'upsert', id, body: partial });
     return saved;
-  }, [token, enqueue]);
+  }, [linked, enqueue]);
 
   const deleteCatalogItem = useCallback(async (id) => {
     setCatalogItems((prev) => {
@@ -615,8 +657,8 @@ export function AppProvider({ children }) {
       setJson(KEYS.ITEMS, next);
       return next;
     });
-    if (token) await enqueue({ collection: 'items', op: 'delete', id });
-  }, [token, enqueue]);
+    if (linked) await enqueue({ collection: 'items', op: 'delete', id });
+  }, [linked, enqueue]);
 
   const value = useMemo(
     () => ({
@@ -657,6 +699,7 @@ export function AppProvider({ children }) {
       clearPlan,
       token,
       user,
+      accountLinked: Boolean(migratedUserId),
       login,
       signup,
       logout,
@@ -701,6 +744,7 @@ export function AppProvider({ children }) {
       clearPlan,
       token,
       user,
+      migratedUserId,
       login,
       signup,
       logout,
