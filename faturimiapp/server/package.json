@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test src/domain.test.js src/mailer.test.js src/automation.test.js src/slack.test.js src/contracts.test.js"
+    "test": "node --test src/profileGuard.test.js src/domain.test.js src/mailer.test.js src/automation.test.js src/slack.test.js src/contracts.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

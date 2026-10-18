@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { initPersist, loadDb, serialize, saveSerialized, hasPostgres } = require('./persist');
+const { syncedProfileChange } = require('./profileGuard');
 const {
   allocateInvoiceNumber,
   clientSnapshot,
@@ -1804,7 +1805,9 @@ function applySyncChange(userId, change) {
   }
 
   if (collection === 'profile' && op === 'upsert') {
-    const saved = updateProfile(userId, body);
+    // A phone's placeholders never replace the company's real details.
+    const change = syncedProfileChange(getProfile(userId), body);
+    const saved = change ? updateProfile(userId, change) : getProfile(userId);
     return { profile: saved };
   }
   if (collection === 'clients') {
