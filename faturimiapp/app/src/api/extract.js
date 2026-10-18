@@ -48,20 +48,3 @@ export async function extractInvoiceInfo(apiBaseUrl, { text, file } = {}) {
 export async function extractClientInfo(apiBaseUrl, text) {
   return extractInvoiceInfo(apiBaseUrl, { text });
 }
-
-export async function extractCompanyInfo(apiBaseUrl, file) {
-  const form = new FormData();
-  form.append('file', {
-    uri: file.uri,
-    name: file.name || 'invoice',
-    type: file.mimeType || 'application/octet-stream',
-  });
-
-  // Do not set Content-Type manually - fetch/RN needs to add its own multipart boundary.
-  const response = await fetch(joinUrl(apiBaseUrl, '/api/extract-company'), {
-    method: 'POST',
-    body: form,
-  });
-
-  return parseExtractResponse(response);
-}

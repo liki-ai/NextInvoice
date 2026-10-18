@@ -2,12 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
 import { spacing, typography, colors, radius } from '../theme';
 import { Button, FormField, Section } from '../components/ui';
-import { extractCompanyInfo } from '../api/extract';
 import { stripSampleCompanyFields } from '../storage/companySamples';
 import { INDUSTRIES, normalizeIndustry } from '../utils/client';
 import { pickImageFile, proofSource } from '../utils/proof';
@@ -22,7 +20,6 @@ export default function ProfileScreen({ navigation }) {
 
   const [form, setForm] = useState(() => stripSampleCompanyFields(companyProfile));
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(settings.apiBaseUrl);
-  const [importing, setImporting] = useState(false);
   // A company already set up shows as a short summary; one still to fill in opens as the form.
   const [expanded, setExpanded] = useState(() => !stripSampleCompanyFields(companyProfile).companyName);
 
@@ -40,37 +37,6 @@ export default function ProfileScreen({ navigation }) {
     { label: t('profile.phone'), value: form.phone },
     { label: 'IBAN', value: [form.iban, form.bankName].filter(Boolean).join(' · ') },
   ].filter((line) => String(line.value || '').trim());
-
-  const handleImport = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      if (result.canceled) return;
-      const file = result.assets ? result.assets[0] : result;
-      if (!file || !file.uri) return;
-      setImporting(true);
-      const data = await extractCompanyInfo(apiBaseUrlInput, file);
-      setForm((prev) => ({
-        ...prev,
-        companyName: data.companyName || prev.companyName,
-        contactPerson: data.contactPerson || prev.contactPerson,
-        nui: data.nui || prev.nui,
-        streetAddress: data.streetAddress || prev.streetAddress,
-        state: data.state || prev.state,
-        zipCode: data.zipCode || prev.zipCode,
-        email: data.email || prev.email,
-        phone: data.phone || prev.phone,
-      }));
-      Alert.alert(t('common.success'), t('profile.importSuccess'));
-    } catch (err) {
-      Alert.alert(t('common.error'), t('profile.importError'));
-    } finally {
-      setImporting(false);
-    }
-  };
 
   const handleSave = async () => {
     await updateCompanyProfile(stripSampleCompanyFields(form));
@@ -162,17 +128,7 @@ export default function ProfileScreen({ navigation }) {
 
       {expanded ? (
       <>
-      <Section title={t('profile.importSectionTitle')} style={{ marginTop: spacing.md }}>
-        <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('profile.importDescription')}</Text>
-        <Button
-          title={importing ? t('profile.importing') : t('profile.importButton')}
-          onPress={handleImport}
-          loading={importing}
-          variant="secondary"
-        />
-      </Section>
-
-      <Section title={t('profile.companySectionTitle')}>
+      <Section title={t('profile.companySectionTitle')} style={{ marginTop: spacing.md }}>
         <Text style={[typography.muted, { marginBottom: spacing.sm }]}>{t('industry.label')}</Text>
         <View style={styles.chipRow}>
           {INDUSTRIES.map((value) => (
