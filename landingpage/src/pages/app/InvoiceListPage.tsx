@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Bell, BellRing, Eye, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Bell, BellRing, Eye, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2, User, X } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
@@ -23,7 +23,9 @@ import {
   invoiceSubject,
   invoiceYear,
   lastReminderTime,
+  statementFileName,
 } from '../../lib/invoice'
+import { clientInvoiceSummary, invoiceClientGroups, isOwed, matchClientGroups } from '../../lib/clientInvoices'
 import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
@@ -39,7 +41,7 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
 }
 
 export function InvoiceListPage() {
-  const { invoices, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid } = useAppData()
+  const { invoices, clients, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid } = useAppData()
   const { t, dict } = useI18n()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue' | 'toSend'>('all')
@@ -61,7 +63,29 @@ export function InvoiceListPage() {
   const [pulseId, setPulseId] = useState<string | null>(null)
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
-  const send = sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter === 'toSend' ? 'all' : statusFilter, t)
+  // Picking a client from the search shows all of that client's invoices, from every year.
+  const [clientKey, setClientKey] = useState<string | null>(null)
+  const [clientTab, setClientTab] = useState<'unpaid' | 'all'>('unpaid')
+  const [suggestIndex, setSuggestIndex] = useState(0)
+  const [suggestHidden, setSuggestHidden] = useState(false)
+  const clientGroups = useMemo(() => invoiceClientGroups(invoices, clients), [invoices, clients])
+  const client = clientKey ? clientGroups.find((group) => group.key === clientKey) : undefined
+  const suggestions = useMemo(() => (client || suggestHidden ? [] : matchClientGroups(clientGroups, query)), [client, suggestHidden, clientGroups, query])
+  // A list for one client holds what the chosen tab shows: what is still owed, or everything.
+  const send = client
+    ? {
+        kind: clientTab,
+        cta: t('invoiceList.sendList'),
+        title: clientTab === 'unpaid' ? t('invoiceList.sendUnpaidTitle') : t('invoiceList.sendAllTitle'),
+      }
+    : sendCopy(statusFilter === 'overdue' ? 'unpaid' : statusFilter === 'toSend' ? 'all' : statusFilter, t)
+
+  function pickClient(key: string) {
+    setClientKey(key)
+    setClientTab('unpaid')
+    setQuery('')
+    setSelected(new Set())
+  }
   // Invoices waiting for their email, from every year: the number on the "To send" filter.
   const toSendCount = useMemo(() => invoices.filter((item) => awaitsDelivery(item)).length, [invoices])
   const addedId = searchParams.get('added')
@@ -98,6 +122,7 @@ export function InvoiceListPage() {
   useEffect(() => {
     if (!addedId) return undefined
     setStatusFilter('all')
+    setClientKey(null)
     setPulseId(addedId)
     window.scrollTo({ top: 0, behavior: 'smooth' })
     const timer = window.setTimeout(() => {
@@ -122,6 +147,7 @@ export function InvoiceListPage() {
   const limitReached = usage?.plan === 'free' && usage.limit !== null && usage.used >= usage.limit
 
   const filtered = useMemo(() => {
+    if (client) return clientTab === 'unpaid' ? client.invoices.filter(isOwed) : client.invoices
     const q = query.trim().toLowerCase()
     const list = !q
       ? yearInvoices
@@ -144,15 +170,8 @@ export function InvoiceListPage() {
       const status = invoiceStatus(item)
       return status === 'unpaid' || status === 'partial'
     })
-  }, [yearInvoices, query, statusFilter])
-
-  // A list is sent to one client, so the button for it shows only once a search has narrowed the
-  // rows to a single client.
-  const oneClient = useMemo(() => {
-    if (!query.trim() || filtered.length === 0) return false
-    const key = (item: (typeof filtered)[number]) => item.clientId || item.client?.id || String(item.client?.fullName || '').trim().toLowerCase()
-    return filtered.every((item) => key(item) === key(filtered[0]))
-  }, [query, filtered])
+  }, [yearInvoices, query, statusFilter, client, clientTab])
+  const clientSummary = useMemo(() => (client ? clientInvoiceSummary(filtered) : null), [client, filtered])
 
   // Rows that can be ticked: issued invoices with something still owed, among those on screen.
   const payable = useMemo(
@@ -244,20 +263,40 @@ export function InvoiceListPage() {
           company: localizeCompanyProfile(profile, t),
           invoices: filtered,
           issuedDate: formatStatementFileDate(new Date()),
+          client: client?.client,
           pdfLabels: {
             ...dict.pdf,
             listTitle: send.title,
             statusPaid: t('invoiceList.statusPaid'),
             statusUnpaid: t('invoiceList.statusUnpaid'),
+            statusPartial: t('docs.statusPartial'),
+            statusCancelled: t('docs.statusCancelled'),
             statusLabel: t('obligations.status'),
+            invoicedLabel: t('invoiceList.summaryInvoiced'),
+            paidLabel: t('invoiceList.summaryPaid'),
+            remainingLabel: t('invoiceList.summaryRemaining'),
           },
         })
       : ''
 
   function onSendList() {
     if (!previewHtml) return
-    downloadHtmlAsPdf(previewHtml, invoiceListFileName(send.kind))
+    downloadHtmlAsPdf(previewHtml, client ? statementFileName(client.client.fullName) : invoiceListFileName(send.kind))
     setPreview(false)
+  }
+
+  function onSearchKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (!suggestions.length) return
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      const step = e.key === 'ArrowDown' ? 1 : -1
+      setSuggestIndex((index) => (index + step + suggestions.length) % suggestions.length)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      pickClient(suggestions[Math.min(suggestIndex, suggestions.length - 1)].key)
+    } else if (e.key === 'Escape') {
+      setSuggestHidden(true)
+    }
   }
 
   return (
@@ -266,7 +305,7 @@ export function InvoiceListPage() {
         <div>
           <h1 className="font-display text-4xl font-medium tracking-tight">{t('invoiceList.title')}</h1>
           <p className="mt-2 text-sm text-brand-ink/55">{t('invoiceList.subtitle')}</p>
-          {invoices.length > 0 ? (
+          {invoices.length > 0 && !client ? (
             <div className="mt-4 flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={t('invoiceList.year')}>
               {yearCounts.map(([value, count]) => (
                 <button
@@ -356,7 +395,21 @@ export function InvoiceListPage() {
         </div>
       ) : null}
 
-      {invoices.length > 0 ? (
+      {client && clientSummary ? (
+        <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[
+            [t('invoiceList.summaryCount'), String(clientSummary.count)],
+            [t('invoiceList.summaryInvoiced'), formatMoneyList(clientSummary.invoiced, formatMoney)],
+            [t('invoiceList.summaryPaid'), formatMoneyList(clientSummary.paid, formatMoney)],
+            [t('invoiceList.summaryRemaining'), formatMoneyList(clientSummary.remaining, formatMoney)],
+          ].map(([label, value], index) => (
+            <div key={label} className="rounded-2xl border border-brand-ink/8 bg-white px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{label}</p>
+              <p className={`mt-1 font-display text-2xl font-medium tabular-nums ${index === 3 && clientSummary.remaining.some((row) => row.amount > 0) ? 'text-[#C0503A]' : ''}`}>{value}</p>
+            </div>
+          ))}
+        </div>
+      ) : invoices.length > 0 ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-brand-ink/8 bg-white px-5 py-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/40">{t('invoiceList.unpaidTotal')}</p>
@@ -404,25 +457,96 @@ export function InvoiceListPage() {
       {invoices.length > 0 ? (
         <div className="mt-6 overflow-hidden rounded-2xl border border-brand-ink/8 bg-white">
           <div className="flex items-center gap-3 border-b border-brand-ink/8 px-4 py-3">
-            <Search className="h-4 w-4 text-brand-ink/35" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('invoiceList.search')}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-brand-ink/35"
-            />
-            {oneClient ? (
+            <Search className="h-4 w-4 shrink-0 text-brand-ink/35" />
+            {client ? (
+              <span className="-my-1 inline-flex min-w-0 items-center gap-2 rounded-xl bg-brand/10 py-1 pl-3 pr-1 text-sm font-semibold text-brand">
+                <User className="h-4 w-4 shrink-0" />
+                <span className="truncate">{client.client.fullName}</span>
+                <button
+                  type="button"
+                  onClick={() => setClientKey(null)}
+                  title={t('invoiceList.clearClient')}
+                  aria-label={t('invoiceList.clearClient')}
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg hover:bg-brand/15"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ) : (
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  setSuggestIndex(0)
+                  setSuggestHidden(false)
+                }}
+                onKeyDown={onSearchKey}
+                placeholder={t('invoiceList.searchClient')}
+                role="combobox"
+                aria-expanded={suggestions.length > 0}
+                aria-controls="invoice-client-suggestions"
+                aria-autocomplete="list"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-brand-ink/35"
+              />
+            )}
+          </div>
+
+          {suggestions.length > 0 ? (
+            <ul id="invoice-client-suggestions" role="listbox" className="border-b border-brand-ink/8 py-1">
+              {suggestions.map((group, index) => {
+                const owed = formatMoneyList(totalsByCurrency(group.invoices, (item) => remainingOf(item)), formatMoney)
+                const owes = group.invoices.some((item) => remainingOf(item) > 0)
+                return (
+                  <li key={group.key} role="option" aria-selected={index === suggestIndex}>
+                    <button
+                      type="button"
+                      onMouseEnter={() => setSuggestIndex(index)}
+                      onClick={() => pickClient(group.key)}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm ${index === suggestIndex ? 'bg-brand/5' : ''}`}
+                    >
+                      <User className="h-4 w-4 shrink-0 text-brand" />
+                      <span className="min-w-0 flex-1 truncate font-semibold">{group.client.fullName}</span>
+                      <span className="shrink-0 text-xs text-brand-ink/50">{t('invoiceList.clientInvoices', { count: group.invoices.length })}</span>
+                      {owes ? <span className="shrink-0 text-xs font-semibold tabular-nums text-[#C0503A]">{owed}</span> : null}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
+
+          {client ? (
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+              {(
+                [
+                  ['unpaid', t('invoiceList.tabUnpaid')],
+                  ['all', t('invoiceList.filterAll')],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={clientTab === key}
+                  onClick={() => {
+                    setClientTab(key)
+                    setSelected(new Set())
+                  }}
+                  className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${clientTab === key ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink'}`}
+                >
+                  {label}
+                </button>
+              ))}
               <button
                 type="button"
+                disabled={filtered.length === 0}
                 onClick={() => setPreview(true)}
-                className="-my-1 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-brand-ink/12 bg-white px-3 py-1.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
+                className="ml-auto inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
                 {send.cta}
               </button>
-            ) : null}
-          </div>
-
+            </div>
+          ) : (
           <div className="flex flex-wrap gap-2 px-4 py-3">
             <button
               type="button"
@@ -461,8 +585,9 @@ export function InvoiceListPage() {
               {t('recurring.delivery.filter')} · {toSendCount}
             </button>
           </div>
+          )}
 
-          {statusFilter === 'toSend' ? (
+          {statusFilter === 'toSend' && !client ? (
             <DeliveryQueue invoices={invoices} />
           ) : (
           <>
@@ -681,7 +806,7 @@ export function InvoiceListPage() {
             </table>
           </div>
           {filtered.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-brand-ink/50">{t('invoiceList.emptyTitle')}</p>
+            <p className="px-5 py-8 text-center text-sm text-brand-ink/50">{client ? t('invoiceList.clientNoUnpaid') : t('invoiceList.emptyTitle')}</p>
           ) : null}
           </>
           )}

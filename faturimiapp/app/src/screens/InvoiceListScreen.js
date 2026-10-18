@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Keyboard, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from '../i18n/I18nContext';
@@ -14,6 +14,7 @@ import PaymentModal from '../components/PaymentModal';
 import SentButton from '../components/SentButton';
 import { daysOverdue, documentTotals, isInvoiceSent, isOverdue, paymentStatus, pdfClient, pdfCompany, remainingOf, togglePaid, visiblePaymentStatus } from '../utils/document';
 import { fullPaymentPayload } from '../utils/invoiceBalance';
+import { clientInvoiceSummary, invoiceClientGroups, isOwed, matchClientGroups } from '../utils/clientInvoices';
 
 function PaidChip({ status, late, paidAmount, remaining, t, loading, onToggle }) {
   const { lock } = useLockRowPress();
@@ -151,8 +152,24 @@ function sendCopy(filter, t) {
   return { kind: 'all', cta: t('invoiceList.sendList'), title: t('invoiceList.sendAllTitle') };
 }
 
+// The PDF labels of a list; a list for one client also shows what was paid and what is left.
+function listPdfLabels(t, title) {
+  return {
+    ...t('pdf'),
+    listTitle: title,
+    statusPaid: t('invoiceDetail.statusPaid'),
+    statusUnpaid: t('invoiceDetail.statusUnpaid'),
+    statusPartial: t('docs.statusPartial'),
+    statusCancelled: t('docs.statusCancelled'),
+    statusLabel: t('obligations.status'),
+    invoicedLabel: t('invoiceList.summaryInvoiced'),
+    paidLabel: t('invoiceList.summaryPaid'),
+    remainingLabel: t('invoiceList.summaryRemaining'),
+  };
+}
+
 export default function InvoiceListScreen({ navigation, route }) {
-  const { invoices, companyProfile, usage, deleteInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, token, flushQueue } = useApp();
+  const { invoices, clients, companyProfile, usage, deleteInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, token, flushQueue } = useApp();
   const { t } = useTranslation();
   const listRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -163,14 +180,29 @@ export default function InvoiceListScreen({ navigation, route }) {
   const [sendingId, setSendingId] = useState(null);
   const [payingId, setPayingId] = useState(null);
   const [pulseId, setPulseId] = useState(null);
+  const [query, setQuery] = useState('');
+  const [clientKey, setClientKey] = useState(null);
+  const [clientTab, setClientTab] = useState('unpaid');
   const currency = companyProfile.currency || 'EUR';
   const limitReached = usage?.plan === 'free' && usage.limit != null && !usage.canCreate;
-  const send = sendCopy(statusFilter, t);
+  const clientGroups = useMemo(() => invoiceClientGroups(invoices, clients), [invoices, clients]);
+  const client = clientKey ? clientGroups.find((group) => group.key === clientKey) : null;
+  const suggestions = useMemo(() => (client ? [] : matchClientGroups(clientGroups, query)), [client, clientGroups, query]);
+  // A list for one client holds what the chosen tab shows: what is still owed, or everything.
+  const send = client
+    ? {
+        kind: clientTab === 'unpaid' ? 'unpaid' : 'all',
+        cta: t('invoiceList.sendList'),
+        title: clientTab === 'unpaid' ? t('invoiceList.sendUnpaidTitle') : t('invoiceList.sendAllTitle'),
+      }
+    : sendCopy(statusFilter, t);
 
   useEffect(() => {
     const id = route?.params?.highlightId;
     if (!id) return undefined;
     setStatusFilter('all');
+    setClientKey(null);
+    setQuery('');
     setPulseId(id);
     requestAnimationFrame(() => {
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -183,14 +215,25 @@ export default function InvoiceListScreen({ navigation, route }) {
   }, [route?.params?.highlightId, navigation]);
 
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return invoices;
-    if (statusFilter === 'paid') return invoices.filter((inv) => paymentStatus(inv) === 'paid');
-    if (statusFilter === 'overdue') return invoices.filter((inv) => isOverdue(inv));
-    return invoices.filter((inv) => {
-      const status = paymentStatus(inv);
-      return status === 'unpaid' || status === 'partial';
-    });
-  }, [invoices, statusFilter]);
+    if (client) return clientTab === 'unpaid' ? client.invoices.filter(isOwed) : client.invoices;
+    // Typing finds invoices by number as well as by client.
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? invoices.filter((inv) => `${inv.number || ''} ${inv.client?.fullName || ''}`.toLowerCase().includes(q))
+      : invoices;
+    if (statusFilter === 'all') return list;
+    if (statusFilter === 'paid') return list.filter((inv) => paymentStatus(inv) === 'paid');
+    if (statusFilter === 'overdue') return list.filter((inv) => isOverdue(inv));
+    return list.filter(isOwed);
+  }, [invoices, statusFilter, client, clientTab, query]);
+  const clientSummary = useMemo(() => (client ? clientInvoiceSummary(filtered) : null), [client, filtered]);
+
+  const pickClient = (group) => {
+    Keyboard.dismiss();
+    setClientKey(group.key);
+    setClientTab('unpaid');
+    setQuery('');
+  };
 
   const unpaidInvoiceTotal = invoices
     .filter((inv) => paymentStatus(inv) !== 'paid' && paymentStatus(inv) !== 'cancelled' && paymentStatus(inv) !== 'draft')
@@ -205,15 +248,10 @@ export default function InvoiceListScreen({ navigation, route }) {
       company: localizeCompanyProfile(companyProfile, t),
       invoices: filtered,
       issuedDate: formatStatementFileDate(new Date()),
-      pdfLabels: {
-        ...t('pdf'),
-        listTitle: send.title,
-        statusPaid: t('invoiceDetail.statusPaid'),
-        statusUnpaid: t('invoiceDetail.statusUnpaid'),
-        statusLabel: t('obligations.status'),
-      },
+      client: client?.client,
+      pdfLabels: listPdfLabels(t, send.title),
     });
-  }, [previewVisible, filtered, companyProfile, t, send.title]);
+  }, [previewVisible, filtered, companyProfile, t, send.title, client]);
 
   const onShareInvoice = async (item) => {
     if (visiblePaymentStatus(item) === 'cancelled') return;
@@ -243,13 +281,8 @@ export default function InvoiceListScreen({ navigation, route }) {
         invoices: filtered,
         issuedDate: formatStatementFileDate(new Date()),
         kind: send.kind,
-        pdfLabels: {
-          ...t('pdf'),
-          listTitle: send.title,
-          statusPaid: t('invoiceDetail.statusPaid'),
-          statusUnpaid: t('invoiceDetail.statusUnpaid'),
-          statusLabel: t('obligations.status'),
-        },
+        client: client?.client,
+        pdfLabels: listPdfLabels(t, send.title),
       });
       setPreviewVisible(false);
     } catch (err) {
@@ -282,6 +315,94 @@ export default function InvoiceListScreen({ navigation, route }) {
       ) : null}
 
       {invoices.length > 0 ? (
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={16} color={colors.textMuted} />
+          {client ? (
+            <Pressable
+              style={styles.searchChosen}
+              onPress={() => setClientKey(null)}
+              accessibilityRole="button"
+              accessibilityLabel={t('invoiceList.clearClient')}
+            >
+              <Text style={styles.searchChosenText} numberOfLines={1}>
+                {client.client?.fullName}
+              </Text>
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </Pressable>
+          ) : (
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('invoiceList.searchClient')}
+              placeholderTextColor={colors.textMuted}
+              style={styles.searchInput}
+              autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+          )}
+        </View>
+      ) : null}
+
+      {suggestions.length > 0 ? (
+        <View style={styles.suggestions}>
+          {suggestions.map((group) => {
+            const owed = clientInvoiceSummary(group.invoices).remaining;
+            return (
+              <Pressable key={group.key} style={styles.suggestion} onPress={() => pickClient(group)}>
+                <Ionicons name="person-outline" size={16} color={colors.primary} />
+                <Text style={styles.suggestionName} numberOfLines={1}>
+                  {group.client?.fullName}
+                </Text>
+                <Text style={typography.muted}>
+                  {owed > 0 ? formatMoney(owed, currency) : t('invoiceList.clientInvoices', { count: group.invoices.length })}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {client ? (
+        <>
+          <View style={styles.summary}>
+            <View style={styles.summaryCell}>
+              <Text style={styles.totalLabel}>{t('invoiceList.summaryCount')}</Text>
+              <Text style={styles.summaryValue}>{clientSummary.count}</Text>
+            </View>
+            <View style={styles.summaryCell}>
+              <Text style={styles.totalLabel}>{t('invoiceList.summaryInvoiced')}</Text>
+              <Text style={styles.summaryValue}>{formatMoney(clientSummary.invoiced, currency)}</Text>
+            </View>
+            <View style={styles.summaryCell}>
+              <Text style={styles.totalLabel}>{t('invoiceList.summaryPaid')}</Text>
+              <Text style={styles.summaryValue}>{formatMoney(clientSummary.paid, currency)}</Text>
+            </View>
+            <View style={styles.summaryCell}>
+              <Text style={styles.totalLabel}>{t('invoiceList.summaryRemaining')}</Text>
+              <Text style={[styles.summaryValue, clientSummary.remaining > 0 && { color: colors.danger }]}>
+                {formatMoney(clientSummary.remaining, currency)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.filterRow}>
+            {[
+              ['unpaid', t('invoiceList.tabUnpaid')],
+              ['all', t('invoiceList.filterAll')],
+            ].map(([key, label]) => (
+              <Pressable
+                key={key}
+                style={[styles.filterItem, clientTab === key && styles.filterItemActive]}
+                onPress={() => setClientTab(key)}
+              >
+                <Text style={[styles.filterText, clientTab === key && styles.filterTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {invoices.length > 0 && !client && !query.trim() ? (
         <View style={styles.totals}>
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>{t('invoiceList.unpaidTotal')}</Text>
@@ -294,7 +415,7 @@ export default function InvoiceListScreen({ navigation, route }) {
         </View>
       ) : null}
 
-      {invoices.length > 0 ? (
+      {invoices.length > 0 && !client ? (
         <View style={styles.filterRow}>
           <Pressable
             style={[styles.filterItem, statusFilter === 'all' && styles.filterItemActive]}
@@ -336,6 +457,8 @@ export default function InvoiceListScreen({ navigation, route }) {
         data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={Keyboard.dismiss}
         refreshControl={
           token ? (
             <RefreshControl
@@ -356,7 +479,9 @@ export default function InvoiceListScreen({ navigation, route }) {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={48} color={colors.textMuted} />
-            <Text style={styles.emptyText}>{t('invoiceList.empty')}</Text>
+            <Text style={styles.emptyText}>
+              {client ? t('invoiceList.clientNoUnpaid') : query.trim() ? t('invoiceList.noMatches') : t('invoiceList.empty')}
+            </Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -545,6 +670,54 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
   totalValue: { marginTop: 4, fontSize: 18, fontWeight: '700', color: colors.text },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  searchInput: { flex: 1, fontSize: 15, color: colors.text, paddingVertical: 10 },
+  searchChosen: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 10 },
+  searchChosenText: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },
+  suggestions: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  suggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  suggestionName: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
+  summary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  summaryCell: { width: '50%', paddingHorizontal: spacing.md, paddingVertical: 6 },
+  summaryValue: { marginTop: 2, fontSize: 16, fontWeight: '700', color: colors.text },
   listContent: { paddingHorizontal: spacing.md, paddingBottom: 96 },
   filterRow: {
     flexDirection: 'row',

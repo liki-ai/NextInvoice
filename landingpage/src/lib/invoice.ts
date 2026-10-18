@@ -1,4 +1,4 @@
-import { documentTotals, parseLooseDate, paymentStatus, remainingOf, totalsByCurrency } from './document'
+import { documentTotals, formatMoneyList, parseLooseDate, paymentStatus, remainingOf, totalsByCurrency } from './document'
 
 export { buildInvoiceHtml } from './invoiceTemplates'
 
@@ -712,11 +712,13 @@ export function buildInvoiceListHtml({
   invoices,
   issuedDate,
   pdfLabels,
+  client,
 }: {
   company: CompanyProfile
   invoices: Array<{
     number?: string
     date?: string
+    dueDate?: string
     status?: string
     lifecycle?: string
     total?: number
@@ -727,6 +729,8 @@ export function buildInvoiceListHtml({
   }>
   issuedDate?: string
   pdfLabels: Record<string, string>
+  /** With a client, the list is the one sent to that client: what each invoice still owes, and what was invoiced, paid and is left. */
+  client?: { fullName?: string; address?: string; phone?: string; email?: string }
 }) {
   const currency = company.currency || 'EUR'
   const dateLabel = issuedDate || formatStatementFileDate(new Date())
@@ -736,6 +740,7 @@ export function buildInvoiceListHtml({
     if (item.status === 'cancelled' || item.lifecycle === 'cancelled') return sum
     return sum + remainingOf(item as Invoice)
   }, 0)
+  if (client) return buildClientInvoiceListHtml({ company, invoices: invoices as Invoice[], dateLabel, cityLine, nuiLabel, pdfLabels, client })
   const rows = invoices
     .map((item) => {
       const status = paymentStatus(item as Invoice)
@@ -805,6 +810,126 @@ export function buildInvoiceListHtml({
       <tbody>${rows}</tbody>
     </table>
     <div class="totals"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, currency)}</span></div>
+  </body>
+  </html>`
+}
+
+function buildClientInvoiceListHtml({
+  company,
+  invoices,
+  dateLabel,
+  cityLine,
+  nuiLabel,
+  pdfLabels,
+  client,
+}: {
+  company: CompanyProfile
+  invoices: Invoice[]
+  dateLabel: string
+  cityLine: string
+  nuiLabel: string
+  pdfLabels: Record<string, string>
+  client: { fullName?: string; address?: string; phone?: string; email?: string }
+}) {
+  const currency = company.currency || 'EUR'
+  const sums = (valueOf: (item: Invoice) => number) => formatMoneyList(totalsByCurrency(invoices, valueOf), formatMoney)
+  const rows = invoices
+    .map((item) => {
+      const status = paymentStatus(item)
+      const statusLabel =
+        status === 'paid'
+          ? pdfLabels.statusPaid || 'Paid'
+          : status === 'partial'
+            ? pdfLabels.statusPartial || 'Partial'
+            : status === 'cancelled'
+              ? pdfLabels.statusCancelled || 'Cancelled'
+              : status === 'draft'
+                ? pdfLabels.statusDraft || 'Draft'
+                : pdfLabels.statusUnpaid || 'Unpaid'
+      const amount = Number(item.total) || 0
+      const left = remainingOf(item)
+      const paid = status === 'draft' || status === 'cancelled' ? 0 : Math.max(amount - left, 0)
+      const rowCurrency = item.currency || currency
+      return `<tr>
+        <td>${escapeHtml(item.number || '')}</td>
+        <td>${escapeHtml(item.date || '')}</td>
+        <td>${escapeHtml(item.dueDate || pdfLabels.onReceipt || '')}</td>
+        <td>${escapeHtml(statusLabel)}</td>
+        <td class="right">${formatMoney(amount, rowCurrency)}</td>
+        <td class="right">${formatMoney(paid, rowCurrency)}</td>
+        <td class="right">${formatMoney(left, rowCurrency)}</td>
+      </tr>`
+    })
+    .join('')
+  const payment =
+    company.bankName || company.iban
+      ? `<div class="payment"><div class="block-title">${escapeHtml(pdfLabels.paymentInfo)}</div>${company.bankName ? `<p>${escapeHtml(pdfLabels.bankName)}: ${escapeHtml(company.bankName)}</p>` : ''}${company.iban ? `<p>${escapeHtml(pdfLabels.ibanLabel)}: ${escapeHtml(company.iban)}</p>` : ''}</div>`
+      : ''
+
+  return `<!DOCTYPE html>
+  <html lang="sq">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1D2B2E; padding: 20px; font-size: 12px; }
+      .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 3px solid #2C6E7F; padding-bottom: 16px; margin-bottom: 18px; }
+      .company-block h1 { margin: 0 0 6px 0; font-size: 20px; color: #1F4E5A; text-transform: uppercase; }
+      .company-block p, .client-block p, .payment p { margin: 2px 0; color: #444; }
+      .invoice-meta { text-align: right; }
+      .invoice-meta h2 { margin: 0 0 8px 0; font-size: 18px; color: #2C6E7F; }
+      .client-block { margin-bottom: 18px; }
+      .block-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6B7A7D; margin-bottom: 6px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      thead tr { background: #2C6E7F; color: #fff; }
+      th, td { padding: 6px 7px; border-bottom: 1px solid #E1E6E7; text-align: left; font-size: 11px; }
+      th.right, td.right { text-align: right; white-space: nowrap; }
+      .sums { width: 300px; margin-left: auto; }
+      .sums div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+      .sums .due { font-weight: 700; font-size: 16px; border-top: 2px solid #2C6E7F; margin-top: 4px; padding-top: 8px; color: #1F4E5A; }
+      .payment { margin-top: 20px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="top-row">
+      <div class="company-block">
+        <h1>${escapeHtml(company.companyName)}</h1>
+        ${company.streetAddress ? `<p>${escapeHtml(company.streetAddress)}</p>` : ''}
+        ${cityLine ? `<p>${escapeHtml(cityLine)}</p>` : ''}
+        ${company.nui ? `<p>${escapeHtml(nuiLabel)} ${escapeHtml(company.nui)}</p>` : ''}
+      </div>
+      <div class="invoice-meta">
+        <h2>${escapeHtml(pdfLabels.listTitle || pdfLabels.statementTitle || 'List')}</h2>
+        <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(dateLabel)}</p>
+      </div>
+    </div>
+    <div class="client-block">
+      <div class="block-title">${escapeHtml(pdfLabels.billedTo || pdfLabels.clientLabel)}</div>
+      <p><strong>${escapeHtml(client.fullName || '')}</strong></p>
+      ${client.address ? `<p>${escapeHtml(client.address)}</p>` : ''}
+      ${client.phone ? `<p>${escapeHtml(client.phone)}</p>` : ''}
+      ${client.email ? `<p>${escapeHtml(client.email)}</p>` : ''}
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>${escapeHtml(pdfLabels.invoiceLabel)}</th>
+          <th>${escapeHtml(pdfLabels.dateLabel)}</th>
+          <th>${escapeHtml(pdfLabels.dueDateLabel)}</th>
+          <th>${escapeHtml(pdfLabels.statusLabel || '')}</th>
+          <th class="right">${escapeHtml(pdfLabels.sum)}</th>
+          <th class="right">${escapeHtml(pdfLabels.paidLabel || '')}</th>
+          <th class="right">${escapeHtml(pdfLabels.remainingLabel || '')}</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="sums">
+      <div><span>${escapeHtml(pdfLabels.invoicedLabel || pdfLabels.total)}</span><span>${sums((item) => documentTotals(item).total)}</span></div>
+      <div><span>${escapeHtml(pdfLabels.paidLabel || '')}</span><span>${sums((item) => documentTotals(item).total - remainingOf(item))}</span></div>
+      <div class="due"><span>${escapeHtml(pdfLabels.remainingLabel || pdfLabels.total)}</span><span>${sums((item) => remainingOf(item))}</span></div>
+    </div>
+    ${payment}
   </body>
   </html>`
 }

@@ -1,5 +1,5 @@
 import { formatMoney, currencySymbol, toNumber } from '../utils/money';
-import { parseLooseDate, remainingOf } from '../utils/document';
+import { documentTotals, parseLooseDate, paymentStatus, remainingOf } from '../utils/document';
 import { computeTotals as invoiceTotals } from './invoiceTemplates';
 import { resolveExportNote } from '../utils/company';
 
@@ -292,23 +292,85 @@ export function buildPaidObligationsHtml({ company, obligations, issuedDate, pdf
   </html>`;
 }
 
-export function buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels }) {
+function listStatusLabel(item, pdfLabels) {
+  const status = paymentStatus(item);
+  if (status === 'paid') return pdfLabels.statusPaid || 'Paid';
+  if (status === 'partial') return pdfLabels.statusPartial || pdfLabels.statusUnpaid || 'Partial';
+  if (status === 'cancelled') return pdfLabels.statusCancelled || 'Cancelled';
+  return pdfLabels.statusUnpaid || 'Unpaid';
+}
+
+// With a client, the list is the one sent to that client: who it is for, what each invoice
+// still owes, and how much was invoiced, paid and is left.
+export function buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels, client }) {
   const currency = company.currency || 'EUR';
   const dateLabel = issuedDate || formatStatementFileDate(new Date());
   const cityLine = [company.zipCode, company.state].filter(Boolean).join(' ');
   const nuiLabel = pdfLabels.pivaLabel || pdfLabels.nuiLabel;
-  const total = (invoices || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  const rows = (invoices || [])
-    .map(
-      (item) => `<tr>
+  const list = invoices || [];
+  const total = list.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+  const counted = list.filter((item) => paymentStatus(item) !== 'draft' && paymentStatus(item) !== 'cancelled');
+  const invoiced = counted.reduce((sum, item) => sum + documentTotals(item).total, 0);
+  const remaining = counted.reduce((sum, item) => sum + remainingOf(item), 0);
+  const rows = list
+    .map((item) => {
+      const amount = Number(item.total) || 0;
+      if (client) {
+        const counts = paymentStatus(item) !== 'draft' && paymentStatus(item) !== 'cancelled';
+        const left = remainingOf(item);
+        return `<tr>
+        <td>${escapeHtml(item.number || '')}</td>
+        <td>${escapeHtml(item.date || '')}</td>
+        <td>${escapeHtml(item.dueDate || pdfLabels.onReceipt || '')}</td>
+        <td>${escapeHtml(listStatusLabel(item, pdfLabels))}</td>
+        <td class="right">${formatMoney(amount, currency)}</td>
+        <td class="right">${formatMoney(counts ? Math.max(amount - left, 0) : 0, currency)}</td>
+        <td class="right">${formatMoney(left, currency)}</td>
+      </tr>`;
+      }
+      return `<tr>
         <td>${escapeHtml(item.number || '')}</td>
         <td>${escapeHtml(item.client?.fullName || '')}</td>
         <td>${escapeHtml(item.date || '')}</td>
         <td>${escapeHtml(item.status === 'paid' ? pdfLabels.statusPaid || 'Paid' : pdfLabels.statusUnpaid || 'Unpaid')}</td>
-        <td class="right">${formatMoney(Number(item.total) || 0, currency)}</td>
-      </tr>`,
-    )
+        <td class="right">${formatMoney(amount, currency)}</td>
+      </tr>`;
+    })
     .join('');
+  const head = client
+    ? `<th>${escapeHtml(pdfLabels.invoiceLabel)}</th>
+          <th>${escapeHtml(pdfLabels.dateLabel)}</th>
+          <th>${escapeHtml(pdfLabels.dueDateLabel)}</th>
+          <th>${escapeHtml(pdfLabels.statusLabel || '')}</th>
+          <th class="right">${escapeHtml(pdfLabels.sum)}</th>
+          <th class="right">${escapeHtml(pdfLabels.paidLabel || '')}</th>
+          <th class="right">${escapeHtml(pdfLabels.remainingLabel || '')}</th>`
+    : `<th>${escapeHtml(pdfLabels.invoiceLabel)}</th>
+          <th>${escapeHtml(pdfLabels.clientLabel)}</th>
+          <th>${escapeHtml(pdfLabels.dateLabel)}</th>
+          <th>${escapeHtml(pdfLabels.statusLabel || '')}</th>
+          <th class="right">${escapeHtml(pdfLabels.sum)}</th>`;
+  const payment =
+    company.bankName || company.iban
+      ? `<div class="payment"><div class="block-title">${escapeHtml(pdfLabels.paymentInfo)}</div>${company.bankName ? `<p>${escapeHtml(pdfLabels.bankName)}: ${escapeHtml(company.bankName)}</p>` : ''}${company.iban ? `<p>${escapeHtml(pdfLabels.ibanLabel)}: ${escapeHtml(company.iban)}</p>` : ''}</div>`
+      : '';
+  const totals = client
+    ? `<div class="sum-block">
+      <div><span>${escapeHtml(pdfLabels.invoicedLabel || pdfLabels.total)}</span><span>${formatMoney(invoiced, currency)}</span></div>
+      <div><span>${escapeHtml(pdfLabels.paidLabel || '')}</span><span>${formatMoney(invoiced - remaining, currency)}</span></div>
+      <div class="totals"><span>${escapeHtml(pdfLabels.remainingLabel || pdfLabels.total)}</span><span>${formatMoney(remaining, currency)}</span></div>
+    </div>
+    ${payment}`
+    : `<div class="totals"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, currency)}</span></div>`;
+  const clientBlock = client
+    ? `<div class="client-block">
+      <div class="block-title">${escapeHtml(pdfLabels.billedTo || pdfLabels.clientLabel)}</div>
+      <p><strong>${escapeHtml(client.fullName)}</strong></p>
+      ${client.address ? `<p>${escapeHtml(client.address)}</p>` : ''}
+      ${client.phone ? `<p>${escapeHtml(client.phone)}</p>` : ''}
+      ${client.email ? `<p>${escapeHtml(client.email)}</p>` : ''}
+    </div>`
+    : '';
 
   return `<!DOCTYPE html>
   <html lang="sq">
@@ -319,14 +381,20 @@ export function buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels 
       body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1D2B2E; padding: 20px; font-size: 12px; }
       .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 3px solid #2C6E7F; padding-bottom: 16px; margin-bottom: 18px; }
       .company-block h1 { margin: 0 0 6px 0; font-size: 20px; color: #1F4E5A; text-transform: uppercase; }
-      .company-block p { margin: 2px 0; color: #444; }
+      .company-block p, .client-block p, .payment p { margin: 2px 0; color: #444; }
       .invoice-meta { text-align: right; }
       .invoice-meta h2 { margin: 0 0 8px 0; font-size: 18px; color: #2C6E7F; }
+      .client-block { margin-bottom: 18px; }
+      .block-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6B7A7D; margin-bottom: 6px; }
       table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
       thead tr { background: #2C6E7F; color: #fff; }
       th, td { padding: 6px 7px; border-bottom: 1px solid #E1E6E7; text-align: left; font-size: 11px; }
-      th.right, td.right { text-align: right; }
+      th.right, td.right { text-align: right; white-space: nowrap; }
       .totals { width: 240px; margin-left: auto; font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; border-top: 2px solid #2C6E7F; padding-top: 8px; color: #1F4E5A; }
+      .sum-block { width: 280px; margin-left: auto; }
+      .sum-block div { display: flex; justify-content: space-between; padding: 3px 0; }
+      .sum-block .totals { width: auto; margin-top: 4px; padding-top: 8px; }
+      .payment { margin-top: 20px; font-size: 12px; }
     </style>
   </head>
   <body>
@@ -342,19 +410,16 @@ export function buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels 
         <p>${escapeHtml(pdfLabels.dateLabel)}: ${escapeHtml(dateLabel)}</p>
       </div>
     </div>
+    ${clientBlock}
     <table>
       <thead>
         <tr>
-          <th>${escapeHtml(pdfLabels.invoiceLabel)}</th>
-          <th>${escapeHtml(pdfLabels.clientLabel)}</th>
-          <th>${escapeHtml(pdfLabels.dateLabel)}</th>
-          <th>${escapeHtml(pdfLabels.statusLabel || '')}</th>
-          <th class="right">${escapeHtml(pdfLabels.sum)}</th>
+          ${head}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="totals"><span>${escapeHtml(pdfLabels.total)}</span><span>${formatMoney(total, currency)}</span></div>
+    ${totals}
   </body>
   </html>`;
 }

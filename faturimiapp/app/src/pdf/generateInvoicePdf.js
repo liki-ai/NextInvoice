@@ -106,10 +106,10 @@ export async function sharePaidObligationsPdf({ company, obligations, issuedDate
   return dest;
 }
 
-export async function shareInvoiceListPdf({ company, invoices, issuedDate, pdfLabels, kind = 'all' }) {
-  const html = buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels });
+export async function shareInvoiceListPdf({ company, invoices, issuedDate, pdfLabels, kind = 'all', client }) {
+  const html = buildInvoiceListHtml({ company, invoices, issuedDate, pdfLabels, client });
   const { uri } = await Print.printToFileAsync({ html, base64: false });
-  const fileName = invoiceListFileName(kind, issuedDate);
+  const fileName = client ? statementFileName(client.fullName, issuedDate) : invoiceListFileName(kind, issuedDate);
   const dest = `${FileSystem.cacheDirectory}${fileName}`;
   const existing = await FileSystem.getInfoAsync(dest);
   if (existing.exists) {
