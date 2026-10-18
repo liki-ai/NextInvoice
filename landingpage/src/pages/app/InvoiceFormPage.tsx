@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Camera, ChevronDown, Eye, FileText, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { Camera, ChevronDown, Eye, StickyNote, FileText, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
@@ -36,6 +36,9 @@ import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catal
 import { fileToSupportedImageDataUrl } from '../../lib/proof'
 
 /** A price as shown in its box: at most two decimals. The full value stays in the form until it is retyped. */
+// The tighter spacing of the fields in the invoice details card.
+const tight = 'mb-3.5 gap-1.5'
+
 function shortAmount(value: string | number) {
   const raw = String(value ?? '').trim()
   if (raw === '' || /^-?\d*([.,]\d{0,2})?$/.test(raw)) return raw
@@ -121,6 +124,8 @@ export function InvoiceFormPage() {
     existing ? Boolean(existing.pricesIncludeTax) : localStorage.getItem('nextinvoice.pricesIncludeTax') === '1',
   )
   const [discount, setDiscount] = useState(String(existing?.discount ?? '0'))
+  // Notes stay behind a small button until asked for, or until the invoice has some.
+  const [notesOpen, setNotesOpen] = useState(false)
   const [taxRate, setTaxRate] = useState(() => String(existing?.taxRate ?? profile?.defaultTaxRate ?? 0))
   // A new invoice starts from the VAT rate in Settings, unless the rate was already set by hand.
   const taxTouched = useRef(Boolean(existing))
@@ -897,24 +902,27 @@ export function InvoiceFormPage() {
         </div>
 
         <div className="space-y-6 lg:sticky lg:top-8">
-          <Card>
-            <h2 className="mb-4 font-semibold">{t('newInvoice.invoiceDetailsSectionTitle')}</h2>
-            <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
-            <DateField label={t('newInvoice.date')} value={date} pickLabel={t('newInvoice.pickDate')} onChange={setDate} />
-            <DateField label={t('newInvoice.dueDate')} value={dueDate} placeholder={t('newInvoice.phDueDate')} pickLabel={t('newInvoice.pickDate')} onChange={setDueDate} />
-            <Field label={t('newInvoice.discount')} value={discount} inputMode="decimal" onChange={(e) => setDiscount(e.target.value)} />
-            <div className="mb-5">
+          <Card className="p-5">
+            <h2 className="mb-3 font-semibold">{t('newInvoice.invoiceDetailsSectionTitle')}</h2>
+            <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} wrapperClassName={tight} onChange={(e) => setInvoiceNumber(e.target.value)} />
+            <DateField label={t('newInvoice.date')} value={date} pickLabel={t('newInvoice.pickDate')} wrapperClassName={tight} onChange={setDate} />
+            <DateField label={t('newInvoice.dueDate')} value={dueDate} placeholder={t('newInvoice.phDueDate')} pickLabel={t('newInvoice.pickDate')} wrapperClassName={tight} onChange={setDueDate} />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t('newInvoice.discount')} value={discount} inputMode="decimal" wrapperClassName={tight} onChange={(e) => setDiscount(e.target.value)} />
               <Field
                 label={t('newInvoice.taxRate')}
                 value={taxRate}
                 inputMode="decimal"
+                wrapperClassName={tight}
                 onChange={(e) => {
                   taxTouched.current = true
                   setTaxFromClient(false)
                   setTaxRate(e.target.value)
                 }}
               />
-              <div className="mt-2 flex gap-1.5">
+            </div>
+            <div className="-mt-1.5 mb-3.5">
+              <div className="flex gap-1.5">
                 {[0, 8, 18].map((rate) => (
                   <button
                     key={rate}
@@ -925,15 +933,15 @@ export function InvoiceFormPage() {
                       setTaxFromClient(false)
                       setTaxRate(String(rate))
                     }}
-                    className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${appliedTaxRate === rate ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/65 hover:border-brand/30'}`}
+                    className={`flex-1 rounded-lg border px-2 py-1 text-xs font-semibold transition ${appliedTaxRate === rate ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/65 hover:border-brand/30'}`}
                   >
                     {rate === 0 ? t('newInvoice.taxNone') : `${rate}%`}
                   </button>
                 ))}
               </div>
-              {taxFromClient ? <p className="mt-2 text-xs text-brand-ink/45">{t('newInvoice.taxFromClient')}</p> : null}
+              {taxFromClient ? <p className="mt-1.5 text-xs text-brand-ink/45">{t('newInvoice.taxFromClient')}</p> : null}
               {appliedTaxRate > 0 ? (
-                <label className="mt-3 flex cursor-pointer items-start gap-2.5">
+                <label title={t('newInvoice.pricesIncludeTaxHint')} className="mt-2.5 flex cursor-pointer items-center gap-2.5">
                   <input
                     type="checkbox"
                     checked={pricesIncludeTax}
@@ -941,18 +949,26 @@ export function InvoiceFormPage() {
                       setPricesIncludeTax(e.target.checked)
                       localStorage.setItem('nextinvoice.pricesIncludeTax', e.target.checked ? '1' : '0')
                     }}
-                    className="mt-0.5 h-4 w-4 accent-[#2C6E7F]"
+                    className="h-4 w-4 accent-[#2C6E7F]"
                   />
-                  <span>
-                    <span className="block text-sm font-semibold">{t('newInvoice.pricesIncludeTax')}</span>
-                    <span className="block text-xs text-brand-ink/45">{t('newInvoice.pricesIncludeTaxHint')}</span>
-                  </span>
+                  <span className="text-sm font-semibold">{t('newInvoice.pricesIncludeTax')}</span>
                 </label>
               ) : null}
             </div>
-            <TextArea label={t('newInvoice.notes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            <UnsignedToggle checked={unsigned} onChange={setUnsigned} />
-            {unsigned ? null : <SignerPicker value={signerId} onChange={pickSigner} className="mt-4" />}
+            {notesOpen || notes.trim() ? (
+              <TextArea label={t('newInvoice.notes')} rows={2} value={notes} autoFocus={notesOpen && !notes} wrapperClassName={tight} onChange={(e) => setNotes(e.target.value)} />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setNotesOpen(true)}
+                className="mb-3.5 inline-flex items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/10"
+              >
+                <StickyNote className="h-4 w-4" />
+                {t('newInvoice.notes')}
+              </button>
+            )}
+            <UnsignedToggle checked={unsigned} onChange={setUnsigned} compact />
+            {unsigned ? null : <SignerPicker value={signerId} onChange={pickSigner} className="mt-3" />}
           </Card>
           <Card>
             <div className="space-y-2 text-sm">

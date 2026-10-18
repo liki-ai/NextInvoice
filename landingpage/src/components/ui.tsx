@@ -59,10 +59,11 @@ export function Select({
 export function TextArea({
   label,
   className,
+  wrapperClassName,
   ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; wrapperClassName?: string }) {
   return (
-    <label className="mb-5 flex flex-col gap-2.5 last:mb-0">
+    <label className={cn('mb-5 flex flex-col gap-2.5 last:mb-0', wrapperClassName)}>
       <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
       <textarea
         {...props}

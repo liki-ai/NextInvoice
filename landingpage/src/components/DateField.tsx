@@ -20,8 +20,9 @@ export function DateField({
   onChange,
   pickLabel,
   className,
+  wrapperClassName,
   ...props
-}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & { label: string; value: string; onChange: (value: string) => void; pickLabel: string }) {
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & { label: string; value: string; onChange: (value: string) => void; pickLabel: string; wrapperClassName?: string }) {
   const picker = useRef<HTMLInputElement>(null)
 
   function openCalendar() {
@@ -40,7 +41,7 @@ export function DateField({
   }
 
   return (
-    <label className="mb-5 flex flex-col gap-2.5 last:mb-0">
+    <label className={cn('mb-5 flex flex-col gap-2.5 last:mb-0', wrapperClassName)}>
       <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-ink/45">{label}</span>
       <span className="relative block">
         <input
