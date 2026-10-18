@@ -3145,6 +3145,15 @@ const translations = {
 			sendPaid: "Dërgo të paguarat",
 			sendAllTitle: "Faturat",
 			sendUnpaidTitle: "Faturat e papaguara",
+			searchClient: "Kërko klientin ose numrin e faturës",
+			clearClient: "Hiq klientin",
+			clientInvoices: "{count} fatura",
+			tabUnpaid: "Pa paguara",
+			summaryCount: "Fatura",
+			summaryInvoiced: "Faturuar",
+			summaryPaid: "Paguar",
+			summaryRemaining: "Mbetur",
+			clientNoUnpaid: "Ky klient nuk ka fatura të papaguara.",
 			sendPaidTitle: "Faturat e paguara"
 		},
 		newInvoice: {
@@ -4133,6 +4142,15 @@ const translations = {
 			sendPaid: "Send paid list",
 			sendAllTitle: "Invoices",
 			sendUnpaidTitle: "Unpaid invoices",
+			searchClient: "Search client or invoice number",
+			clearClient: "Clear client",
+			clientInvoices: "{count} invoices",
+			tabUnpaid: "Unpaid",
+			summaryCount: "Invoices",
+			summaryInvoiced: "Invoiced",
+			summaryPaid: "Paid",
+			summaryRemaining: "Remaining",
+			clientNoUnpaid: "This client has no unpaid invoices.",
 			sendPaidTitle: "Paid invoices"
 		},
 		newInvoice: {
@@ -5121,6 +5139,15 @@ const translations = {
 			sendPaid: "Invia pagate",
 			sendAllTitle: "Fatture",
 			sendUnpaidTitle: "Fatture non pagate",
+			searchClient: "Cerca cliente o numero fattura",
+			clearClient: "Rimuovi cliente",
+			clientInvoices: "{count} fatture",
+			tabUnpaid: "Da pagare",
+			summaryCount: "Fatture",
+			summaryInvoiced: "Fatturato",
+			summaryPaid: "Pagato",
+			summaryRemaining: "Residuo",
+			clientNoUnpaid: "Questo cliente non ha fatture da pagare.",
 			sendPaidTitle: "Fatture pagate"
 		},
 		newInvoice: {
