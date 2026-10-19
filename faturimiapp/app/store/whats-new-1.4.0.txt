@@ -1,0 +1,5 @@
+Search your invoices by client: pick a client to see all of their invoices, how much was invoiced, paid and is left, and send them the list of what they still owe.
+
+Sign in with your web account: the phone and the web now share the same invoices, both ways.
+
+Invoices are listed newest first, plus smaller fixes and improvements.
