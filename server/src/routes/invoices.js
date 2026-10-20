@@ -47,6 +47,7 @@ function sendError(res, err) {
     ISSUED_LOCKED: [409, 'Issued invoices cannot be edited silently. Use correction or cancel.'],
     CANCELLED_LOCKED: [409, 'Cancelled invoices cannot be changed.'],
     ISSUED_DELETE: [409, 'Issued invoices cannot be deleted. Cancel them instead.'],
+    CANCELLED_DELETE: [403, 'Only an administrator of the company can delete a cancelled invoice.'],
     CANCEL_REASON: [400, 'A cancel reason is required.'],
     CORRECT_REASON: [400, 'A correction reason is required.'],
     DATE_INVALID: [400, 'Enter a valid invoice date.'],
@@ -272,7 +273,10 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
-    const ok = deleteInvoice(req.user.id, req.params.id);
+    const manager = req.user.role === 'owner' || req.user.role === 'admin';
+    const current = getInvoice(req.user.id, req.params.id);
+    if (current && current.lifecycle === 'cancelled' && !manager) throw new Error('CANCELLED_DELETE');
+    const ok = deleteInvoice(req.user.id, req.params.id, { allowCancelled: manager });
     if (!ok) return res.status(404).json({ error: 'Invoice not found.' });
     res.json({ ok: true });
   } catch (err) {

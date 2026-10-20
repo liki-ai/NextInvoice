@@ -2,6 +2,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, BellRing, Eye, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2, User, X } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
+import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { Button, Modal } from '../../components/ui'
@@ -43,6 +44,9 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
 export function InvoiceListPage() {
   const { invoices, clients, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid } = useAppData()
   const { t, dict } = useI18n()
+  const { user } = useAuth()
+  // Cancelled invoices can be deleted only by the company's owner and administrators.
+  const manager = user?.role !== 'member'
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue' | 'toSend'>('all')
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
@@ -229,8 +233,9 @@ export function InvoiceListPage() {
     formatMoney,
   )
 
-  async function onDelete(id: string) {
-    if (!window.confirm(t('invoiceList.deleteConfirm'))) return
+  async function onDelete(id: string, cancelledNumber?: string) {
+    const question = cancelledNumber === undefined ? t('invoiceList.deleteConfirm') : t('invoiceList.deleteCancelledConfirm', { number: cancelledNumber })
+    if (!window.confirm(question)) return
     if (busyId) return
     setBusyId(id)
     try {
@@ -788,14 +793,27 @@ export function InvoiceListPage() {
                             </button>
                           </>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewId(item.id)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            {t('newInvoice.preview')}
-                          </button>
+                          <>
+                            {status === 'cancelled' && manager ? (
+                              <button
+                                type="button"
+                                disabled={busyId === item.id}
+                                onClick={() => void onDelete(item.id, item.number)}
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#C0503A] hover:bg-[#F8E8E4]"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                {t('common.delete')}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => setPreviewId(item.id)}
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              {t('newInvoice.preview')}
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

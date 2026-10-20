@@ -785,13 +785,15 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
   return hydrateFor(db, userId, list[idx]);
 }
 
-function deleteInvoice(userId, invoiceId) {
+/** Deletes a draft; a cancelled invoice only with allowCancelled (the company's owner or an administrator). */
+function deleteInvoice(userId, invoiceId, { allowCancelled = false } = {}) {
   migrateUserData(userId);
   const db = readDb();
   const list = db.invoices[userId] || [];
   const current = list.find((inv) => inv.id === invoiceId);
   if (!current) return false;
-  if ((current.lifecycle || 'issued') !== 'draft') {
+  const lifecycle = current.lifecycle || 'issued';
+  if (lifecycle !== 'draft' && !(lifecycle === 'cancelled' && allowCancelled)) {
     const err = new Error('ISSUED_DELETE');
     throw err;
   }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Eye, Pencil, Send, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
+import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal } from '../../components/ui'
 import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, invoiceStatus } from '../../lib/invoice'
@@ -19,6 +20,9 @@ export function InvoiceDetailPage() {
   const { invoiceId } = useParams()
   const { invoices, profile, loading, removeInvoice, issueInvoice, cancelInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice } = useAppData()
   const { t, dict } = useI18n()
+  const { user } = useAuth()
+  // Cancelled invoices can be deleted only by the company's owner and administrators.
+  const manager = user?.role !== 'member'
   const navigate = useNavigate()
   const [preview, setPreview] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -55,11 +59,14 @@ export function InvoiceDetailPage() {
   )
 
   async function onDelete() {
-    if (!confirm(t('invoiceList.deleteConfirm'))) return
+    const question = current.lifecycle === 'cancelled' ? t('invoiceList.deleteCancelledConfirm', { number: current.number }) : t('invoiceList.deleteConfirm')
+    if (!confirm(question)) return
     setBusy(true)
     try {
       await removeInvoice(current.id)
       navigate('/app')
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : t('common.error'))
     } finally {
       setBusy(false)
     }
@@ -371,7 +378,7 @@ export function InvoiceDetailPage() {
               </Button>
             ) : null}
           </div>
-          {status === 'draft' ? (
+          {status === 'draft' || (status === 'cancelled' && manager) ? (
             <button
               type="button"
               disabled={busy}
