@@ -582,7 +582,10 @@ export function InvoiceFormPage() {
         }
         savedId = invoiceId
       } else if (savedId) {
-        await updateInvoice(savedId, payload)
+        // The autosaved draft stays a draft until it is issued: marked issued here already, the issue
+        // step would find its own number taken and give it the next one (202610-012 became 013).
+        const { lifecycle: _issued, ...fields } = payload
+        await updateInvoice(savedId, fields)
         if (canSaveOnly) finalNumber = (await issueInvoice(savedId)).number || finalNumber
       } else {
         const saved = await createInvoice(payload)

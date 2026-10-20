@@ -649,8 +649,9 @@ function findUserByIapOriginalId(originalTransactionId) {
   return db.users.find((u) => u.iapOriginalTransactionId === originalTransactionId) || null;
 }
 
-function uniqueIssuedNumber(userId, proposed, date) {
-  const existing = readDb().invoices[userId] || [];
+/** The proposed number, or the next free one when another issued invoice has it. `ownId` is the invoice being issued, never in its own way. */
+function uniqueIssuedNumber(userId, proposed, date, ownId) {
+  const existing = (readDb().invoices[userId] || []).filter((item) => !ownId || item.id !== ownId);
   const taken = new Set(
     existing.filter((item) => item.lifecycle !== 'draft').map((item) => String(item.number || '')),
   );
@@ -821,7 +822,7 @@ function issueInvoice(userId, invoiceId) {
     {
       ...current,
       lifecycle: 'issued',
-      number: uniqueIssuedNumber(userId, current.number, current.date),
+      number: uniqueIssuedNumber(userId, current.number, current.date, current.id),
       issuedAt: nowIso(),
       updatedAt: nowIso(),
     },
