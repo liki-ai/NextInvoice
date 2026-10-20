@@ -39,12 +39,13 @@ function blankPlan(currency: string, taxRate: number): PlanInput {
     from: '',
     paymentUrl: '',
     notes: '',
+    sendMode: 'auto',
     active: true,
   }
 }
 
 function toInput(plan: PlanView): PlanInput {
-  return { ...plan, to: plan.to.join(', '), cc: plan.cc.join(', ') }
+  return { ...plan, to: plan.to.join(', '), cc: plan.cc.join(', '), sendMode: plan.sendMode || 'auto' }
 }
 
 function errorText(err: unknown, t: (key: string) => string) {
@@ -230,7 +231,7 @@ export function RecurringPage({ embedded = false }: { embedded?: boolean }) {
                         <span className="font-semibold text-brand-ink">{formatMoney(total, plan.currency)}</span> {t('recurring.perPeriod')}
                       </p>
                       <p className="mt-1 text-xs text-brand-ink/50">
-                        {plan.active && plan.next ? t('recurring.next', { from: printDay(plan.next.start), to: printDay(plan.next.end), date: printDay(plan.next.sendOn) }) : plan.active ? t('recurring.noNext') : null}
+                        {plan.active && plan.next ? t(plan.sendMode === 'manual' ? 'recurring.nextManual' : 'recurring.next', { from: printDay(plan.next.start), to: printDay(plan.next.end), date: printDay(plan.next.sendOn) }) : plan.active ? t('recurring.noNext') : null}
                       </p>
                       {plan.lastError ? <p className="mt-1 text-xs text-[#C0503A]">{t('recurring.lastError', { error: deliveryErrorText(plan.lastError, t) })}</p> : null}
                     </div>
@@ -389,6 +390,10 @@ export function RecurringPage({ embedded = false }: { embedded?: boolean }) {
             <p className="-mt-2 mb-4 text-xs leading-5 text-brand-ink/50">{t('recurring.graceHint')}</p>
 
             <div className="grid gap-x-4 sm:grid-cols-2">
+              <Select label={t('recurring.sendMode')} value={form.sendMode || 'auto'} onChange={(e) => setField('sendMode', e.target.value as PlanInput['sendMode'])}>
+                <option value="auto">{t('recurring.sendAuto')}</option>
+                <option value="manual">{t('recurring.sendManual')}</option>
+              </Select>
               <Select label={t('recurring.kind')} value={form.kind} onChange={(e) => setField('kind', e.target.value as PlanInput['kind'])}>
                 <option value="auto">{t('recurring.kindAuto')}</option>
                 <option value="subscription">{t('recurring.kindSubscription')}</option>

@@ -2,6 +2,8 @@ import type { DeliveryStatus } from './delivery'
 
 export type Frequency = 'monthly' | 'quarterly' | 'yearly'
 export type PlanKind = 'auto' | 'subscription' | 'invoice'
+/** 'auto': each invoice is emailed on its day; 'manual': it is made as a draft to check and send by hand. */
+export type SendMode = 'auto' | 'manual'
 
 export type PlanItem = { description: string; quantity: number | string; unitPrice: number | string }
 
@@ -28,6 +30,7 @@ export type RecurringPlan = {
   from: string
   paymentUrl: string
   notes: string
+  sendMode?: SendMode
   active: boolean
   lastError?: string | null
   createdAt?: string
@@ -69,3 +72,12 @@ export type RecurringState = {
 export type PlanInput = Omit<RecurringPlan, 'id' | 'to' | 'cc' | 'history' | 'createdAt' | 'lastError'> & { to: string; cc: string }
 
 export const FREQUENCIES: Frequency[] = ['monthly', 'quarterly', 'yearly']
+
+const MONTHS: Record<Frequency, number> = { monthly: 1, quarterly: 3, yearly: 12 }
+
+/** The day the next period starts: the date moved by the frequency, on the same day of the month where that month has it. */
+export function nextRenewal(from: Date, frequency: Frequency) {
+  const month = from.getMonth() + MONTHS[frequency]
+  const last = new Date(from.getFullYear(), month + 1, 0).getDate()
+  return new Date(from.getFullYear(), month, Math.min(from.getDate(), last))
+}

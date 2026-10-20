@@ -131,6 +131,8 @@ function createPeriodInvoice(ownerId, plan, period) {
   const day = today();
   const sendOn = period.sendOn < day ? day : period.sendOn;
   const lang = templates.pickLang(plan.lang, client.language);
+  // Sent by hand: the invoice waits as a draft, with no email scheduled.
+  const manual = plan.sendMode === 'manual';
   const periodNote = t(lang, 'recurring.periodNote', { from: printedDay(period.start), to: printedDay(period.end) });
   let invoice;
   try {
@@ -152,7 +154,7 @@ function createPeriodInvoice(ownerId, plan, period) {
         periodEnd: period.end,
         graceEnds: schedule.addDays(period.start, Math.max(0, Number(plan.graceDays) || 0)),
       },
-      delivery: { status: 'scheduled', scheduledFor: sendOn, to: plan.to || [], cc: plan.cc || [], lang: plan.lang || '', from: plan.from || '', attempts: [], createdBy: 'plan' },
+      delivery: manual ? null : { status: 'scheduled', scheduledFor: sendOn, to: plan.to || [], cc: plan.cc || [], lang: plan.lang || '', from: plan.from || '', attempts: [], createdBy: 'plan' },
       events: [event('generated', { planId: plan.id, period: period.start })],
     });
   } catch (err) {

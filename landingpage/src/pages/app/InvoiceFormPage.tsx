@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Camera, ChevronDown, Eye, StickyNote, FileText, ImagePlus, MapPin, Phone, Plus, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { ChevronDown, Eye, StickyNote, FileText, MapPin, Phone, Plus, Repeat, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { FREQUENCIES, nextRenewal, type Frequency, type SendMode } from '../../lib/recurring'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
@@ -31,11 +32,34 @@ import { UnsignedToggle } from '../../components/UnsignedToggle'
 import { SignerPicker } from '../../components/SignerPicker'
 import { useAuth } from '../../context/AuthContext'
 import { proposedSigner } from '../../lib/signers'
-import { clientDisplayName, clientMatchesQuery, composeClient, findMatchingClient, frequentClients } from '../../lib/client'
-import { invoiceLineFromCatalog, invoiceLinesFromExtract } from '../../lib/catalog'
-import { fileToSupportedImageDataUrl } from '../../lib/proof'
+import { clientDisplayName, clientMatchesQuery, composeClient, frequentClients } from '../../lib/client'
+import { invoiceLineFromCatalog } from '../../lib/catalog'
 
 /** A price as shown in its box: at most two decimals. The full value stays in the form until it is retyped. */
+/** The calendar day of a date, as plans keep it (2026-10-20). */
+function dayKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** A row of buttons, one of them chosen: how often the invoice repeats, and how it is sent. */
+function Choice<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (value: T) => void }) {
+  return (
+    <div className="flex gap-1.5">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={`flex-1 rounded-lg border px-2 py-1 text-xs font-semibold transition ${value === option.value ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/65 hover:border-brand/30'}`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // The tighter spacing of the fields in the invoice details card.
 const tight = 'mb-3.5 gap-1.5'
 
@@ -78,8 +102,6 @@ export function InvoiceFormPage() {
   const persistedIdRef = useRef(invoiceId || '')
   const skipAutosaveRef = useRef(false)
   const persistLock = useRef<Promise<unknown> | null>(null)
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef({
     client: existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' },
     clientId: existing?.clientId || '',
@@ -98,10 +120,6 @@ export function InvoiceFormPage() {
     canSaveOnly: true,
   })
 
-  const [mode, setMode] = useState<'manual' | 'ai'>('manual')
-  const [aiText, setAiText] = useState('')
-  const [extracting, setExtracting] = useState(false)
-  const [aiCollapsed, setAiCollapsed] = useState(false)
   const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' })
   const [clientId, setClientId] = useState(existing?.clientId || searchParams.get('clientId') || '')
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
@@ -126,6 +144,10 @@ export function InvoiceFormPage() {
   const [discount, setDiscount] = useState(String(existing?.discount ?? '0'))
   // Notes stay behind a small button until asked for, or until the invoice has some.
   const [notesOpen, setNotesOpen] = useState(false)
+  // Repeating: saving the invoice also starts a plan that makes the next ones by itself.
+  const [repeat, setRepeat] = useState(false)
+  const [repeatFrequency, setRepeatFrequency] = useState<Frequency>('monthly')
+  const [repeatSend, setRepeatSend] = useState<SendMode>('auto')
   const [taxRate, setTaxRate] = useState(() => String(existing?.taxRate ?? profile?.defaultTaxRate ?? 0))
   // A new invoice starts from the VAT rate in Settings, unless the rate was already set by hand.
   const taxTouched = useRef(Boolean(existing))
@@ -232,6 +254,8 @@ export function InvoiceFormPage() {
   const { subtotal, total, taxAmount, taxRate: appliedTaxRate } = computeTotals(netItems, discount, taxRate)
   const issued = Boolean(existing && existing.lifecycle !== 'draft')
   const canSaveOnly = !issued
+  // A new invoice or a draft can start a plan; one a plan made already belongs to it.
+  const canRepeat = !issued && !existing?.recurring
   const [correctReason, setCorrectReason] = useState('')
   // Price boxes the user has typed in show exactly what was typed; the others show two decimals.
   const [typedPrices, setTypedPrices] = useState<Set<string>>(() => new Set())
@@ -376,95 +400,8 @@ export function InvoiceFormPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)))
   }
 
-  async function applyExtracted(result: {
-    fullName?: string
-    address?: string
-    phone?: string
-    email?: string
-    businessId?: string
-    items?: { description?: string; quantity?: string | number; unitPrice?: string | number }[]
-  }) {
-    const extractedClient = {
-      fullName: result.fullName || '',
-      address: result.address || '',
-      phone: result.phone || '',
-      email: result.email || '',
-      businessId: result.businessId || '',
-    }
-    const match = findMatchingClient(clients, extractedClient)
-    if (match) {
-      setClientId(match.id)
-      applyClientTax(match)
-      setClient({
-        vatNumber: match.vatNumber || '',
-        fiscalNumber: match.fiscalNumber || '',
-        fullName: clientDisplayName(match) || extractedClient.fullName,
-        address: extractedClient.address || match.address || '',
-        phone: extractedClient.phone || match.phone || '',
-        email: extractedClient.email || match.email || '',
-        businessId: extractedClient.businessId || match.businessId || '',
-      })
-    } else if (extractedClient.fullName.trim() || extractedClient.address || extractedClient.phone) {
-      setClientId('')
-      setClient(extractedClient)
-    }
-    const lines = invoiceLinesFromExtract(result.items, catalogItems)
-    if (lines.length) {
-      setItems(lines)
-      setActiveItemId(lines[0].id)
-    }
-    setAiCollapsed(true)
-  }
-
-  async function extractClient() {
-    if (!aiText.trim()) return
-    setExtracting(true)
-    setError('')
-    try {
-      const result = await api<{
-        fullName?: string
-        address?: string
-        phone?: string
-        email?: string
-        businessId?: string
-        items?: { description?: string; quantity?: string | number; unitPrice?: string | number }[]
-      }>('/api/extract-client', {
-        method: 'POST',
-        body: { text: aiText },
-      })
-      await applyExtracted(result)
-    } catch {
-      setError(t('newInvoice.aiExtractError'))
-    } finally {
-      setExtracting(false)
-    }
-  }
-
-  async function extractFromPhoto(file: File) {
-    setExtracting(true)
-    setError('')
-    try {
-      const image = await fileToSupportedImageDataUrl(file)
-      const result = await api<{
-        fullName?: string
-        address?: string
-        phone?: string
-        email?: string
-        businessId?: string
-        items?: { description?: string; quantity?: string | number; unitPrice?: string | number }[]
-      }>('/api/extract-client', {
-        method: 'POST',
-        body: { text: aiText.trim(), image },
-      })
-      await applyExtracted(result)
-    } catch {
-      setError(t('newInvoice.aiExtractError'))
-    } finally {
-      setExtracting(false)
-      if (photoInputRef.current) photoInputRef.current.value = ''
-      if (cameraInputRef.current) cameraInputRef.current.value = ''
-    }
-  }
+  const repeatStart = parseLooseDate(date)
+  const repeatNext = repeat && repeatStart ? nextRenewal(repeatStart, repeatFrequency) : null
 
   function validate() {
     if (!client.fullName.trim()) {
@@ -541,6 +478,29 @@ export function InvoiceFormPage() {
     return saved.id
   }
 
+  /** The plan this invoice starts: its lines and client, every month (or as chosen) from its date, as its first period. */
+  function planFromInvoice(saved: { id: string; clientId: string; items: InvoiceItem[]; discount: string; taxRate: number; notes: string; date: string; dueDate: string }) {
+    const start = parseLooseDate(saved.date) as Date
+    const due = saved.dueDate ? parseLooseDate(saved.dueDate) : null
+    const dueDays = due ? Math.min(120, Math.max(0, Math.round((due.getTime() - start.getTime()) / 86400000))) : 0
+    return {
+      firstInvoiceId: saved.id,
+      clientId: saved.clientId,
+      kind: 'invoice',
+      items: saved.items.map((item) => ({ description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
+      discount: toNumber(saved.discount),
+      taxRate: saved.taxRate,
+      currency,
+      frequency: repeatFrequency,
+      anchorDate: dayKey(start),
+      sendDaysBefore: 0,
+      dueDays,
+      graceDays: 0,
+      sendMode: repeatSend,
+      notes: saved.notes,
+    }
+  }
+
   async function onSave(asDraft = false) {
     const invoice = validate()
     if (!invoice) return
@@ -588,6 +548,13 @@ export function InvoiceFormPage() {
         savedId = saved.id
         persistedIdRef.current = saved.id
       }
+      if (repeat && canRepeat && savedId) {
+        try {
+          await api('/api/recurring', { method: 'POST', body: planFromInvoice({ ...payload, id: savedId }) })
+        } catch (err) {
+          window.alert(t('recurring.repeatFailed', { error: err instanceof Error ? err.message : t('common.error') }))
+        }
+      }
       if (sharing && profile) {
         const html = buildInvoiceHtml({
           company: localizeCompanyProfile(profile, t),
@@ -624,84 +591,7 @@ export function InvoiceFormPage() {
         <h1 className="font-display text-4xl font-medium tracking-tight">
           {isEditing ? t('newInvoice.editTitle') : t('newInvoice.title')}
         </h1>
-        <div className="inline-flex rounded-xl bg-white p-1 ring-1 ring-brand-ink/10">
-          {(['manual', 'ai'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setMode(value)}
-              className={cn(
-                'rounded-lg px-4 py-2 text-sm font-semibold',
-                mode === value ? 'bg-brand text-white' : 'text-brand-ink/55 hover:text-brand-ink',
-              )}
-            >
-              {value === 'manual' ? t('newInvoice.modeManual') : t('newInvoice.modeAi')}
-            </button>
-          ))}
-        </div>
       </div>
-
-      {mode === 'ai' ? (
-        aiCollapsed ? (
-          <button
-            type="button"
-            onClick={() => setAiCollapsed(false)}
-            className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-brand-ink/8 bg-white px-4 py-3 text-left text-sm font-semibold text-brand-ink shadow-[0_1px_2px_rgba(29,43,46,0.04)]"
-          >
-            <span className="flex-1">{t('newInvoice.aiFilledCollapsed')}</span>
-            <span className="text-brand">▾</span>
-          </button>
-        ) : (
-        <Card className="mt-6">
-          <TextArea
-            label={t('newInvoice.aiInputLabel')}
-            rows={3}
-            placeholder={t('newInvoice.aiInputPlaceholder')}
-            value={aiText}
-            onChange={(e) => setAiText(e.target.value)}
-          />
-          <div className="mt-3 flex flex-wrap items-stretch gap-2">
-            <Button type="button" disabled={!aiText.trim() || extracting} onClick={() => void extractClient()}>
-              {extracting ? t('newInvoice.aiExtracting') : t('newInvoice.aiExtractButton')}
-            </Button>
-            <Button type="button" variant="secondary" disabled={extracting} onClick={() => cameraInputRef.current?.click()}>
-              <Camera className="h-4 w-4" />
-              {t('newInvoice.aiTakePhoto')}
-            </Button>
-            <button
-              type="button"
-              disabled={extracting}
-              onClick={() => photoInputRef.current?.click()}
-              title={t('newInvoice.aiChoosePhoto')}
-              className="inline-flex min-h-[42px] w-11 items-center justify-center rounded-xl border border-brand text-brand hover:bg-brand/5 disabled:opacity-50"
-            >
-              <ImagePlus className="h-5 w-5" />
-            </button>
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) void extractFromPhoto(file)
-              }}
-            />
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) void extractFromPhoto(file)
-              }}
-            />
-          </div>
-        </Card>
-        )
-      ) : null}
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-6">
@@ -969,6 +859,36 @@ export function InvoiceFormPage() {
             )}
             <UnsignedToggle checked={unsigned} onChange={setUnsigned} compact />
             {unsigned ? null : <SignerPicker value={signerId} onChange={pickSigner} className="mt-3" />}
+            {canRepeat ? (
+              <div className="mt-4 border-t border-brand-ink/8 pt-4">
+                <label className="flex cursor-pointer items-center gap-2.5">
+                  <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} className="h-4 w-4 accent-[#2C6E7F]" />
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                    <Repeat className="h-3.5 w-3.5 text-brand" />
+                    {t('recurring.repeat')}
+                  </span>
+                </label>
+                {repeat ? (
+                  <div className="mt-3 space-y-2">
+                    <Choice options={FREQUENCIES.map((value) => ({ value, label: t(`recurring.${value}`) }))} value={repeatFrequency} onChange={setRepeatFrequency} />
+                    <Choice
+                      options={[
+                        { value: 'auto' as const, label: t('recurring.sendAuto') },
+                        { value: 'manual' as const, label: t('recurring.sendManual') },
+                      ]}
+                      value={repeatSend}
+                      onChange={setRepeatSend}
+                    />
+                    {repeatNext ? (
+                      <p className="text-xs leading-5 text-brand-ink/50">
+                        {t(repeatSend === 'auto' ? 'recurring.repeatNextAuto' : 'recurring.repeatNextManual', { date: formatDateForInvoice(repeatNext) })}
+                      </p>
+                    ) : null}
+                    {repeatSend === 'auto' && !String(client.email || '').trim() ? <p className="text-xs leading-5 text-[#8A5A00]">{t('recurring.repeatNoEmail')}</p> : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </Card>
           <Card>
             <div className="space-y-2 text-sm">

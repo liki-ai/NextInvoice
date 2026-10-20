@@ -24,6 +24,7 @@ const ERRORS = {
   PLAN_URL: [400, 'The payment link must start with https://'],
   PLAN_DATES_LOCKED: [409, 'The renewal date and frequency cannot change once invoices have been made; stop this plan and start a new one.'],
   PLAN_LIMIT: [409, 'Too many plans.'],
+  PLAN_FIRST: [400, 'This invoice cannot start a plan.'],
   MAIL_RECIPIENT: [400, 'Enter valid email addresses.'],
   STRIPE_KEY: [400, 'This is not a Stripe secret key (sk_live_… or sk_test_…).'],
   STRIPE_WEBHOOK: [400, 'This is not a Stripe webhook signing secret (whsec_…).'],
@@ -89,6 +90,8 @@ function sanitizePlan(ownerId, body, current) {
     from: cleanEmail(src.from) || '',
     paymentUrl,
     notes: String(src.notes || '').trim().slice(0, 1000),
+    // 'manual': each period's invoice is made as a draft for the company to check and send itself.
+    sendMode: src.sendMode === 'manual' ? 'manual' : 'auto',
     active: src.active === undefined ? (current ? current.active : true) : Boolean(src.active),
   };
 }
@@ -120,14 +123,40 @@ router.get('/', (req, res) => {
   res.json(describe(req.user.id));
 });
 
+/**
+ * The invoice a plan starts from, when it is made from the invoice form: that invoice is the plan's
+ * first period, so the plan goes on with the next one.
+ */
+function firstInvoiceOf(ownerId, invoiceId) {
+  if (!invoiceId) return null;
+  const invoice = store.getInvoice(ownerId, String(invoiceId));
+  if (!invoice || invoice.recurring || invoice.lifecycle === 'cancelled') throw fail('PLAN_FIRST');
+  return invoice;
+}
+
 router.post('/', (req, res, next) => {
   try {
     const recurring = ensureNotifySince(store.getRecurring(req.user.id));
     if (recurring.plans.length >= PLAN_MAX) throw fail('PLAN_LIMIT');
     const now = new Date().toISOString();
-    const plan = { id: crypto.randomUUID(), ...sanitizePlan(req.user.id, req.body, null), periods: {}, createdAt: now, updatedAt: now, createdBy: req.user.email, history: [{ at: now, type: 'created', detail: { by: req.user.email } }] };
+    const first = firstInvoiceOf(req.user.id, req.body && req.body.firstInvoiceId);
+    const fields = sanitizePlan(req.user.id, req.body, null);
+    const periods = first ? { [fields.anchorDate]: { invoiceId: first.id, at: now } } : {};
+    const plan = { id: crypto.randomUUID(), ...fields, periods, createdAt: now, updatedAt: now, createdBy: req.user.email, history: [{ at: now, type: 'created', detail: { by: req.user.email, ...(first ? { invoiceId: first.id } : {}) } }] };
     recurring.plans.push(plan);
     store.saveRecurring(req.user.id, recurring);
+    if (first) {
+      store.mutateInvoiceDelivery(req.user.id, first.id, (draft) => {
+        draft.recurring = {
+          planId: plan.id,
+          period: plan.anchorDate,
+          periodEnd: schedule.periodOf(plan, 0).end,
+          graceEnds: schedule.addDays(plan.anchorDate, Math.max(0, Number(plan.graceDays) || 0)),
+        };
+        draft.events.push({ at: now, type: 'planStarted', detail: { planId: plan.id, by: req.user.email } });
+        return draft;
+      });
+    }
     // A period due now is made at once, so the page shows it without waiting for the next round.
     automation.generateDue(req.user.id);
     res.status(201).json({ ...describe(req.user.id), planId: plan.id });
