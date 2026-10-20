@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, BellRing, Eye, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2, User, X } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useAuth } from '../../context/AuthContext'
@@ -42,7 +42,7 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
 }
 
 export function InvoiceListPage() {
-  const { invoices, clients, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid } = useAppData()
+  const { invoices, clients, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid, syncInvoices } = useAppData()
   const { t, dict } = useI18n()
   const { user } = useAuth()
   // Cancelled invoices can be deleted only by the company's owner and administrators.
@@ -65,6 +65,13 @@ export function InvoiceListPage() {
   const [previewId, setPreviewId] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [pulseId, setPulseId] = useState<string | null>(null)
+  const location = useLocation()
+  // Set by the invoice form when the number it showed was issued meanwhile and the server gave the next one.
+  const [renumbered, setRenumbered] = useState(() => (location.state as { renumbered?: { from: string; to: string } } | null)?.renumbered || null)
+  // The invoice that took the number was issued elsewhere; fetched so it shows in the list too.
+  useEffect(() => {
+    if (renumbered) syncInvoices().catch(() => undefined)
+  }, [renumbered, syncInvoices])
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
   // Picking a client from the search shows all of that client's invoices, from every year.
@@ -306,6 +313,14 @@ export function InvoiceListPage() {
 
   return (
     <div>
+      {renumbered ? (
+        <div role="status" className="mb-6 flex items-start gap-3 rounded-xl border border-[#E3C27A]/70 bg-[#FFF8E8] px-4 py-3 text-sm leading-6 text-brand-ink">
+          <p className="min-w-0 flex-1">{t('invoiceList.renumbered', { from: renumbered.from, to: renumbered.to })}</p>
+          <button type="button" onClick={() => setRenumbered(null)} aria-label={t('common.close')} className="-mr-1 rounded-lg p-1 text-brand-ink/50 hover:bg-brand-ink/5 hover:text-brand-ink">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-4xl font-medium tracking-tight">{t('invoiceList.title')}</h1>

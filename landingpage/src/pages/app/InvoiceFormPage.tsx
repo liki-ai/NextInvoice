@@ -63,6 +63,11 @@ function Choice<T extends string>({ options, value, onChange }: { options: { val
 // The tighter spacing of the fields in the invoice details card.
 const tight = 'mb-3.5 gap-1.5'
 
+/** Whether another invoice was already issued with this number; the server would then give this one the next free number. */
+function numberIssuedElsewhere(invoices: Invoice[], number: string, ownId: string) {
+  return Boolean(number) && invoices.some((inv) => inv.id !== ownId && inv.lifecycle !== 'draft' && inv.number === number)
+}
+
 function shortAmount(value: string | number) {
   const raw = String(value ?? '').trim()
   if (raw === '' || /^-?\d*([.,]\d{0,2})?$/.test(raw)) return raw
@@ -91,7 +96,7 @@ function formItems(source: { items?: Invoice['items']; taxRate?: number; pricesI
 
 export function InvoiceFormPage() {
   const { invoiceId } = useParams()
-  const { invoices, clients, items: catalogItems, profile, createInvoice, updateInvoice, issueInvoice, correctInvoice, createClient } = useAppData()
+  const { invoices, clients, items: catalogItems, profile, syncInvoices, createInvoice, updateInvoice, issueInvoice, correctInvoice, createClient } = useAppData()
   const { t, dict } = useI18n()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -123,6 +128,11 @@ export function InvoiceFormPage() {
   const [client, setClient] = useState(existing?.client || { fullName: '', address: '', phone: '', email: '', businessId: '' })
   const [clientId, setClientId] = useState(existing?.clientId || searchParams.get('clientId') || '')
   const [invoiceNumber, setInvoiceNumber] = useState(() => existing?.number || generateInvoiceNumber(invoices))
+  // The number this form proposed, followed as the list changes until the user types their own.
+  const autoNumberRef = useRef(existing ? '' : invoiceNumber)
+  const [numberTyped, setNumberTyped] = useState(false)
+  // Why the proposed number changed: the one shown before was issued meanwhile by someone else.
+  const [numberNote, setNumberNote] = useState('')
   const [date, setDate] = useState(() => existing?.date || formatDateForInvoice(new Date()))
   const [dueDate, setDueDate] = useState(() => existing?.dueDate || '')
   const [items, setItems] = useState<InvoiceItem[]>(() => (existing?.items?.length ? formItems(existing) : [emptyItem()]))
@@ -187,6 +197,7 @@ export function InvoiceFormPage() {
     setClient(existing.client || { fullName: '', address: '', phone: '', email: '', businessId: '' })
     setClientId(existing.clientId || '')
     setInvoiceNumber(existing.number)
+    autoNumberRef.current = ''
     setDate(existing.date)
     setDueDate(existing.dueDate || '')
     setItems(existing.items?.length ? formItems(existing) : [emptyItem()])
@@ -202,17 +213,21 @@ export function InvoiceFormPage() {
     setNotes(existing.notes || '')
   }, [existing?.id])
 
+  const duplicatedRef = useRef('')
   useEffect(() => {
     if (isEditing) return
     const duplicateFromId = ((location as any).state as { duplicateFromId?: string } | undefined)?.duplicateFromId
-    if (!duplicateFromId) return
+    // Copied once: the list changes again with every autosave and every fetch, and must not undo what was typed since.
+    if (!duplicateFromId || duplicatedRef.current === duplicateFromId) return
     const source = invoices.find((inv) => inv.id === duplicateFromId)
     if (!source) return
+    duplicatedRef.current = duplicateFromId
 
     const draftCopy = draftFromInvoice(source, invoices)
     setClient({ ...draftCopy.client, email: draftCopy.client.email || '', businessId: draftCopy.client.businessId || '' })
     setClientId(source.clientId || '')
     setInvoiceNumber(draftCopy.number)
+    autoNumberRef.current = draftCopy.number
     setDate(draftCopy.date)
     setDueDate(draftCopy.dueDate || '')
     setItems(formItems(source, true))
@@ -281,6 +296,30 @@ export function InvoiceFormPage() {
   useEffect(() => {
     if (invoiceId) persistedIdRef.current = invoiceId
   }, [invoiceId])
+
+  // Others in the company issue invoices too: the list is fetched again when the form opens (and by
+  // the app whenever its tab comes back), so the number proposed is still free when this one is issued.
+  useEffect(() => {
+    if (canSaveOnly) syncInvoices().catch(() => undefined)
+  }, [canSaveOnly, syncInvoices])
+
+  // The proposed number follows the list until the user types their own. A number that another
+  // invoice was issued with meanwhile is replaced by the next free one, as the server would do
+  // anyway, and the form says why.
+  useEffect(() => {
+    if (!canSaveOnly) return
+    const current = formRef.current.invoiceNumber
+    const taken = numberIssuedElsewhere(invoices, current, persistedIdRef.current || invoiceId || '')
+    const following = autoNumberRef.current !== '' && current === autoNumberRef.current
+    const placeholder = !current.trim() || current.startsWith('DRAFT-')
+    if (!following && (numberTyped || (!taken && !placeholder))) return
+    const next = generateInvoiceNumber(invoices)
+    if (next === current) return
+    autoNumberRef.current = next
+    setInvoiceNumber(next)
+    setNumberNote(taken ? t('newInvoice.numberUpdated', { taken: current, number: next }) : '')
+  }, [invoices, canSaveOnly, numberTyped, invoiceId, t])
+  const numberTaken = canSaveOnly && numberTyped && numberIssuedElsewhere(invoices, invoiceNumber, persistedIdRef.current || invoiceId || '')
 
   formRef.current = {
     client,
@@ -523,6 +562,8 @@ export function InvoiceFormPage() {
         sentAt: sharing ? new Date().toISOString() : asDraft ? undefined : existing?.sentAt,
       }
       let savedId = persistedIdRef.current || invoiceId
+      // The server gives the next free number when this one was issued meanwhile; the PDF and the list follow it.
+      let finalNumber = invoice.number
       if (issued && invoiceId) {
         await correctInvoice(invoiceId, {
           items: payload.items,
@@ -542,9 +583,10 @@ export function InvoiceFormPage() {
         savedId = invoiceId
       } else if (savedId) {
         await updateInvoice(savedId, payload)
-        if (canSaveOnly) await issueInvoice(savedId)
+        if (canSaveOnly) finalNumber = (await issueInvoice(savedId)).number || finalNumber
       } else {
         const saved = await createInvoice(payload)
+        finalNumber = saved.number || finalNumber
         savedId = saved.id
         persistedIdRef.current = saved.id
       }
@@ -559,13 +601,15 @@ export function InvoiceFormPage() {
         const html = buildInvoiceHtml({
           company: localizeCompanyProfile(profile, t),
           client,
-          invoice: { ...payload, number: invoice.number },
+          invoice: { ...payload, number: finalNumber },
           pdfLabels: dict.pdf,
           template,
         })
-        downloadHtmlAsPdf(html, `${invoice.number}.pdf`)
+        downloadHtmlAsPdf(html, `${finalNumber}.pdf`)
       }
-      navigate(savedId ? `/app?added=${encodeURIComponent(savedId)}` : '/app')
+      const typed = invoice.number.trim()
+      const renumbered = typed && !typed.startsWith('DRAFT-') && finalNumber !== invoice.number ? { from: typed, to: finalNumber } : null
+      navigate(savedId ? `/app?added=${encodeURIComponent(savedId)}` : '/app', renumbered ? { state: { renumbered } } : undefined)
     } catch (err) {
       skipAutosaveRef.current = false
       const message = err instanceof Error ? err.message : t('common.error')
@@ -794,7 +838,19 @@ export function InvoiceFormPage() {
         <div className="space-y-6 lg:sticky lg:top-8">
           <Card className="p-5">
             <h2 className="mb-3 font-semibold">{t('newInvoice.invoiceDetailsSectionTitle')}</h2>
-            <Field label={t('newInvoice.invoiceNumber')} value={invoiceNumber} wrapperClassName={tight} onChange={(e) => setInvoiceNumber(e.target.value)} />
+            <Field
+              label={t('newInvoice.invoiceNumber')}
+              value={invoiceNumber}
+              wrapperClassName={tight}
+              error={numberTaken ? t('newInvoice.numberTaken', { number: invoiceNumber }) : undefined}
+              onChange={(e) => {
+                autoNumberRef.current = ''
+                setNumberTyped(true)
+                setNumberNote('')
+                setInvoiceNumber(e.target.value)
+              }}
+            />
+            {numberNote && !numberTaken ? <p className="-mt-2 mb-3.5 text-xs leading-5 text-brand-ink/60">{numberNote}</p> : null}
             <DateField label={t('newInvoice.date')} value={date} pickLabel={t('newInvoice.pickDate')} wrapperClassName={tight} onChange={setDate} />
             <DateField label={t('newInvoice.dueDate')} value={dueDate} placeholder={t('newInvoice.phDueDate')} pickLabel={t('newInvoice.pickDate')} wrapperClassName={tight} onChange={setDueDate} />
             <div className="grid grid-cols-2 gap-3">

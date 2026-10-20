@@ -18,6 +18,8 @@ type DataValue = {
   profile: CompanyProfile | null
   loading: boolean
   refresh: () => Promise<void>
+  /** Fetches the invoices again, so ones issued meanwhile by others in the company show; adds and updates only. */
+  syncInvoices: () => Promise<void>
   createInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Promise<Invoice>
   updateInvoice: (id: string, invoice: Partial<Invoice>) => Promise<Invoice>
   removeInvoice: (id: string) => Promise<void>
@@ -116,6 +118,41 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  const syncInvoices = useCallback(async () => {
+    if (!token) return
+    const res = await api<{ invoices: Invoice[] }>('/api/invoices')
+    const fetched = res.invoices || []
+    // Nothing local is dropped: a draft saved while this was on its way must stay in the list. Of
+    // two copies of one invoice, the one changed last wins.
+    setInvoices((prev) => {
+      const local = new Map(prev.map((item) => [item.id, item]))
+      const seen = new Set(fetched.map((item) => item.id))
+      const merged = fetched.map((item) => {
+        const mine = local.get(item.id)
+        return mine && String(mine.updatedAt || '') > String(item.updatedAt || '') ? mine : item
+      })
+      return [...prev.filter((item) => !seen.has(item.id)), ...merged]
+    })
+  }, [token])
+
+  // Coming back to the tab fetches the invoices again, at most every 10 seconds, so ones issued
+  // meanwhile by others in the company show and the next number proposed is free.
+  useEffect(() => {
+    if (!token) return undefined
+    let last = Date.now()
+    const sync = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 10000) return
+      last = Date.now()
+      syncInvoices().catch(() => undefined)
+    }
+    window.addEventListener('focus', sync)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.removeEventListener('focus', sync)
+      document.removeEventListener('visibilitychange', sync)
+    }
+  }, [token, syncInvoices])
 
   const createInvoice = useCallback(async (invoice: Omit<Invoice, 'id' | 'createdAt'>) => {
     const res = await api<{ invoice: Invoice }>('/api/invoices', { method: 'POST', body: invoice })
@@ -356,6 +393,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       refresh,
+      syncInvoices,
       createInvoice,
       updateInvoice,
       removeInvoice,
@@ -400,6 +438,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       refresh,
+      syncInvoices,
       createInvoice,
       updateInvoice,
       removeInvoice,
