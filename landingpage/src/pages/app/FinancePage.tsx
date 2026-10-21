@@ -385,7 +385,7 @@ export function FinancePage() {
                 <span className={cn('h-2 w-2 shrink-0 rounded-full', DOT[signal.status])} />
                 <p className="text-[13px] font-semibold">{t(`finance.signal.${signal.key}.title`)}</p>
               </div>
-              <p className="mt-1.5 text-[13px] leading-5 text-brand-ink/60">{t(`finance.signal.${signal.key}.${signal.status}`, signal.params)}</p>
+              <p className="mt-1.5 text-[13px] leading-5 text-brand-ink/60">{t(`finance.signal.${signal.key}.${signal.status}`, signal.key === 'liquidity' ? { ...signal.params, cash: money(Number(signal.params.cash)), burn: money(Number(signal.params.burn)) } : signal.params)}</p>
             </div>
           ))}
         </div>

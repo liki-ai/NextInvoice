@@ -7,9 +7,13 @@ import { formatMoney, invoiceStatus } from '../lib/invoice'
 import { cn } from '../lib/cn'
 import { Button, Modal } from './ui'
 
-/** A change that takes a recorded payment away: the statement only does not show it, which proves less. */
-function removes(verdict: InvoiceVerdict) {
-  return verdict.change !== 'none' && verdict.bankPaid < verdict.recorded
+/**
+ * What applying the file does to an invoice: record what the bank paid. A change that would take a
+ * recorded payment away is never offered — a statement that does not show a payment proves little (it
+ * may have been cash, another account or a day the file leaves out), and the dialog is for closing.
+ */
+function closes(verdict: InvoiceVerdict) {
+  return verdict.change !== 'none' && verdict.bankPaid >= verdict.recorded
 }
 
 /** 2026-10-13 → 13.10.2026 */
@@ -20,10 +24,10 @@ function day(iso: string) {
 
 /**
  * Comparing the invoices with a bank statement. The user uploads the statement as the bank exports
- * it; every incoming payment is paired with the invoices it settles, and the dialog lists what
- * that would change — invoices to mark paid, partly paid or unpaid — for the user to accept or
- * leave out. Payments that belong to no invoice are listed too, which is where a double payment
- * or an invoice missing from the books shows up.
+ * it; every incoming payment is paired with the invoices it settles, and the dialog lists what the
+ * file pays: first the invoices it closes (paid or partly paid), ticked, then those already paid in
+ * the app. Payments that belong to no invoice are listed too, which is where a double payment or an
+ * invoice missing from the books shows up.
  */
 export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; /** A statement already in hand (one that came by email), read as soon as the dialog opens. */ initialFile?: Blob }) {
   const { invoices, profile, reconcileInvoices } = useAppData()
@@ -31,7 +35,7 @@ export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; 
   const [statement, setStatement] = useState<BankStatement | null>(null)
   const [reading, setReading] = useState(false)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState<'changes' | 'paid' | 'loose'>('changes')
+  const [tab, setTab] = useState<'paid' | 'loose'>('paid')
   const [left, setLeft] = useState<Set<string>>(new Set())
   const [dates, setDates] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -39,11 +43,18 @@ export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; 
   const fallbackCurrency = profile?.currency || 'EUR'
 
   const match = useMemo(() => (statement ? matchStatement(statement, invoices, { dates }) : null), [statement, invoices, dates])
-  const changes = useMemo(() => (match ? match.verdicts.filter((item) => item.change !== 'none').sort((a, b) => b.invoice.number.localeCompare(a.invoice.number)) : []), [match])
+  const changes = useMemo(() => (match ? match.verdicts.filter(closes) : []), [match])
   const chosen = changes.filter((item) => !left.has(item.invoice.id))
-  // What this file pays, whether the app had it already or not.
-  const paidByFile = useMemo(() => (match ? match.verdicts.filter((item) => item.bankPaid > 0).sort((a, b) => b.invoice.number.localeCompare(a.invoice.number)) : []), [match])
-  const removals = changes.filter(removes)
+  // What this file pays: the invoices it closes first, then those the app has as paid already.
+  const paidByFile = useMemo(
+    () =>
+      match
+        ? match.verdicts
+            .filter((item) => item.bankPaid > 0)
+            .sort((a, b) => Number(closes(b)) - Number(closes(a)) || b.invoice.number.localeCompare(a.invoice.number))
+        : [],
+    [match],
+  )
   const money = (amount: number, verdict?: InvoiceVerdict) => formatMoney(amount, verdict?.invoice.currency || fallbackCurrency)
 
   async function onFile(file: Blob | undefined) {
@@ -56,9 +67,8 @@ export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; 
       if (!read) setError(t('bank.errNoTable'))
       else {
         setStatement(read)
-        // Taking a recorded payment away is left for the user to choose; adding the bank's is ticked.
-        setLeft(new Set(matchStatement(read, invoices, { dates }).verdicts.filter(removes).map((item) => item.invoice.id)))
-        setTab('changes')
+        setLeft(new Set())
+        setTab('paid')
       }
     } catch {
       setError(t('bank.errFile'))
@@ -87,16 +97,8 @@ export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; 
     }
   }
 
-  function nowLabel(verdict: InvoiceVerdict) {
-    const status = invoiceStatus(verdict.invoice)
-    if (status === 'paid') return t('invoiceList.statusPaid')
-    if (status === 'partial') return t('docs.statusPartial')
-    return t('invoiceList.statusUnpaid')
-  }
-
   function bankLabel(verdict: InvoiceVerdict) {
     const last = verdict.payments[verdict.payments.length - 1]
-    if (verdict.change === 'unpaid') return t('bank.markUnpaid')
     if (verdict.change === 'partial') return t('bank.markPartial', { paid: money(verdict.bankPaid + verdict.kept, verdict), total: money(Number(verdict.invoice.total) || 0, verdict) })
     if (verdict.change === 'dates') return t('bank.fixDates', { date: last ? day(last.date) : '' })
     return t('bank.markPaid', { date: last ? day(last.date) : '' })
@@ -165,7 +167,7 @@ export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; 
                 [
                   [t('bank.incoming'), String(match.statement.lines.length), formatMoney(incomingTotal, fallbackCurrency)],
                   [t('bank.settled'), String(settled), ''],
-                  [t('bank.toChange'), String(changes.length), ''],
+                  [t('bank.toClose'), String(changes.length), ''],
                   [t('bank.loose'), String(match.loose.length), formatMoney(looseTotal, fallbackCurrency)],
                 ] as [string, string, string][]
               ).map(([label, value, note]) => (
@@ -178,129 +180,98 @@ export function BankMatchModal({ onClose, initialFile }: { onClose: () => void; 
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {(['changes', 'paid', 'loose'] as const).map((item) => (
+              {(['paid', 'loose'] as const).map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => setTab(item)}
                   className={cn('rounded-xl px-3 py-1.5 text-sm font-semibold transition', tab === item ? 'bg-brand text-white' : 'bg-brand-bg text-brand-ink/65 hover:text-brand-ink')}
                 >
-                  {item === 'changes'
-                    ? t('bank.tabChanges', { count: changes.length })
-                    : item === 'paid'
-                      ? t('bank.tabPaid', { count: paidByFile.length })
-                      : t('bank.tabLoose', { count: match.loose.length })}
+                  {item === 'paid' ? t('bank.tabPaid', { count: paidByFile.length }) : t('bank.tabLoose', { count: match.loose.length })}
                 </button>
               ))}
               <span className="ml-auto">{picker(t('bank.another'), false)}</span>
             </div>
 
             {tab === 'paid' ? (
-              paidByFile.length === 0 ? (
-                <p className="rounded-xl border border-brand-ink/8 px-4 py-6 text-center text-sm text-brand-ink/60">{t('bank.noPaid')}</p>
-              ) : (
-                <div className="max-h-[46vh] overflow-auto rounded-xl border border-brand-ink/8">
-                  <table className="w-full text-left text-sm">
-                    <thead className="sticky top-0 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
-                      <tr>
-                        <th className="py-2.5 pl-4 pr-3 font-semibold">{t('newInvoice.invoiceNumber')}</th>
-                        <th className="px-3 py-2.5 text-right font-semibold">{t('bank.paidFromFile')}</th>
-                        <th className="px-3 py-2.5 font-semibold">{t('newInvoice.date')}</th>
-                        <th className="px-3 py-2.5 pr-4 font-semibold">{t('bank.now')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paidByFile.map((verdict) => (
-                        <tr key={verdict.invoice.id} className="border-t border-brand-ink/5">
-                          <td className="max-w-0 py-2.5 pl-4 pr-3 align-top sm:w-2/5">
-                            <span className="block font-semibold">{verdict.invoice.number}</span>
-                            <span className="block truncate text-xs text-brand-ink/50">{verdict.invoice.client?.fullName}</span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right align-top font-semibold tabular-nums">{money(verdict.bankPaid, verdict)}</td>
-                          <td className="whitespace-nowrap px-3 py-2.5 align-top text-brand-ink/70">{verdict.payments.map((payment) => day(payment.date)).join(', ')}</td>
-                          <td className="px-3 py-2.5 pr-4 align-top">
-                            <span className={cn('font-semibold', verdict.change === 'none' ? 'text-brand-ink/55' : 'text-[#2E7D32]')}>{verdict.change === 'none' ? t('bank.alreadyRecorded') : t('bank.willRecord')}</span>
-                            {verdict.basis === 'amount' ? (
-                              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#FFF6E5] px-2 py-0.5 text-[11px] font-semibold text-[#8A5A00]" title={t('bank.byAmountHint')}>
-                                <AlertTriangle className="h-3 w-3" />
-                                {t('bank.byAmount')}
-                              </span>
-                            ) : null}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            ) : tab === 'changes' ? (
               <>
-                {removals.length > 0 ? <p className="rounded-xl bg-[#FFF6E5] px-3.5 py-2.5 text-xs leading-5 text-[#8A5A00]">{t('bank.removalNote')}</p> : null}
-                {changes.length === 0 ? (
-                  <p className="rounded-xl border border-brand-ink/8 px-4 py-6 text-center text-sm text-brand-ink/60">{t('bank.noChanges')}</p>
+                {paidByFile.length === 0 ? (
+                  <p className="rounded-xl border border-brand-ink/8 px-4 py-6 text-center text-sm text-brand-ink/60">{t('bank.noPaid')}</p>
                 ) : (
                   <div className="max-h-[46vh] overflow-auto rounded-xl border border-brand-ink/8">
                     <table className="w-full text-left text-sm">
                       <thead className="sticky top-0 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
                         <tr>
                           <th className="w-10 py-2.5 pl-4">
-                            <input
-                              type="checkbox"
-                              aria-label={t('invoiceList.selectAll')}
-                              checked={allChosen}
-                              onChange={() => setLeft(allChosen ? new Set(changes.map((item) => item.invoice.id)) : new Set())}
-                              className="h-4 w-4 cursor-pointer accent-[#2C6E7F]"
-                            />
+                            {changes.length > 0 ? (
+                              <input
+                                type="checkbox"
+                                aria-label={t('invoiceList.selectAll')}
+                                checked={allChosen}
+                                onChange={() => setLeft(allChosen ? new Set(changes.map((item) => item.invoice.id)) : new Set())}
+                                className="h-4 w-4 cursor-pointer accent-[#2C6E7F]"
+                              />
+                            ) : null}
                           </th>
                           <th className="px-3 py-2.5 font-semibold">{t('newInvoice.invoiceNumber')}</th>
-                          <th className="px-3 py-2.5 text-right font-semibold">{t('invoiceList.amount')}</th>
-                          <th className="px-3 py-2.5 font-semibold">{t('bank.now')}</th>
-                          <th className="px-3 py-2.5 pr-4 font-semibold">{t('bank.byBank')}</th>
+                          <th className="px-3 py-2.5 text-right font-semibold">{t('bank.paidFromFile')}</th>
+                          <th className="px-3 py-2.5 font-semibold">{t('newInvoice.date')}</th>
+                          <th className="px-3 py-2.5 pr-4 font-semibold">{t('bank.status')}</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {changes.map((verdict) => (
-                          <tr key={verdict.invoice.id} className="border-t border-brand-ink/5">
-                            <td className="py-2.5 pl-4 align-top">
-                              <input
-                                type="checkbox"
-                                aria-label={verdict.invoice.number}
-                                checked={!left.has(verdict.invoice.id)}
-                                onChange={() =>
-                                  setLeft((prev) => {
-                                    const next = new Set(prev)
-                                    if (next.has(verdict.invoice.id)) next.delete(verdict.invoice.id)
-                                    else next.add(verdict.invoice.id)
-                                    return next
-                                  })
-                                }
-                                className="mt-0.5 h-4 w-4 cursor-pointer accent-[#2C6E7F]"
-                              />
-                            </td>
-                            <td className="max-w-0 px-3 py-2.5 align-top sm:w-2/5">
-                              <span className="block font-semibold">{verdict.invoice.number}</span>
-                              <span className="block truncate text-xs text-brand-ink/50">
-                                {verdict.invoice.client?.fullName} · {verdict.invoice.date}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2.5 text-right align-top font-semibold tabular-nums">{money(Number(verdict.invoice.total) || 0, verdict)}</td>
-                            <td className="whitespace-nowrap px-3 py-2.5 align-top text-brand-ink/60">{nowLabel(verdict)}</td>
-                            <td className="px-3 py-2.5 pr-4 align-top">
-                              <span className={cn('font-semibold', verdict.change === 'unpaid' ? 'text-[#C0503A]' : verdict.change === 'partial' ? 'text-[#8A5A00]' : 'text-[#2E7D32]')}>{bankLabel(verdict)}</span>
-                              {removes(verdict) ? <span className="block text-xs text-brand-ink/50">{t('bank.removalHint')}</span> : null}
-                              {verdict.bankPaid > 0 && verdict.basis === 'amount' ? (
-                                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#FFF6E5] px-2 py-0.5 text-[11px] font-semibold text-[#8A5A00]" title={t('bank.byAmountHint')}>
-                                  <AlertTriangle className="h-3 w-3" />
-                                  {t('bank.byAmount')}
-                                </span>
-                              ) : null}
-                            </td>
-                          </tr>
-                        ))}
+                        {paidByFile.map((verdict) => {
+                          const closing = closes(verdict)
+                          return (
+                            <tr key={verdict.invoice.id} className="border-t border-brand-ink/5">
+                              <td className="py-2.5 pl-4 align-top">
+                                {closing ? (
+                                  <input
+                                    type="checkbox"
+                                    aria-label={verdict.invoice.number}
+                                    checked={!left.has(verdict.invoice.id)}
+                                    onChange={() =>
+                                      setLeft((prev) => {
+                                        const next = new Set(prev)
+                                        if (next.has(verdict.invoice.id)) next.delete(verdict.invoice.id)
+                                        else next.add(verdict.invoice.id)
+                                        return next
+                                      })
+                                    }
+                                    className="mt-0.5 h-4 w-4 cursor-pointer accent-[#2C6E7F]"
+                                  />
+                                ) : null}
+                              </td>
+                              <td className="max-w-0 px-3 py-2.5 align-top sm:w-2/5">
+                                <span className={cn('block font-semibold', !closing && 'text-brand-ink/60')}>{verdict.invoice.number}</span>
+                                <span className="block truncate text-xs text-brand-ink/50">{verdict.invoice.client?.fullName}</span>
+                              </td>
+                              <td className={cn('whitespace-nowrap px-3 py-2.5 text-right align-top font-semibold tabular-nums', !closing && 'text-brand-ink/60')}>{money(verdict.bankPaid, verdict)}</td>
+                              <td className="whitespace-nowrap px-3 py-2.5 align-top text-brand-ink/60">{verdict.payments.map((payment) => day(payment.date)).join(', ')}</td>
+                              <td className="px-3 py-2.5 pr-4 align-top">
+                                {closing ? (
+                                  <span className={cn('font-semibold', verdict.change === 'partial' ? 'text-[#8A5A00]' : 'text-[#2E7D32]')}>{bankLabel(verdict)}</span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#E8F3EA] px-2 py-0.5 text-[11px] font-semibold text-[#2E7D32]">
+                                    <Check className="h-3 w-3" />
+                                    {invoiceStatus(verdict.invoice) === 'paid' ? t('bank.alreadyPaid') : t('bank.alreadyRecorded')}
+                                  </span>
+                                )}
+                                {verdict.basis === 'amount' ? (
+                                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#FFF6E5] px-2 py-0.5 text-[11px] font-semibold text-[#8A5A00]" title={t('bank.byAmountHint')}>
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {t('bank.byAmount')}
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
+                {paidByFile.length > 0 && changes.length === 0 ? <p className="text-sm text-brand-ink/60">{t('bank.allPaid')}</p> : null}
                 <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
                   <input type="checkbox" checked={dates} onChange={(e) => setDates(e.target.checked)} className="h-4 w-4 rounded border-brand-ink/25 accent-[#2C6E7F]" />
                   {t('bank.dates')}

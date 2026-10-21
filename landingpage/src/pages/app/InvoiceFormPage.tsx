@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronDown, Eye, StickyNote, FileText, MapPin, Phone, Plus, Repeat, Send, Trash2, UserPlus, Users } from 'lucide-react'
+import { ChevronDown, Eye, StickyNote, FileText, MapPin, Phone, Plus, Repeat, Save, Trash2, UserPlus, Users } from 'lucide-react'
 import { FREQUENCIES, nextRenewal, type Frequency, type SendMode } from '../../lib/recurring'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -285,8 +285,9 @@ export function InvoiceFormPage() {
       appliedTaxRate !== before.taxRate
     )
   }, [issued, existing, netItems, subtotal, total, appliedTaxRate])
-  const saveLabel = issued ? (amountsChanged ? t('docs.correct') : t('newInvoice.saveChanges')) : t('newInvoice.saveAndShare')
-  const [savingDraft, setSavingDraft] = useState(false)
+  const saveLabel = issued ? (amountsChanged ? t('docs.correct') : t('newInvoice.saveChanges')) : t('docs.saveDraft')
+  // One Save: a new invoice is issued without being marked as sent (it is sent from the list); an issued one keeps whether it was sent.
+  const save = () => void onSave(canSaveOnly)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
@@ -622,7 +623,6 @@ export function InvoiceFormPage() {
       }
     } finally {
       setSaving(false)
-      setSavingDraft(false)
     }
   }
 
@@ -977,29 +977,13 @@ export function InvoiceFormPage() {
             {issued && amountsChanged ? <Field label={t('docs.correctReason')} value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} /> : null}
             {error ? <p className="mt-4 text-sm text-[#C0503A]">{error}</p> : null}
             <div className="mt-5 flex flex-col gap-2">
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" className="flex-1" onClick={() => (validate() ? setPreview(true) : null)}>
-                  <Eye className="h-4 w-4" />
-                  {t('newInvoice.preview')}
-                </Button>
-                {canSaveOnly ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="flex-1"
-                    disabled={saving || savingDraft}
-                    onClick={() => {
-                      setSavingDraft(true)
-                      void onSave(true)
-                    }}
-                  >
-                    {savingDraft ? t('common.loading') : t('docs.saveDraft')}
-                  </Button>
-                ) : null}
-              </div>
-              <Button type="button" disabled={saving} onClick={() => void onSave(false)}>
+              <Button type="button" variant="secondary" onClick={() => (validate() ? setPreview(true) : null)}>
+                <Eye className="h-4 w-4" />
+                {t('newInvoice.preview')}
+              </Button>
+              <Button type="button" disabled={saving} onClick={save}>
+                <Save className="h-4 w-4" />
                 {saving ? t('common.loading') : saveLabel}
-                {!issued ? <Send className="h-4 w-4" /> : null}
               </Button>
             </div>
           </Card>
@@ -1084,9 +1068,9 @@ export function InvoiceFormPage() {
               <Button type="button" variant="secondary" onClick={() => setPreview(false)}>
                 {t('common.close')}
               </Button>
-              <Button type="button" disabled={saving} onClick={() => void onSave(false)}>
-                {saveLabel}
-                {!issued ? <Send className="h-4 w-4" /> : null}
+              <Button type="button" disabled={saving} onClick={save}>
+                <Save className="h-4 w-4" />
+                {saving ? t('common.loading') : saveLabel}
               </Button>
             </>
           }

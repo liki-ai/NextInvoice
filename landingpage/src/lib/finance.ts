@@ -640,7 +640,8 @@ export function buildFinanceSummary(allDocs: FinanceDoc[], invoices: Invoice[], 
   })
   if (cash && has(burn) && burn > 0) {
     const runway = cash.amount / burn
-    signals.push({ key: 'liquidity', status: runway >= 3 ? 'good' : runway >= 1 ? 'warn' : 'bad', params: { months: Math.round(runway * 10) / 10 } })
+    // The amounts go along so the message shows what it compares, and a wrong one is seen at once.
+    signals.push({ key: 'liquidity', status: runway >= 3 ? 'good' : runway >= 1 ? 'warn' : 'bad', params: { months: Math.round(runway * 10) / 10, cash: cash.amount, burn } })
   } else signals.push({ key: 'liquidity', status: 'unknown', params: {} })
   signals.push({
     key: 'documents',

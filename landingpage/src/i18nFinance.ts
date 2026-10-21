@@ -51,9 +51,9 @@ const sq = {
     },
     liquidity: {
       title: 'Paraja',
-      good: 'Paraja në bankë mjafton për rreth {months} muaj shpenzime.',
-      warn: 'Paraja në bankë mjafton vetëm për rreth {months} muaj shpenzime.',
-      bad: 'Paraja në bankë nuk mbulon as një muaj shpenzime ({months}).',
+      good: 'Paraja në bankë, {cash}, mjafton për rreth {months} muaj: nga banka dalin mesatarisht {burn} në muaj (3 muajt e fundit, pa dividendë).',
+      warn: 'Paraja në bankë, {cash}, mjafton vetëm për rreth {months} muaj: nga banka dalin mesatarisht {burn} në muaj (3 muajt e fundit, pa dividendë).',
+      bad: 'Paraja në bankë, {cash}, nuk mbulon as një muaj ({months}): nga banka dalin mesatarisht {burn} në muaj (3 muajt e fundit, pa dividendë).',
       unknown: 'Duhet një ekstrakt bankar me saldo që të dihet.',
     },
     documents: {
@@ -259,9 +259,9 @@ const en: typeof sq = {
     },
     liquidity: {
       title: 'Cash',
-      good: 'Cash in the bank covers about {months} months of spending.',
-      warn: 'Cash in the bank covers only about {months} months of spending.',
-      bad: 'Cash in the bank does not cover one month of spending ({months}).',
+      good: 'Cash in the bank, {cash}, covers about {months} months: on average {burn} leaves the bank each month (last 3 months, dividends aside).',
+      warn: 'Cash in the bank, {cash}, covers only about {months} months: on average {burn} leaves the bank each month (last 3 months, dividends aside).',
+      bad: 'Cash in the bank, {cash}, does not cover one month ({months}): on average {burn} leaves the bank each month (last 3 months, dividends aside).',
       unknown: 'A bank statement with a balance is needed to tell.',
     },
     documents: {
@@ -483,9 +483,9 @@ const it: typeof sq = {
     },
     liquidity: {
       title: 'Liquidità',
-      good: 'La liquidità in banca copre circa {months} mesi di spese.',
-      warn: 'La liquidità in banca copre solo circa {months} mesi di spese.',
-      bad: 'La liquidità in banca non copre un mese di spese ({months}).',
+      good: 'La liquidità in banca, {cash}, copre circa {months} mesi: in media escono {burn} al mese (ultimi 3 mesi, dividendi esclusi).',
+      warn: 'La liquidità in banca, {cash}, copre solo circa {months} mesi: in media escono {burn} al mese (ultimi 3 mesi, dividendi esclusi).',
+      bad: 'La liquidità in banca, {cash}, non copre un mese ({months}): in media escono {burn} al mese (ultimi 3 mesi, dividendi esclusi).',
       unknown: 'Serve un estratto conto con il saldo.',
     },
     documents: {
