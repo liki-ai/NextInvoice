@@ -15,6 +15,7 @@ import { DeliveryHistory } from '../../components/DeliveryHistory'
 import { PaymentModal } from '../../components/PaymentModal'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
 import { ProofField } from '../../components/ProofField'
+import { RepeatInvoiceButton } from '../../components/RepeatModal'
 
 export function InvoiceDetailPage() {
   const { invoiceId } = useParams()
@@ -193,6 +194,7 @@ export function InvoiceDetailPage() {
           <Button type="button" variant="secondary" onClick={onDuplicate}>
             {t('invoiceDetail.duplicate')}
           </Button>
+          <RepeatInvoiceButton invoice={invoice} />
           <Button type="button" onClick={onDownload}>
             {t('invoiceDetail.downloadPdf')}
           </Button>

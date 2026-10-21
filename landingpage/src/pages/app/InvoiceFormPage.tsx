@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronDown, Eye, StickyNote, FileText, MapPin, Phone, Plus, Repeat, Save, Trash2, UserPlus, Users } from 'lucide-react'
-import { FREQUENCIES, nextRenewal, type Frequency, type SendMode } from '../../lib/recurring'
+import { DEFAULT_REPEAT, planFromInvoice, repeatSummary, type RepeatSettings } from '../../lib/recurring'
+import { RepeatInvoiceButton, RepeatModal } from '../../components/RepeatModal'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
@@ -36,30 +37,6 @@ import { clientDisplayName, clientMatchesQuery, composeClient, frequentClients }
 import { invoiceLineFromCatalog } from '../../lib/catalog'
 
 /** A price as shown in its box: at most two decimals. The full value stays in the form until it is retyped. */
-/** The calendar day of a date, as plans keep it (2026-10-20). */
-function dayKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-/** A row of buttons, one of them chosen: how often the invoice repeats, and how it is sent. */
-function Choice<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (value: T) => void }) {
-  return (
-    <div className="flex gap-1.5">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={`flex-1 rounded-lg border px-2 py-1 text-xs font-semibold transition ${value === option.value ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/65 hover:border-brand/30'}`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 // The tighter spacing of the fields in the invoice details card.
 const tight = 'mb-3.5 gap-1.5'
 
@@ -154,10 +131,9 @@ export function InvoiceFormPage() {
   const [discount, setDiscount] = useState(String(existing?.discount ?? '0'))
   // Notes stay behind a small button until asked for, or until the invoice has some.
   const [notesOpen, setNotesOpen] = useState(false)
-  // Repeating: saving the invoice also starts a plan that makes the next ones by itself.
-  const [repeat, setRepeat] = useState(false)
-  const [repeatFrequency, setRepeatFrequency] = useState<Frequency>('monthly')
-  const [repeatSend, setRepeatSend] = useState<SendMode>('auto')
+  // Repeating, set in its own modal: saving the invoice also starts a plan that makes the next ones by itself.
+  const [repeat, setRepeat] = useState<RepeatSettings | null>(null)
+  const [repeatOpen, setRepeatOpen] = useState(false)
   const [taxRate, setTaxRate] = useState(() => String(existing?.taxRate ?? profile?.defaultTaxRate ?? 0))
   // A new invoice starts from the VAT rate in Settings, unless the rate was already set by hand.
   const taxTouched = useRef(Boolean(existing))
@@ -440,8 +416,6 @@ export function InvoiceFormPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)))
   }
 
-  const repeatStart = parseLooseDate(date)
-  const repeatNext = repeat && repeatStart ? nextRenewal(repeatStart, repeatFrequency) : null
 
   function validate() {
     if (!client.fullName.trim()) {
@@ -518,28 +492,6 @@ export function InvoiceFormPage() {
     return saved.id
   }
 
-  /** The plan this invoice starts: its lines and client, every month (or as chosen) from its date, as its first period. */
-  function planFromInvoice(saved: { id: string; clientId: string; items: InvoiceItem[]; discount: string; taxRate: number; notes: string; date: string; dueDate: string }) {
-    const start = parseLooseDate(saved.date) as Date
-    const due = saved.dueDate ? parseLooseDate(saved.dueDate) : null
-    const dueDays = due ? Math.min(120, Math.max(0, Math.round((due.getTime() - start.getTime()) / 86400000))) : 0
-    return {
-      firstInvoiceId: saved.id,
-      clientId: saved.clientId,
-      kind: 'invoice',
-      items: saved.items.map((item) => ({ description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
-      discount: toNumber(saved.discount),
-      taxRate: saved.taxRate,
-      currency,
-      frequency: repeatFrequency,
-      anchorDate: dayKey(start),
-      sendDaysBefore: 0,
-      dueDays,
-      graceDays: 0,
-      sendMode: repeatSend,
-      notes: saved.notes,
-    }
-  }
 
   async function onSave(asDraft = false) {
     const invoice = validate()
@@ -596,7 +548,9 @@ export function InvoiceFormPage() {
       }
       if (repeat && canRepeat && savedId) {
         try {
-          await api('/api/recurring', { method: 'POST', body: planFromInvoice({ ...payload, id: savedId }) })
+          const start = parseLooseDate(payload.date) as Date
+          const due = payload.dueDate ? parseLooseDate(payload.dueDate) : null
+          await api('/api/recurring', { method: 'POST', body: planFromInvoice({ ...payload, id: savedId }, start, repeat, currency, due) })
         } catch (err) {
           window.alert(t('recurring.repeatFailed', { error: err instanceof Error ? err.message : t('common.error') }))
         }
@@ -919,34 +873,39 @@ export function InvoiceFormPage() {
             <UnsignedToggle checked={unsigned} onChange={setUnsigned} compact />
             {unsigned ? null : <SignerPicker value={signerId} onChange={pickSigner} className="mt-3" />}
             {canRepeat ? (
-              <div className="mt-4 border-t border-brand-ink/8 pt-4">
-                <label className="flex cursor-pointer items-center gap-2.5">
-                  <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} className="h-4 w-4 accent-[#2C6E7F]" />
-                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                    <Repeat className="h-3.5 w-3.5 text-brand" />
-                    {t('recurring.repeat')}
-                  </span>
-                </label>
+              <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/8 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setRepeatOpen(true)}
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/10"
+                >
+                  <Repeat className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{repeat ? `${t('recurring.repeatOn')} · ${repeatSummary(repeat, t)}` : t('recurring.repeat')}</span>
+                </button>
                 {repeat ? (
-                  <div className="mt-3 space-y-2">
-                    <Choice options={FREQUENCIES.map((value) => ({ value, label: t(`recurring.${value}`) }))} value={repeatFrequency} onChange={setRepeatFrequency} />
-                    <Choice
-                      options={[
-                        { value: 'auto' as const, label: t('recurring.sendAuto') },
-                        { value: 'manual' as const, label: t('recurring.sendManual') },
-                      ]}
-                      value={repeatSend}
-                      onChange={setRepeatSend}
-                    />
-                    {repeatNext ? (
-                      <p className="text-xs leading-5 text-brand-ink/50">
-                        {t(repeatSend === 'auto' ? 'recurring.repeatNextAuto' : 'recurring.repeatNextManual', { date: formatDateForInvoice(repeatNext) })}
-                      </p>
-                    ) : null}
-                    {repeatSend === 'auto' && !String(client.email || '').trim() ? <p className="text-xs leading-5 text-[#8A5A00]">{t('recurring.repeatNoEmail')}</p> : null}
-                  </div>
+                  <button type="button" onClick={() => setRepeat(null)} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-brand-ink/50 hover:bg-brand-ink/5 hover:text-brand-ink">
+                    {t('recurring.repeatRemove')}
+                  </button>
                 ) : null}
               </div>
+            ) : existing && existing.lifecycle !== 'draft' ? (
+              <div className="mt-4 border-t border-brand-ink/8 pt-4">
+                <RepeatInvoiceButton invoice={existing} compact />
+              </div>
+            ) : null}
+            {repeatOpen ? (
+              <RepeatModal
+                start={parseLooseDate(date)}
+                clientEmail={String(client.email || '')}
+                initial={repeat || DEFAULT_REPEAT}
+                note={t('recurring.repeatOnSave')}
+                confirmLabel={t('recurring.repeatSet')}
+                onConfirm={(settings) => {
+                  setRepeat(settings)
+                  setRepeatOpen(false)
+                }}
+                onClose={() => setRepeatOpen(false)}
+              />
             ) : null}
           </Card>
           <Card>
