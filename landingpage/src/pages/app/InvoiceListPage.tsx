@@ -820,16 +820,18 @@ export function InvoiceListPage() {
                                 {t('common.delete')}
                               </button>
                             ) : null}
-                            <button
-                              type="button"
-                              onClick={() => setPreviewId(item.id)}
-                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              {t('newInvoice.preview')}
-                            </button>
                           </>
                         )}
+                        {/* Every invoice, drafts too: the invoice as it prints, without leaving the list. */}
+                        <button
+                          type="button"
+                          onClick={() => setPreviewId(item.id)}
+                          title={t('newInvoice.preview')}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          {t('newInvoice.preview')}
+                        </button>
                       </div>
                     </td>
                   </tr>
