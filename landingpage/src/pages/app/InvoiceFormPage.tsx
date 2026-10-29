@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronDown, Eye, StickyNote, FileText, MapPin, Phone, Plus, Repeat, Save, Trash2, UserPlus, Users } from 'lucide-react'
+import { ChevronDown, Eye, FileText, MapPin, Phone, Plus, Repeat, Save, Trash2, UserPlus, Users } from 'lucide-react'
 import { DEFAULT_REPEAT, planFromInvoice, repeatSummary, type RepeatSettings } from '../../lib/recurring'
 import { RepeatInvoiceButton, RepeatModal } from '../../components/RepeatModal'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
-import { Button, Card, Field, Modal, TextArea } from '../../components/ui'
+import { Button, Card, Field, Modal } from '../../components/ui'
 import { DateField } from '../../components/DateField'
 import { parseLooseDate } from '../../lib/document'
 import {
@@ -31,6 +31,7 @@ import { normalizeTemplate, type InvoiceTemplateId } from '../../lib/invoiceTemp
 import { TemplateSwitch } from '../../components/TemplateSwitch'
 import { UnsignedToggle } from '../../components/UnsignedToggle'
 import { SignerPicker } from '../../components/SignerPicker'
+import { InvoiceNotes } from '../../components/InvoiceNotes'
 import { useAuth } from '../../context/AuthContext'
 import { proposedSigner } from '../../lib/signers'
 import { clientDisplayName, clientMatchesQuery, composeClient, frequentClients } from '../../lib/client'
@@ -130,7 +131,6 @@ export function InvoiceFormPage() {
   )
   const [discount, setDiscount] = useState(String(existing?.discount ?? '0'))
   // Notes stay behind a small button until asked for, or until the invoice has some.
-  const [notesOpen, setNotesOpen] = useState(false)
   // Repeating, set in its own modal: saving the invoice also starts a plan that makes the next ones by itself.
   const [repeat, setRepeat] = useState<RepeatSettings | null>(null)
   const [repeatOpen, setRepeatOpen] = useState(false)
@@ -790,6 +790,8 @@ export function InvoiceFormPage() {
               </table>
             </div>
           </Card>
+
+          <InvoiceNotes label={t('newInvoice.notes')} value={notes} onChange={setNotes} />
         </div>
 
         <div className="space-y-6 lg:sticky lg:top-8">
@@ -858,18 +860,6 @@ export function InvoiceFormPage() {
                 </label>
               ) : null}
             </div>
-            {notesOpen || notes.trim() ? (
-              <TextArea label={t('newInvoice.notes')} rows={2} value={notes} autoFocus={notesOpen && !notes} wrapperClassName={tight} onChange={(e) => setNotes(e.target.value)} />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setNotesOpen(true)}
-                className="mb-3.5 inline-flex items-center gap-1.5 rounded-lg bg-[#EEF5F7] px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand/10"
-              >
-                <StickyNote className="h-4 w-4" />
-                {t('newInvoice.notes')}
-              </button>
-            )}
             <UnsignedToggle checked={unsigned} onChange={setUnsigned} compact />
             {unsigned ? null : <SignerPicker value={signerId} onChange={pickSigner} className="mt-3" />}
             {canRepeat ? (

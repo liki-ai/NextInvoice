@@ -48,6 +48,38 @@ function esc(value: unknown) {
     .replace(/"/g, '&quot;')
 }
 
+// A link in the notes: "[Pay here](https://…)" shows "Pay here", and a bare https:// address shows
+// itself. A bare address ends before trailing punctuation, so "see https://x.com." links x.com.
+const NOTE_LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]])/g
+
+export type NotePart = { text: string; href?: string }
+
+/** The notes as plain text and links, in order. */
+export function noteParts(notes: string): NotePart[] {
+  const text = String(notes || '')
+  const parts: NotePart[] = []
+  let last = 0
+  for (const match of text.matchAll(NOTE_LINK)) {
+    const at = match.index ?? 0
+    if (at > last) parts.push({ text: text.slice(last, at) })
+    parts.push(match[3] ? { text: match[3], href: match[3] } : { text: match[1], href: match[2] })
+    last = at + match[0].length
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) })
+  return parts
+}
+
+/** The notes for the printed invoice, with their links clickable in the page and in the PDF. */
+function notesHtml(notes: string, accent: string) {
+  return noteParts(notes)
+    .map((part) =>
+      part.href
+        ? `<a href="${esc(part.href)}" target="_blank" rel="noopener noreferrer" style="color: ${accent}; font-weight: 600; text-decoration: underline; word-break: break-all;">${esc(part.text)}</a>`
+        : esc(part.text),
+    )
+    .join('')
+}
+
 function channels(hex: string) {
   const n = parseInt(hex.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
@@ -402,7 +434,7 @@ function classicTemplate(v: View) {
       <div class="grand"><span>${esc(L.total)}</span><span>${money(v.total)}</span></div>
       ${v.showBalance ? `<div><span>${esc(L.amountPaid || '')}</span><span>${money(v.paid)}</span></div><div class="grand"><span>${esc(L.amountDue || L.total)}</span><span>${money(v.due)}</span></div>` : ''}
     </div>
-    ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ''}
+    ${invoice.notes ? `<div class="notes pre">${notesHtml(invoice.notes, accent)}</div>` : ''}
     ${
       v.hasPayment
         ? `<div class="payment keep"><div class="label">${esc(L.paymentInfo)}</div>${paymentLines(v)}</div>`
@@ -585,7 +617,7 @@ function corporateTemplate(v: View) {
         }
       </table>
     </div>
-    ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ''}
+    ${invoice.notes ? `<div class="notes pre">${notesHtml(invoice.notes, accent)}</div>` : ''}
     <div class="signs keep">
       <div class="sign">
         <b>${esc(L.signature || 'Signature')} (${esc(company.companyName)}):</b>
@@ -717,7 +749,7 @@ function minimalTemplate(v: View) {
             ? `<div class="block"><div class="cap">${esc(L.paymentDetails || L.paymentInfo)}</div>${paymentLines(v)}</div>`
             : ''
         }
-        ${invoice.notes ? `<div class="block pre">${esc(invoice.notes)}</div>` : ''}
+        ${invoice.notes ? `<div class="block pre">${notesHtml(invoice.notes, accent)}</div>` : ''}
       </div>
       <div class="totals">
         <div class="kv"><span>${esc(L.subtotal)}</span><span>${money(v.subtotal)}</span></div>

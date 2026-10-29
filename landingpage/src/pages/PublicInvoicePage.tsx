@@ -122,7 +122,8 @@ export default function PublicInvoicePage() {
       {justPaid ? <p className="bg-brand/10 px-5 py-3 text-center text-sm font-semibold text-brand">{translateIn(lang, 'recurring.pay.paid')}</p> : null}
       {payFailed ? <p className="bg-[#F8E8E4] px-5 py-3 text-center text-sm font-medium text-[#C0503A]">{translateIn(lang, 'recurring.pay.failed')}</p> : null}
       <main className="mx-auto w-full max-w-[860px] flex-1 p-4 sm:p-6">
-        <iframe title={shared.invoice.number} sandbox="" srcDoc={html} className="h-[1160px] w-full rounded-lg border border-brand-ink/8 bg-white shadow-[0_2px_12px_rgba(29,43,46,0.08)]" />
+        {/* No scripts; links in the notes (a payment link) open in a tab of their own. */}
+        <iframe title={shared.invoice.number} sandbox="allow-popups allow-popups-to-escape-sandbox" srcDoc={html} className="h-[1160px] w-full rounded-lg border border-brand-ink/8 bg-white shadow-[0_2px_12px_rgba(29,43,46,0.08)]" />
       </main>
     </div>
   )

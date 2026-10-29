@@ -10,6 +10,7 @@ import { activePayments, daysOverdue, isInvoiceSent, remainingOf, reminderText, 
 import { companyForPdf } from '../../lib/companySamples'
 import { normalizeTemplate } from '../../lib/invoiceTemplates'
 import { InvoicePreviewModal } from '../../components/InvoicePreviewModal'
+import { NoteText } from '../../components/InvoiceNotes'
 import { SendInvoiceModal } from '../../components/SendInvoiceModal'
 import { DeliveryHistory } from '../../components/DeliveryHistory'
 import { PaymentModal } from '../../components/PaymentModal'
@@ -355,7 +356,7 @@ export function InvoiceDetailPage() {
               <span>{formatMoney(due, currency)}</span>
             </div>
           </div>
-          {invoice.notes ? <p className="mt-5 text-sm text-brand-ink/55">{invoice.notes}</p> : null}
+          {invoice.notes ? <NoteText notes={invoice.notes} className="mt-5 text-sm text-brand-ink/55" /> : null}
           {invoice.cancelReason ? <p className="mt-5 text-sm text-[#C0503A]">{t('docs.cancelInvoice')}: {invoice.cancelReason}</p> : null}
           <div className="mt-5 flex flex-col gap-2">
             {status !== 'draft' && status !== 'cancelled' && due > 0 ? (
