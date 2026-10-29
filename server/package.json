@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test src/profileGuard.test.js src/domain.test.js src/mailer.test.js src/automation.test.js src/slack.test.js src/contracts.test.js src/numbering.test.js",
+    "test": "node --test src/profileGuard.test.js src/domain.test.js src/mailer.test.js src/automation.test.js src/slack.test.js src/contracts.test.js src/numbering.test.js src/companies.test.js",
     "test:pg": "node --test src/persist.pg.test.js"
   },
   "dependencies": {

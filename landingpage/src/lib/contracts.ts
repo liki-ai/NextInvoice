@@ -1,4 +1,4 @@
-import { api, apiBase, getToken } from './api'
+import { api, apiBase, authHeaders } from './api'
 
 // The company's contracts, kept on the server with the signed document behind each one. A document
 // is read there once; the fields it fills are listed in `filled`.
@@ -149,7 +149,7 @@ export async function contractText(id: string) {
 
 /** The document's bytes, typed by its name so the browser can show a PDF or an image. */
 export async function contractBlob(contract: Contract) {
-  const res = await fetch(`${apiBase()}/api/contracts/${contract.id}/file`, { headers: { Authorization: `Bearer ${getToken()}` } })
+  const res = await fetch(`${apiBase()}/api/contracts/${contract.id}/file`, { headers: authHeaders() })
   if (!res.ok) throw new Error(String(res.status))
   const blob = await res.blob()
   const kind = fileKind(contract.file)

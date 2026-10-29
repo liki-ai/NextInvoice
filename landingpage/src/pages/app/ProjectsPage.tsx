@@ -6,7 +6,7 @@ import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card } from '../../components/ui'
 import { ProjectDetail } from '../../components/ProjectDetail'
-import { api, apiBase, getToken } from '../../lib/api'
+import { api, apiBase, authHeaders } from '../../lib/api'
 import { matchStatement, readStatementFile, type BankLine } from '../../lib/bankMatch'
 import { cn } from '../../lib/cn'
 import { currencySymbol, type Invoice } from '../../lib/invoice'
@@ -106,7 +106,7 @@ async function looseCredits(docs: FinanceDoc[], invoices: Invoice[], months: str
   const ordered = [...statements].sort((a, b) => String(b.statement?.to || '').localeCompare(String(a.statement?.to || '')) || String(b.receivedAt).localeCompare(String(a.receivedAt)))
   for (const doc of ordered) {
     try {
-      const res = await fetch(`${apiBase()}/api/finance/documents/${doc.id}/file`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      const res = await fetch(`${apiBase()}/api/finance/documents/${doc.id}/file`, { headers: authHeaders() })
       if (!res.ok) continue
       const statement = await readStatementFile(await res.blob())
       if (!statement) continue

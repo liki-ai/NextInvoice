@@ -1,4 +1,6 @@
 const TOKEN_KEY = 'nextinvoice.token'
+// Which of the account's companies this browser works in; the server checks it is one of theirs.
+const COMPANY_KEY = 'nextinvoice.company'
 
 const HOME = 'https://api.mynextinvoice.com'
 // The address the API had before it moved. It forwards to the same server, and every network
@@ -19,6 +21,24 @@ export function getToken() {
 export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
+}
+
+export function getActiveCompany() {
+  return localStorage.getItem(COMPANY_KEY)
+}
+
+export function setActiveCompany(id: string | null) {
+  if (id) localStorage.setItem(COMPANY_KEY, id)
+  else localStorage.removeItem(COMPANY_KEY)
+}
+
+/** For requests made without api(), such as file downloads: the session and the company it works in. */
+export function authHeaders(token = getToken()): Record<string, string> {
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  const company = getActiveCompany()
+  if (token && company) headers['X-Company-Id'] = company
+  return headers
 }
 
 const UNREACHABLE: Record<string, string> = {
@@ -68,9 +88,8 @@ type ApiOptions = {
 }
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const headers: Record<string, string> = {}
   const token = options.token === undefined ? getToken() : options.token
-  if (token) headers.Authorization = `Bearer ${token}`
+  const headers = authHeaders(token)
   if (!options.form) headers['Content-Type'] = 'application/json'
 
   const response = await send(path, {

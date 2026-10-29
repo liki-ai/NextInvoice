@@ -26,7 +26,7 @@ router.get('/usage', authRequired, (req, res) => {
 router.get('/me', authRequired, (req, res) => {
   // The person signed in, with the plan of the company they work in as it is right now.
   const stored = findUserById(req.user.accountId);
-  res.json({ user: (stored && sessionUser(stored)) || req.user, usage: canCreateInvoice(req.user.id) });
+  res.json({ user: (stored && sessionUser(stored, req.user.id)) || req.user, usage: canCreateInvoice(req.user.id) });
 });
 
 router.post('/checkout', authRequired, managerRequired, async (req, res) => {
@@ -44,7 +44,8 @@ router.post('/checkout', authRequired, managerRequired, async (req, res) => {
       });
     }
 
-    const user = findUserById(req.user.id);
+    // The plan is the main company's, whichever of its companies is open.
+    const user = findUserById(req.user.teamId);
     if (!user) return res.status(404).json({ error: 'Account not found.' });
 
     let customerId = user.stripeCustomerId;
@@ -94,7 +95,7 @@ router.get('/checkout/status', authRequired, async (req, res) => {
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['subscription'],
     });
-    if (session.metadata?.userId && session.metadata.userId !== req.user.id) {
+    if (session.metadata?.userId && session.metadata.userId !== req.user.teamId) {
       return res.status(403).json({ error: 'Session does not belong to this account.' });
     }
 
@@ -103,7 +104,7 @@ router.get('/checkout/status', authRequired, async (req, res) => {
         ? await stripe.subscriptions.retrieve(session.subscription)
         : session.subscription;
       const premium = isPremiumSubscription(sub);
-      setUserPlan(req.user.id, premium ? 'premium' : 'free', {
+      setUserPlan(req.user.teamId, premium ? 'premium' : 'free', {
         billingSource: 'stripe',
         stripeCustomerId: session.customer || undefined,
         stripeSubscriptionId: sub.id,
@@ -116,7 +117,7 @@ router.get('/checkout/status', authRequired, async (req, res) => {
     return res.json({
       status: session.status,
       usage: canCreateInvoice(req.user.id),
-      user: sessionUser(findUserById(req.user.accountId)) || publicUser(findUserById(req.user.id)),
+      user: sessionUser(findUserById(req.user.accountId), req.user.id) || publicUser(findUserById(req.user.id)),
     });
   } catch (err) {
     console.error('[billing/checkout/status]', err);
@@ -128,7 +129,7 @@ router.post('/portal', authRequired, managerRequired, async (req, res) => {
   try {
     const stripe = stripeClient();
     if (!stripe) return res.status(503).json({ error: 'Stripe is not configured.' });
-    const user = findUserById(req.user.id);
+    const user = findUserById(req.user.teamId);
     if (!user?.stripeCustomerId) {
       return res.status(400).json({ error: 'No Stripe customer on this account yet.' });
     }
@@ -150,7 +151,7 @@ router.post('/subscribe', authRequired, managerRequired, (req, res) => {
       error: 'Mock subscribe is disabled. Use Stripe Checkout or IAP.',
     });
   }
-  const user = setUserPlan(req.user.id, 'premium', { billingSource: 'mock' });
+  const user = setUserPlan(req.user.teamId, 'premium', { billingSource: 'mock' });
   if (!user) return res.status(404).json({ error: 'Account not found.' });
   res.json({ user, usage: canCreateInvoice(req.user.id) });
 });
@@ -159,7 +160,7 @@ router.post('/iap/verify', authRequired, async (req, res) => {
   try {
     const verified = await verifyIapPayload(req.body);
     if (!verified.active) {
-      setUserPlan(req.user.id, 'free', {
+      setUserPlan(req.user.teamId, 'free', {
         billingSource: 'iap',
         iapOriginalTransactionId: verified.originalTransactionId,
         planExpiresAt: verified.expiresAt,
@@ -172,11 +173,11 @@ router.post('/iap/verify', authRequired, async (req, res) => {
     }
 
     const existing = findUserByIapOriginalId(verified.originalTransactionId);
-    if (existing && existing.id !== req.user.id) {
+    if (existing && existing.id !== req.user.teamId) {
       return res.status(409).json({ error: 'This purchase is already linked to another account.' });
     }
 
-    const user = setUserPlan(req.user.id, 'premium', {
+    const user = setUserPlan(req.user.teamId, 'premium', {
       billingSource: 'iap',
       iapPlatform: verified.platform,
       iapProductId: verified.productId,

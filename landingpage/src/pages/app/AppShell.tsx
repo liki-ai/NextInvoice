@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { AppDataProvider, useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { LanguagePicker } from '../../components/LangSwitch'
+import { CompanySwitcher } from '../../components/CompanySwitcher'
 import { cn } from '../../lib/cn'
 import { displayCompanyValue } from '../../lib/companySamples'
 
@@ -67,12 +68,13 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-6 pb-6 pt-7">
+      <div className="px-6 pb-5 pt-7">
         <button type="button" onClick={() => { navigate('/app'); onNavigate?.() }} className="text-left">
           <span className="font-display text-xl font-semibold tracking-tight text-white">Next Invoice</span>
           <span className="mt-1 block text-[11px] font-medium uppercase tracking-[0.14em] text-white/45">{t('nav.workspace')}</span>
         </button>
       </div>
+      <CompanySwitcher variant="dark" className="mx-3 mb-5" />
       <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-4">
         {NAV_GROUPS.map((group, index) => (
           <div key={group.label || index}>
@@ -176,7 +178,11 @@ function ShellInner() {
           <button type="button" onClick={() => setOpen(true)} className="rounded-lg p-2 text-brand-ink hover:bg-white" aria-label={t('nav.menu')}>
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-display text-lg font-semibold">Next Invoice</span>
+          <CompanySwitcher
+            variant="light"
+            className="min-w-0 max-w-[60vw] flex-1 sm:max-w-xs sm:flex-none"
+            fallback={<span className="font-display text-lg font-semibold">Next Invoice</span>}
+          />
           <div className="ml-auto flex items-center gap-2">
             {showCompose ? (
               <NavLink

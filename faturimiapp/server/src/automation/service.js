@@ -220,7 +220,8 @@ function fail(code, detail) {
 }
 
 function ownerAccount(ownerId) {
-  const owner = store.findUserById(ownerId);
+  // A company opened under another has no address of its own: the main company's is used.
+  const owner = store.billingAccount(store.findUserById(ownerId));
   return { id: ownerId, accountId: ownerId, email: owner ? owner.email : '' };
 }
 
@@ -440,7 +441,7 @@ function unscheduleInvoice(ownerId, invoiceId) {
 
 function notifyTargets(ownerId) {
   const settings = store.getRecurring(ownerId).settings;
-  const owner = store.findUserById(ownerId);
+  const owner = store.billingAccount(store.findUserById(ownerId));
   const list = (settings.notifyEmails || []).length ? settings.notifyEmails : owner ? [owner.email] : [];
   return { settings, to: list.map(cleanEmail).filter(Boolean) };
 }

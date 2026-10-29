@@ -21,11 +21,13 @@ function authRequired(req, res, next) {
     const payload = jwt.verify(token, jwtSecret());
     const user = findUserById(payload.sub);
     // A user taken out of their company, or whose company is gone, is no longer signed in.
-    const session = user ? sessionUser(user) : null;
+    // X-Company-Id picks which of the person's companies this request works in; any other id means their main one.
+    const session = user ? sessionUser(user, String(req.headers['x-company-id'] || '')) : null;
     if (!session) {
       return res.status(401).json({ error: 'Authentication required.' });
     }
-    // req.user.id is the company's data key; req.user.accountId and .email are the person's own.
+    // req.user.id is the company's data key; req.user.teamId the main company, which holds the users and
+    // the plan; req.user.accountId and .email are the person's own.
     req.user = session;
     return next();
   } catch {

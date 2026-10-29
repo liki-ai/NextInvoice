@@ -1,9 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, getToken, setToken } from '../lib/api'
+import { api, getToken, setActiveCompany, setToken } from '../lib/api'
+
+/** One of the companies the account works in. */
+export type CompanyChoice = { id: string; companyName: string; currency?: string }
 
 export type User = {
-  /** The company this person works in: the key all its invoices and clients are stored under. */
+  /** The company this person works in now: the key all its invoices and clients are stored under. */
   id: string
+  /** The main company, which holds the users and the plan of all its companies. */
+  teamId?: string
+  /** Every company this person can switch to, the main one first. */
+  companies?: CompanyChoice[]
   /** The person's own account. */
   accountId?: string
   email: string
@@ -25,6 +32,10 @@ type AuthValue = {
   signup: (email: string, password: string, extras?: { language?: string; industry?: string; invite?: string }) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
+  /** Opens the app in another of the account's companies; the page loads again with its data. */
+  switchCompany: (id: string, path?: string) => void
+  /** Opens a new company under the main one and returns it. */
+  createCompany: (input: { companyName: string; currency?: string }) => Promise<CompanyChoice>
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
@@ -60,6 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const check = () =>
       api<{ user: User }>('/api/auth/me', { token: current })
         .then((res) => {
+          // A company that is no longer theirs falls back to the main one on the server; follow it.
+          setActiveCompany(res.user.id)
           rememberUser(res.user)
           setUser(res.user)
           setTokenState(current)
@@ -92,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     setToken(res.token)
     setTokenState(res.token)
+    setActiveCompany(res.user.id)
     rememberUser(res.user)
     setUser(res.user)
   }, [])
@@ -104,12 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     setToken(res.token)
     setTokenState(res.token)
+    setActiveCompany(res.user.id)
     rememberUser(res.user)
     setUser(res.user)
   }, [])
 
   const logout = useCallback(() => {
     setToken(null)
+    setActiveCompany(null)
     setTokenState(null)
     rememberUser(null)
     setUser(null)
@@ -126,9 +142,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user)
   }, [])
 
+  const switchCompany = useCallback((id: string, path = '/app') => {
+    setActiveCompany(id)
+    // A full load: every page and list starts over with the other company's data.
+    window.location.assign(path)
+  }, [])
+
+  const createCompany = useCallback(async (input: { companyName: string; currency?: string }) => {
+    const res = await api<{ company: CompanyChoice; user: User }>('/api/companies', { method: 'POST', body: input })
+    return res.company
+  }, [])
+
   const value = useMemo(
-    () => ({ user, token, loading, login, signup, logout, refreshUser }),
-    [user, token, loading, login, signup, logout, refreshUser],
+    () => ({ user, token, loading, login, signup, logout, refreshUser, switchCompany, createCompany }),
+    [user, token, loading, login, signup, logout, refreshUser, switchCompany, createCompany],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

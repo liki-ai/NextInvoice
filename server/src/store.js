@@ -251,6 +251,7 @@ const FREE_MONTHLY_LIMIT = 10;
  * comma-separated. Kept in the server's environment, not in this repository, which is public.
  */
 function isComplimentary(user) {
+  user = billingAccount(user);
   if (!user) return false;
   const list = String(process.env.PREMIUM_ACCOUNTS || '')
     .split(/[,;\s]+/)
@@ -260,6 +261,7 @@ function isComplimentary(user) {
 }
 
 function isPremiumUser(user) {
+  user = billingAccount(user);
   if (isComplimentary(user)) return true;
   if (!user || user.plan !== 'premium') return false;
   if (user.planExpiresAt) {
@@ -271,14 +273,15 @@ function isPremiumUser(user) {
 
 function publicUser(user) {
   const premium = isPremiumUser(user);
+  const account = billingAccount(user);
   return {
     id: user.id,
-    email: user.email,
+    email: user.email || account.email,
     createdAt: user.createdAt,
     plan: premium ? 'premium' : 'free',
     // 'complimentary': the app shows no subscription to this company at all.
-    billingSource: isComplimentary(user) ? 'complimentary' : user.billingSource || null,
-    planExpiresAt: user.planExpiresAt || null,
+    billingSource: isComplimentary(user) ? 'complimentary' : account.billingSource || null,
+    planExpiresAt: account.planExpiresAt || null,
   };
 }
 
@@ -302,22 +305,82 @@ function roleOf(user) {
   return user.role === 'admin' ? 'admin' : 'member';
 }
 
+// ---- several companies under one account ------------------------------------------------------
+// The account can open further companies (e.g. a US LLC next to the Kosovo company). Each keeps its
+// own profile, invoices, clients and settings under its own id; its users and its plan are those of
+// the company that opened it. Such a company is a record in `users` with `kind: 'company'` and a
+// `parentId`, with no email or password, so nobody ever signs in as it.
+
+const COMPANIES_MAX = 10;
+
+/** The account whose plan and billing apply: the company that opened this one, or itself. */
+function billingAccount(user) {
+  if (user && user.parentId) return findUserById(user.parentId) || user;
+  return user;
+}
+
+/** The main company first, then the ones opened from it, oldest first. */
+function companiesOf(primaryId) {
+  const db = readDb();
+  const primary = db.users.find((item) => item.id === primaryId);
+  const opened = db.users
+    .filter((item) => item.kind === 'company' && item.parentId === primaryId)
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  return primary ? [primary, ...opened] : opened;
+}
+
+function companyChoice(db, company) {
+  const profile = db.profiles[company.id] || {};
+  return { id: company.id, companyName: profile.companyName || '', currency: profile.currency || 'EUR' };
+}
+
+/** Opens a new company under the main one, with the main one's language and a profile to fill in. */
+function createCompany(primaryId, { companyName, currency, createdBy }) {
+  return withWriteLock(async () => {
+    const db = readDb();
+    const name = String(companyName || '').trim().slice(0, 160);
+    if (!name) throw teamError('COMPANY_NAME_REQUIRED');
+    if (companiesOf(primaryId).length >= COMPANIES_MAX) throw teamError('COMPANIES_FULL');
+    const parentProfile = db.profiles[primaryId] || {};
+    const company = { id: crypto.randomUUID(), kind: 'company', parentId: primaryId, email: '', createdAt: nowIso(), createdBy: createdBy || '' };
+    db.users.push(company);
+    db.profiles[company.id] = {
+      ...DEFAULT_COMPANY_PROFILE,
+      companyName: name,
+      currency: /^[A-Z]{3}$/.test(String(currency || '')) ? currency : parentProfile.currency || DEFAULT_COMPANY_PROFILE.currency,
+      language: normalizeLang(parentProfile.language),
+      industry: parentProfile.industry || DEFAULT_COMPANY_PROFILE.industry,
+    };
+    ensureUserCollections(db, company.id);
+    db.migrations[company.id] = { v: DATA_VERSION, at: nowIso() };
+    await writeDb(db);
+    return companyChoice(db, company);
+  });
+}
+
 /**
- * The signed-in person as the apps see them. `id` is the company's data key, which every route
- * reads and writes under; `accountId` and `email` are the person's own.
+ * The signed-in person as the apps see them. `id` is the data key of the company they are working
+ * in, which every route reads and writes under: the one asked for (`companyId`, when it is one of
+ * theirs), else their main company. `teamId` is the main company, which holds the users and the
+ * plan; `accountId` and `email` are the person's own.
  */
-function sessionUser(user) {
-  const owner = companyOwner(user);
-  if (!owner) return null;
-  const profile = readDb().profiles[owner.id] || {};
+function sessionUser(user, companyId) {
+  const primary = companyOwner(user);
+  if (!primary) return null;
+  const db = readDb();
+  const companies = companiesOf(primary.id);
+  const owner = (companyId && companies.find((item) => item.id === companyId)) || primary;
+  const profile = db.profiles[owner.id] || {};
   return {
     ...publicUser(owner),
     id: owner.id,
+    teamId: primary.id,
     accountId: user.id,
     email: user.email,
     createdAt: user.createdAt,
     role: roleOf(user),
     companyName: profile.companyName || '',
+    companies: companies.map((item) => companyChoice(db, item)),
   };
 }
 
@@ -496,7 +559,7 @@ async function createUser({ email, passwordHash, language, industry }) {
 function findUserByEmail(email) {
   const db = readDb();
   const normalized = normalizeEmail(email);
-  const matches = db.users.filter((u) => u.email === normalized);
+  const matches = normalized ? db.users.filter((u) => u.email === normalized && u.kind !== 'company') : [];
   if (matches.length === 0) return null;
   return matches.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
 }
@@ -592,7 +655,7 @@ function invoicesCreatedThisMonth(userId, now = new Date()) {
 }
 
 function canCreateInvoice(userId) {
-  const user = findUserById(userId);
+  const user = billingAccount(findUserById(userId));
   if (isPremiumUser(user)) {
     return {
       ok: true,
@@ -1934,6 +1997,8 @@ module.exports = {
   FREE_MONTHLY_LIMIT,
   publicUser,
   sessionUser,
+  billingAccount,
+  createCompany,
   listTeam,
   addMember,
   setMemberRole,

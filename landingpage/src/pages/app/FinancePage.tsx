@@ -6,7 +6,7 @@ import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, Select } from '../../components/ui'
 import { BankMatchModal } from '../../components/BankMatchModal'
-import { api, apiBase, getToken } from '../../lib/api'
+import { api, apiBase, authHeaders } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { currencySymbol, formatMoney } from '../../lib/invoice'
 import {
@@ -57,7 +57,7 @@ function monthName(period: string, lang: string) {
 }
 
 async function fetchFile(doc: FinanceDoc) {
-  const res = await fetch(`${apiBase()}/api/finance/documents/${doc.id}/file`, { headers: { Authorization: `Bearer ${getToken()}` } })
+  const res = await fetch(`${apiBase()}/api/finance/documents/${doc.id}/file`, { headers: authHeaders() })
   if (!res.ok) throw new Error(String(res.status))
   return res.blob()
 }
