@@ -484,7 +484,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$6 = {
+const sq$7 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -748,7 +748,7 @@ const sq$6 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$6 = {
+const en$7 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -1012,8 +1012,8 @@ const en$6 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$6 = {
-	...en$6,
+const it$7 = {
+	...en$7,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1279,17 +1279,17 @@ const it$6 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$6,
+		...sq$7,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$6,
+		...en$7,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$6,
+		...it$7,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1301,7 +1301,7 @@ const financeNav = {
 };
 //#endregion
 //#region src/i18nMercury.ts
-const sq$5 = {
+const sq$6 = {
 	tab: "Mercury",
 	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
 	settings: "Lidhja me Mercury",
@@ -1395,7 +1395,7 @@ const sq$5 = {
 		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
 	}
 };
-const en$5 = {
+const en$6 = {
 	tab: "Mercury",
 	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
 	settings: "Mercury connection",
@@ -1490,10 +1490,10 @@ const en$5 = {
 	}
 };
 const mercuryTexts = {
-	sq: sq$5,
-	en: en$5,
+	sq: sq$6,
+	en: en$6,
 	it: {
-		...en$5,
+		...en$6,
 		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
 		settings: "Collegamento Mercury",
 		syncNow: "Aggiorna",
@@ -1544,7 +1544,7 @@ const mercuryTexts = {
 };
 //#endregion
 //#region src/i18nProjectDetail.ts
-const sq$4 = {
+const sq$5 = {
 	back: "Të gjitha projektet",
 	addProject: "Shto projekt",
 	projectName: "Emri, p.sh. TeamPlaner",
@@ -1607,7 +1607,7 @@ const sq$4 = {
 		costPerHour: "Kosto / orë"
 	}
 };
-const en$4 = {
+const en$5 = {
 	back: "All projects",
 	addProject: "Add project",
 	projectName: "Name, e.g. TeamPlaner",
@@ -1671,10 +1671,10 @@ const en$4 = {
 	}
 };
 const projectDetailTexts = {
-	sq: sq$4,
-	en: en$4,
+	sq: sq$5,
+	en: en$5,
 	it: {
-		...en$4,
+		...en$5,
 		back: "Tutti i progetti",
 		addProject: "Aggiungi progetto",
 		projectName: "Nome, es. TeamPlaner",
@@ -1696,7 +1696,7 @@ const projectDetailTexts = {
 		monthlyTitle: "Mese per mese: ricavi contro costi",
 		teamTitle: "Squadra ({count})",
 		col: {
-			...en$4.col,
+			...en$5.col,
 			month: "Mese",
 			hours: "Ore",
 			cost: "Costo",
@@ -2965,6 +2965,41 @@ const companiesTexts = {
 		unnamed: "Senza nome"
 	}
 };
+const notesTexts = {
+	sq: {
+		addLink: "Shto link",
+		hint: "Zgjidh një pjesë të tekstit, p.sh. “Paguaj këtu”, dhe kliko Shto link. Klienti e klikon në faturë, në PDF dhe në lidhjen e faturës.",
+		url: "Adresa e linkut",
+		urlPlaceholder: "https://buy.stripe.com/…",
+		linkText: "Teksti që shihet",
+		defaultText: "Paguaj online",
+		apply: "Vendos linkun",
+		urlInvalid: "Shkruaj një adresë që fillon me https://",
+		onInvoice: "Në faturë:"
+	},
+	en: {
+		addLink: "Add link",
+		hint: "Select part of the text, e.g. “Pay here”, and click Add link. The client can click it on the invoice, in the PDF and on the invoice link.",
+		url: "Link address",
+		urlPlaceholder: "https://buy.stripe.com/…",
+		linkText: "Text shown",
+		defaultText: "Pay online",
+		apply: "Insert link",
+		urlInvalid: "Enter an address starting with https://",
+		onInvoice: "On the invoice:"
+	},
+	it: {
+		addLink: "Aggiungi link",
+		hint: "Seleziona una parte del testo, ad es. “Paga qui”, e clicca Aggiungi link. Il cliente lo clicca sulla fattura, nel PDF e nel link della fattura.",
+		url: "Indirizzo del link",
+		urlPlaceholder: "https://buy.stripe.com/…",
+		linkText: "Testo visibile",
+		defaultText: "Paga online",
+		apply: "Inserisci link",
+		urlInvalid: "Inserisci un indirizzo che inizia con https://",
+		onInvoice: "Sulla fattura:"
+	}
+};
 //#endregion
 //#region src/i18nCore.ts
 const LANGS = [
@@ -2996,6 +3031,7 @@ const translations = {
 		slack: slackTexts.sq,
 		contracts: contractsTexts.sq,
 		companies: companiesTexts.sq,
+		notesEditor: notesTexts.sq,
 		nav: {
 			finance: financeNav.sq,
 			recurring: recurringNav.sq,
@@ -3993,6 +4029,7 @@ const translations = {
 		slack: slackTexts.en,
 		contracts: contractsTexts.en,
 		companies: companiesTexts.en,
+		notesEditor: notesTexts.en,
 		nav: {
 			finance: financeNav.en,
 			recurring: recurringNav.en,
@@ -4990,6 +5027,7 @@ const translations = {
 		slack: slackTexts.it,
 		contracts: contractsTexts.it,
 		companies: companiesTexts.it,
+		notesEditor: notesTexts.it,
 		nav: {
 			finance: financeNav.it,
 			recurring: recurringNav.it,
@@ -6136,6 +6174,31 @@ function resolveAccent(template, accentColor) {
 function esc(value) {
 	return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+const NOTE_LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]])/g;
+/** The notes as plain text and links, in order. */
+function noteParts(notes) {
+	const text = String(notes || "");
+	const parts = [];
+	let last = 0;
+	for (const match of text.matchAll(NOTE_LINK)) {
+		const at = match.index ?? 0;
+		if (at > last) parts.push({ text: text.slice(last, at) });
+		parts.push(match[3] ? {
+			text: match[3],
+			href: match[3]
+		} : {
+			text: match[1],
+			href: match[2]
+		});
+		last = at + match[0].length;
+	}
+	if (last < text.length) parts.push({ text: text.slice(last) });
+	return parts;
+}
+/** The notes for the printed invoice, with their links clickable in the page and in the PDF. */
+function notesHtml(notes, accent) {
+	return noteParts(notes).map((part) => part.href ? `<a href="${esc(part.href)}" target="_blank" rel="noopener noreferrer" style="color: ${accent}; font-weight: 600; text-decoration: underline; word-break: break-all;">${esc(part.text)}</a>` : esc(part.text)).join("");
+}
 function channels(hex) {
 	const n = parseInt(hex.slice(1), 16);
 	return [
@@ -6438,7 +6501,7 @@ function classicTemplate(v) {
       <div class="grand"><span>${esc(L.total)}</span><span>${money(v.total)}</span></div>
       ${v.showBalance ? `<div><span>${esc(L.amountPaid || "")}</span><span>${money(v.paid)}</span></div><div class="grand"><span>${esc(L.amountDue || L.total)}</span><span>${money(v.due)}</span></div>` : ""}
     </div>
-    ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ""}
+    ${invoice.notes ? `<div class="notes pre">${notesHtml(invoice.notes, accent)}</div>` : ""}
     ${v.hasPayment ? `<div class="payment keep"><div class="label">${esc(L.paymentInfo)}</div>${paymentLines(v)}</div>` : ""}
     <div class="thanks">${esc(L.thankYou)}</div>
     ${v.exportNote ? `<div class="law">${esc(v.exportNote)}</div>` : ""}
@@ -6594,7 +6657,7 @@ function corporateTemplate(v) {
                <tr class="grand"><td class="k">${esc(L.amountDue || L.total)}</td><td><div class="amount">${cell(v.due)}</div></td></tr>` : ""}
       </table>
     </div>
-    ${invoice.notes ? `<div class="notes pre">${esc(invoice.notes)}</div>` : ""}
+    ${invoice.notes ? `<div class="notes pre">${notesHtml(invoice.notes, accent)}</div>` : ""}
     <div class="signs keep">
       <div class="sign">
         <b>${esc(L.signature || "Signature")} (${esc(company.companyName)}):</b>
@@ -6711,7 +6774,7 @@ function minimalTemplate(v) {
     <div class="after keep">
       <div class="side">
         ${v.hasPayment ? `<div class="block"><div class="cap">${esc(L.paymentDetails || L.paymentInfo)}</div>${paymentLines(v)}</div>` : ""}
-        ${invoice.notes ? `<div class="block pre">${esc(invoice.notes)}</div>` : ""}
+        ${invoice.notes ? `<div class="block pre">${notesHtml(invoice.notes, accent)}</div>` : ""}
       </div>
       <div class="totals">
         <div class="kv"><span>${esc(L.subtotal)}</span><span>${money(v.subtotal)}</span></div>
