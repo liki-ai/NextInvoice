@@ -484,7 +484,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$5 = {
+const sq$6 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -748,7 +748,7 @@ const sq$5 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$5 = {
+const en$6 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -1012,8 +1012,8 @@ const en$5 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$5 = {
-	...en$5,
+const it$6 = {
+	...en$6,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1279,17 +1279,17 @@ const it$5 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$5,
+		...sq$6,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$5,
+		...en$6,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$5,
+		...it$6,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1301,7 +1301,7 @@ const financeNav = {
 };
 //#endregion
 //#region src/i18nMercury.ts
-const sq$4 = {
+const sq$5 = {
 	tab: "Mercury",
 	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
 	settings: "Lidhja me Mercury",
@@ -1395,7 +1395,7 @@ const sq$4 = {
 		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
 	}
 };
-const en$4 = {
+const en$5 = {
 	tab: "Mercury",
 	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
 	settings: "Mercury connection",
@@ -1490,10 +1490,10 @@ const en$4 = {
 	}
 };
 const mercuryTexts = {
-	sq: sq$4,
-	en: en$4,
+	sq: sq$5,
+	en: en$5,
 	it: {
-		...en$4,
+		...en$5,
 		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
 		settings: "Collegamento Mercury",
 		syncNow: "Aggiorna",
@@ -1544,7 +1544,7 @@ const mercuryTexts = {
 };
 //#endregion
 //#region src/i18nProjectDetail.ts
-const sq$3 = {
+const sq$4 = {
 	back: "Të gjitha projektet",
 	addProject: "Shto projekt",
 	projectName: "Emri, p.sh. TeamPlaner",
@@ -1607,7 +1607,7 @@ const sq$3 = {
 		costPerHour: "Kosto / orë"
 	}
 };
-const en$3 = {
+const en$4 = {
 	back: "All projects",
 	addProject: "Add project",
 	projectName: "Name, e.g. TeamPlaner",
@@ -1671,10 +1671,10 @@ const en$3 = {
 	}
 };
 const projectDetailTexts = {
-	sq: sq$3,
-	en: en$3,
+	sq: sq$4,
+	en: en$4,
 	it: {
-		...en$3,
+		...en$4,
 		back: "Tutti i progetti",
 		addProject: "Aggiungi progetto",
 		projectName: "Nome, es. TeamPlaner",
@@ -1696,7 +1696,7 @@ const projectDetailTexts = {
 		monthlyTitle: "Mese per mese: ricavi contro costi",
 		teamTitle: "Squadra ({count})",
 		col: {
-			...en$3.col,
+			...en$4.col,
 			month: "Mese",
 			hours: "Ore",
 			cost: "Costo",
@@ -1776,6 +1776,17 @@ const recurringTexts = {
 		repeatNextManual: "Fatura e radhës krijohet më {date} si draft, që ta shikosh dhe ta dërgosh vetë.",
 		repeatNoEmail: "Klienti nuk ka email. Shtoje te klienti që fatura të dërgohet.",
 		repeatFailed: "Fatura u ruajt, por plani periodik nuk u krijua: {error}",
+		repeatMake: "Bëje periodike",
+		repeatOn: "Periodike",
+		repeatHint: "Kjo faturë është periudha e parë; të tjerat krijohen vetë me të njëjtat rreshta, për të njëjtin klient.",
+		repeatOnSave: "Plani fillon kur ruhet fatura.",
+		repeatNowAuto: "Fatura e radhës, për periudhën nga {date}, krijohet tani dhe i dërgohet klientit me email.",
+		repeatNowManual: "Fatura e radhës, për periudhën nga {date}, krijohet tani si draft, që ta shikosh dhe ta dërgosh vetë.",
+		repeatNoClient: "Kjo faturë nuk është e lidhur me një klient të ruajtur. Hape për ta ndryshuar, zgjidh klientin nga lista dhe provo sërish.",
+		repeatSet: "Vendos",
+		repeatStart: "Fillo planin",
+		repeatRemove: "Hiq",
+		repeatStarted: "Plani periodik filloi.",
 		nextManual: "Fatura tjetër: periudha {from} – {to}, krijohet si draft më {date}",
 		editTitle: "Plan periodik",
 		periodNote: "Periudha: {from} – {to}",
@@ -2000,6 +2011,17 @@ const recurringTexts = {
 		repeatNextManual: "The next invoice is created on {date} as a draft, for you to check and send.",
 		repeatNoEmail: "The client has no email address. Add one to the client so the invoice can be sent.",
 		repeatFailed: "The invoice was saved, but the recurring plan was not created: {error}",
+		repeatMake: "Make recurring",
+		repeatOn: "Recurring",
+		repeatHint: "This invoice is the first period; the next ones are made by themselves with the same lines, for the same client.",
+		repeatOnSave: "The plan starts when the invoice is saved.",
+		repeatNowAuto: "The next invoice, for the period from {date}, is made now and emailed to the client.",
+		repeatNowManual: "The next invoice, for the period from {date}, is made now as a draft, for you to check and send.",
+		repeatNoClient: "This invoice is not linked to a saved client. Open it to change it, pick the client from the list and try again.",
+		repeatSet: "Set",
+		repeatStart: "Start the plan",
+		repeatRemove: "Remove",
+		repeatStarted: "The recurring plan has started.",
 		nextManual: "Next invoice: period {from} – {to}, created as a draft on {date}",
 		editTitle: "Recurring plan",
 		periodNote: "Period: {from} – {to}",
@@ -2224,6 +2246,17 @@ const recurringTexts = {
 		repeatNextManual: "La prossima fattura viene creata il {date} come bozza, da controllare e inviare tu.",
 		repeatNoEmail: "Il cliente non ha un indirizzo email. Aggiungilo al cliente perché la fattura possa essere inviata.",
 		repeatFailed: "La fattura è stata salvata, ma il piano ricorrente non è stato creato: {error}",
+		repeatMake: "Rendi ricorrente",
+		repeatOn: "Ricorrente",
+		repeatHint: "Questa fattura è il primo periodo; le prossime si creano da sole con le stesse righe, per lo stesso cliente.",
+		repeatOnSave: "Il piano parte quando la fattura viene salvata.",
+		repeatNowAuto: "La prossima fattura, per il periodo dal {date}, viene creata ora e inviata al cliente per email.",
+		repeatNowManual: "La prossima fattura, per il periodo dal {date}, viene creata ora come bozza, da controllare e inviare.",
+		repeatNoClient: "Questa fattura non è collegata a un cliente salvato. Aprila per modificarla, scegli il cliente dalla lista e riprova.",
+		repeatSet: "Imposta",
+		repeatStart: "Avvia il piano",
+		repeatRemove: "Rimuovi",
+		repeatStarted: "Il piano ricorrente è partito.",
 		nextManual: "Prossima fattura: periodo {from} – {to}, creata come bozza il {date}",
 		editTitle: "Piano ricorrente",
 		periodNote: "Periodo: {from} – {to}",
@@ -2885,6 +2918,53 @@ const contractsTexts = {
 		}
 	}
 };
+const companiesTexts = {
+	sq: {
+		label: "Kompania",
+		switch: "Ndrro kompaninë",
+		main: "Kryesore",
+		add: "Shto kompani",
+		addTitle: "Kompani e re",
+		addHint: "Kompania e re ka faturat, klientët, artikujt dhe profilin e vet. Përdoruesit dhe plani janë të njëjtët si te kompania kryesore. Pasi ta krijosh, plotëso të dhënat e saj te Cilësimet.",
+		name: "Emri i kompanisë",
+		namePlaceholder: "p.sh. Tretek LLC",
+		currency: "Valuta",
+		create: "Krijo dhe hape",
+		creating: "Po krijohet…",
+		nameRequired: "Shkruaj emrin e kompanisë.",
+		unnamed: "Pa emër"
+	},
+	en: {
+		label: "Company",
+		switch: "Switch company",
+		main: "Main",
+		add: "Add company",
+		addTitle: "New company",
+		addHint: "The new company has its own invoices, clients, items and profile. Its users and plan are those of the main company. Once it is created, fill in its details in Settings.",
+		name: "Company name",
+		namePlaceholder: "e.g. Tretek LLC",
+		currency: "Currency",
+		create: "Create and open",
+		creating: "Creating…",
+		nameRequired: "Enter the company name.",
+		unnamed: "Unnamed"
+	},
+	it: {
+		label: "Azienda",
+		switch: "Cambia azienda",
+		main: "Principale",
+		add: "Aggiungi azienda",
+		addTitle: "Nuova azienda",
+		addHint: "La nuova azienda ha fatture, clienti, articoli e profilo propri. Utenti e piano sono quelli dell’azienda principale. Dopo averla creata, completa i suoi dati nelle Impostazioni.",
+		name: "Nome dell’azienda",
+		namePlaceholder: "es. Tretek LLC",
+		currency: "Valuta",
+		create: "Crea e apri",
+		creating: "Creazione…",
+		nameRequired: "Inserisci il nome dell’azienda.",
+		unnamed: "Senza nome"
+	}
+};
 //#endregion
 //#region src/i18nCore.ts
 const LANGS = [
@@ -2915,6 +2995,7 @@ const translations = {
 		recurring: recurringTexts.sq,
 		slack: slackTexts.sq,
 		contracts: contractsTexts.sq,
+		companies: companiesTexts.sq,
 		nav: {
 			finance: financeNav.sq,
 			recurring: recurringNav.sq,
@@ -3911,6 +3992,7 @@ const translations = {
 		recurring: recurringTexts.en,
 		slack: slackTexts.en,
 		contracts: contractsTexts.en,
+		companies: companiesTexts.en,
 		nav: {
 			finance: financeNav.en,
 			recurring: recurringNav.en,
@@ -4907,6 +4989,7 @@ const translations = {
 		recurring: recurringTexts.it,
 		slack: slackTexts.it,
 		contracts: contractsTexts.it,
+		companies: companiesTexts.it,
 		nav: {
 			finance: financeNav.it,
 			recurring: recurringNav.it,
