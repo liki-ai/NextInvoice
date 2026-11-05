@@ -1,5 +1,7 @@
 const TOKEN_KEY = 'nextinvoice.token'
-// Which of the account's companies this browser works in; the server checks it is one of theirs.
+// Which of the account's companies a tab works in; the server checks it is one of theirs. Tabs share
+// localStorage but not sessionStorage: the last choice opens new tabs, and each open tab stays with
+// its own, so what it saves goes to the company it shows, whatever another tab switches to.
 const COMPANY_KEY = 'nextinvoice.company'
 
 const HOME = 'https://api.mynextinvoice.com'
@@ -23,13 +25,38 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY)
 }
 
+// Fixed when the page loads: every request of this page, to its last one, is for the same company.
+let activeCompany = sessionStorage.getItem(COMPANY_KEY) || localStorage.getItem(COMPANY_KEY)
+if (activeCompany) sessionStorage.setItem(COMPANY_KEY, activeCompany)
+
 export function getActiveCompany() {
-  return localStorage.getItem(COMPANY_KEY)
+  return activeCompany
 }
 
+/** This tab keeps working in this company, as the server has said; other tabs are not affected. */
+export function keepTabCompany(id: string) {
+  activeCompany = id
+  sessionStorage.setItem(COMPANY_KEY, id)
+}
+
+/** Signing in or out: this tab, and tabs opened from now on, start in this company. */
 export function setActiveCompany(id: string | null) {
-  if (id) localStorage.setItem(COMPANY_KEY, id)
-  else localStorage.removeItem(COMPANY_KEY)
+  activeCompany = id
+  chooseCompanyForNextLoad(id)
+}
+
+/**
+ * The company this tab and new tabs open in the next time the page loads. The page still open keeps
+ * its own until then, so a draft it is saving as it leaves does not land in the company being opened.
+ */
+export function chooseCompanyForNextLoad(id: string | null) {
+  if (id) {
+    sessionStorage.setItem(COMPANY_KEY, id)
+    localStorage.setItem(COMPANY_KEY, id)
+  } else {
+    sessionStorage.removeItem(COMPANY_KEY)
+    localStorage.removeItem(COMPANY_KEY)
+  }
 }
 
 /** For requests made without api(), such as file downloads: the session and the company it works in. */

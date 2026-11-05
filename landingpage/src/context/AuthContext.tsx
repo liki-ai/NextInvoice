@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, getToken, setActiveCompany, setToken } from '../lib/api'
+import { api, chooseCompanyForNextLoad, getActiveCompany, getToken, keepTabCompany, setActiveCompany, setToken } from '../lib/api'
 
 /** One of the companies the account works in. */
 export type CompanyChoice = { id: string; companyName: string; currency?: string }
@@ -44,7 +44,10 @@ const USER_KEY = 'nextinvoice.user'
 
 function rememberedUser(): User | null {
   try {
-    return JSON.parse(localStorage.getItem(USER_KEY) || 'null') as User | null
+    const seen = JSON.parse(localStorage.getItem(USER_KEY) || 'null') as User | null
+    // Last seen by any tab, perhaps in another company: this tab shows the one it works in.
+    const company = seen?.companies?.find((item) => item.id === getActiveCompany())
+    return seen && company ? { ...seen, id: company.id, companyName: company.companyName } : seen
   } catch {
     return null
   }
@@ -72,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       api<{ user: User }>('/api/auth/me', { token: current })
         .then((res) => {
           // A company that is no longer theirs falls back to the main one on the server; follow it.
-          setActiveCompany(res.user.id)
+          if (res.user.id !== getActiveCompany()) keepTabCompany(res.user.id)
           rememberUser(res.user)
           setUser(res.user)
           setTokenState(current)
@@ -143,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const switchCompany = useCallback((id: string, path = '/app') => {
-    setActiveCompany(id)
+    chooseCompanyForNextLoad(id)
     // A full load: every page and list starts over with the other company's data.
     window.location.assign(path)
   }, [])
