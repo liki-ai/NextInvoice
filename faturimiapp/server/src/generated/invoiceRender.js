@@ -3857,6 +3857,8 @@ const translations = {
 			roleMember: "Përdorues",
 			roleAdminHint: "Administratori ndryshon edhe cilësimet e kompanisë dhe përdoruesit.",
 			roleMemberHint: "Përdoruesi punon me fatura, klientë, artikuj dhe detyrime.",
+			roleInvoicer: "Faturues",
+			roleInvoicerHint: "Faturuesi shton dhe dërgon fatura, shton klientë dhe sheh vetëm faturat që ka shtuar vetë.",
 			email: "Email",
 			added: "Shtuar më {date}",
 			addTitle: "Shto përdorues",
@@ -3888,7 +3890,8 @@ const translations = {
 			errPasswordShort: "Fjalëkalimi duhet të ketë të paktën 8 shkronja.",
 			errManagerOnly: "Vetëm një administrator i kompanisë mund ta bëjë këtë.",
 			errOwnerFixed: "Pronari i kompanisë nuk mund të ndryshohet ose të hiqet.",
-			errSelfFixed: "Nuk mund ta ndryshosh ose ta heqësh qasjen tënde."
+			errSelfFixed: "Nuk mund ta ndryshosh ose ta heqësh qasjen tënde.",
+			errInvoicerOnly: "Me rolin tënd mund vetëm të shtosh dhe të dërgosh fatura."
 		},
 		importer: {
 			button: "Importo nga Excel",
@@ -4855,6 +4858,8 @@ const translations = {
 			roleMember: "User",
 			roleAdminHint: "An administrator can also change the company settings and the users.",
 			roleMemberHint: "A user works with invoices, clients, items and bills.",
+			roleInvoicer: "Invoicer",
+			roleInvoicerHint: "An invoicer adds and sends invoices, adds clients and sees only the invoices they added.",
 			email: "Email",
 			added: "Added on {date}",
 			addTitle: "Add a user",
@@ -4886,7 +4891,8 @@ const translations = {
 			errPasswordShort: "The password must be at least 8 characters.",
 			errManagerOnly: "Only an administrator of the company can do this.",
 			errOwnerFixed: "The owner of the company cannot be changed or removed.",
-			errSelfFixed: "You cannot change or remove your own access."
+			errSelfFixed: "You cannot change or remove your own access.",
+			errInvoicerOnly: "Your role can only add and send invoices."
 		},
 		importer: {
 			button: "Import from Excel",
@@ -5853,6 +5859,8 @@ const translations = {
 			roleMember: "Utente",
 			roleAdminHint: "L'amministratore può modificare anche le impostazioni dell'azienda e gli utenti.",
 			roleMemberHint: "L'utente lavora con fatture, clienti, articoli e spese.",
+			roleInvoicer: "Fatturatore",
+			roleInvoicerHint: "Il fatturatore aggiunge e invia fatture, aggiunge clienti e vede solo le fatture che ha aggiunto.",
 			email: "Email",
 			added: "Aggiunto il {date}",
 			addTitle: "Aggiungi utente",
@@ -5884,7 +5892,8 @@ const translations = {
 			errPasswordShort: "La password deve avere almeno 8 caratteri.",
 			errManagerOnly: "Solo un amministratore dell'azienda può farlo.",
 			errOwnerFixed: "Il titolare dell'azienda non può essere modificato o rimosso.",
-			errSelfFixed: "Non puoi modificare o rimuovere il tuo accesso."
+			errSelfFixed: "Non puoi modificare o rimuovere il tuo accesso.",
+			errInvoicerOnly: "Con il tuo ruolo puoi solo aggiungere e inviare fatture."
 		},
 		importer: {
 			button: "Importa da Excel",
