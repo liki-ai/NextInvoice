@@ -3859,6 +3859,11 @@ const translations = {
 			roleMemberHint: "Përdoruesi punon me fatura, klientë, artikuj dhe detyrime.",
 			roleInvoicer: "Faturues",
 			roleInvoicerHint: "Faturuesi shton dhe dërgon fatura, shton klientë dhe sheh vetëm faturat që ka shtuar vetë.",
+			companies: "Kompanitë",
+			companiesHint: "Përdoruesi punon vetëm në kompanitë e zgjedhura.",
+			allCompanies: "Të gjitha kompanitë",
+			editCompanies: "Ndrysho kompanitë",
+			doneCompanies: "Mbyll",
 			email: "Email",
 			added: "Shtuar më {date}",
 			addTitle: "Shto përdorues",
@@ -3891,6 +3896,7 @@ const translations = {
 			errManagerOnly: "Vetëm një administrator i kompanisë mund ta bëjë këtë.",
 			errOwnerFixed: "Pronari i kompanisë nuk mund të ndryshohet ose të hiqet.",
 			errSelfFixed: "Nuk mund ta ndryshosh ose ta heqësh qasjen tënde.",
+			errCompaniesRequired: "Zgjidh të paktën një kompani.",
 			errInvoicerOnly: "Me rolin tënd mund vetëm të shtosh dhe të dërgosh fatura."
 		},
 		importer: {
@@ -4860,6 +4866,11 @@ const translations = {
 			roleMemberHint: "A user works with invoices, clients, items and bills.",
 			roleInvoicer: "Invoicer",
 			roleInvoicerHint: "An invoicer adds and sends invoices, adds clients and sees only the invoices they added.",
+			companies: "Companies",
+			companiesHint: "The user works only in the companies chosen.",
+			allCompanies: "All companies",
+			editCompanies: "Change companies",
+			doneCompanies: "Close",
 			email: "Email",
 			added: "Added on {date}",
 			addTitle: "Add a user",
@@ -4892,6 +4903,7 @@ const translations = {
 			errManagerOnly: "Only an administrator of the company can do this.",
 			errOwnerFixed: "The owner of the company cannot be changed or removed.",
 			errSelfFixed: "You cannot change or remove your own access.",
+			errCompaniesRequired: "Choose at least one company.",
 			errInvoicerOnly: "Your role can only add and send invoices."
 		},
 		importer: {
@@ -5861,6 +5873,11 @@ const translations = {
 			roleMemberHint: "L'utente lavora con fatture, clienti, articoli e spese.",
 			roleInvoicer: "Fatturatore",
 			roleInvoicerHint: "Il fatturatore aggiunge e invia fatture, aggiunge clienti e vede solo le fatture che ha aggiunto.",
+			companies: "Aziende",
+			companiesHint: "L'utente lavora solo nelle aziende scelte.",
+			allCompanies: "Tutte le aziende",
+			editCompanies: "Modifica aziende",
+			doneCompanies: "Chiudi",
 			email: "Email",
 			added: "Aggiunto il {date}",
 			addTitle: "Aggiungi utente",
@@ -5893,6 +5910,7 @@ const translations = {
 			errManagerOnly: "Solo un amministratore dell'azienda può farlo.",
 			errOwnerFixed: "Il titolare dell'azienda non può essere modificato o rimosso.",
 			errSelfFixed: "Non puoi modificare o rimuovere il tuo accesso.",
+			errCompaniesRequired: "Scegli almeno un'azienda.",
 			errInvoicerOnly: "Con il tuo ruolo puoi solo aggiungere e inviare fatture."
 		},
 		importer: {
