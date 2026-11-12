@@ -18,6 +18,7 @@ const TEAM_ERRORS = {
   TEAM_FULL: [409, 'The company has reached the maximum number of users.'],
   OWNER_FIXED: [409, 'The owner of the company cannot be changed or removed.'],
   SELF_FIXED: [409, 'You cannot change or remove your own access.'],
+  COMPANIES_REQUIRED: [400, 'Choose at least one company.'],
 };
 
 function fail(code) {
@@ -38,6 +39,7 @@ function describe(user) {
   return {
     members: team.members.map((item) => ({ ...item, you: item.id === user.accountId })),
     invites: team.invites,
+    companies: team.companies,
     canManage: user.role === 'owner' || user.role === 'admin',
     mailReady: mailReady(getMailSettings(user.id)) || mailReady(getMailSettings(personalMailKey(user.accountId))),
   };
@@ -64,7 +66,7 @@ router.post('/members', managerRequired, async (req, res, next) => {
     const password = String((req.body && req.body.password) || '');
     if (!email) throw fail('EMAIL_INVALID');
     if (password.length < 8) throw fail('PASSWORD_SHORT');
-    await addMember(req.user.teamId, { email, passwordHash: await bcrypt.hash(password, 12), role: req.body.role, addedBy: req.user.email });
+    await addMember(req.user.teamId, { email, passwordHash: await bcrypt.hash(password, 12), role: req.body.role, addedBy: req.user.email, companyIds: req.body.companyIds });
     res.status(201).json(describe(req.user));
   } catch (err) {
     if (!sendTeamError(res, err)) next(err);
@@ -74,7 +76,8 @@ router.post('/members', managerRequired, async (req, res, next) => {
 router.patch('/members/:id', managerRequired, (req, res, next) => {
   try {
     assertTarget(req.user, req.params.id);
-    if (!setMemberRole(req.user.teamId, req.params.id, req.body && req.body.role)) return res.status(404).json({ error: 'User not found.' });
+    const body = req.body || {};
+    if (!setMemberRole(req.user.teamId, req.params.id, body.role, { companyIds: body.companyIds })) return res.status(404).json({ error: 'User not found.' });
     res.json(describe(req.user));
   } catch (err) {
     if (!sendTeamError(res, err)) next(err);
@@ -100,7 +103,7 @@ router.post('/invites', managerRequired, async (req, res, next) => {
   try {
     const email = cleanEmail(req.body && req.body.email);
     if (!email) throw fail('EMAIL_INVALID');
-    const { invite, token } = createInvite(req.user.teamId, { email, role: req.body.role, invitedBy: req.user.email });
+    const { invite, token } = createInvite(req.user.teamId, { email, role: req.body.role, invitedBy: req.user.email, companyIds: req.body.companyIds });
     const link = inviteLink(token);
     const result = { ...describe(req.user), invite, link, emailed: false };
 

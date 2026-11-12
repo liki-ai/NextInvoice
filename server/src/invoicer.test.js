@@ -115,3 +115,15 @@ test('a plain user still sees every invoice and the rest of the app', async () =
   assert.equal((await call('member', 'GET', '/api/invoices')).body.invoices.length, 2);
   assert.equal((await call('member', 'GET', '/api/obligations')).status, 200);
 });
+
+test('an invoicer is proposed the next number after everyone\'s invoices', async () => {
+  const owners = await call('owner', 'POST', '/api/invoices', { ...draft('Owner Client'), number: 'NOV-007', lifecycle: 'issued' });
+  assert.equal(owners.status, 201);
+  const numbers = await call('invoicer', 'GET', '/api/invoices/numbers');
+  assert.equal(numbers.status, 200);
+  assert.ok(numbers.body.numbers.some((item) => item.number === 'NOV-007'));
+  // Whatever number an invoicer sends, an issued invoice never takes one already used.
+  const clash = await call('invoicer', 'POST', '/api/invoices', { ...draft('Sales Client'), number: 'NOV-007', lifecycle: 'issued' });
+  assert.equal(clash.status, 201);
+  assert.notEqual(clash.body.invoice.number, 'NOV-007');
+});

@@ -83,6 +83,17 @@ router.get('/', (req, res) => {
   res.json({ invoices: listInvoices(req.user.id).filter(visibleTo(req.user)) });
 });
 
+/**
+ * The numbers the company's invoices were issued with, so that an invoicer, who sees only their own
+ * invoices, is proposed the next number after everyone's and not one already taken.
+ */
+router.get('/numbers', (req, res) => {
+  const numbers = listInvoices(req.user.id)
+    .filter((invoice) => invoice.lifecycle !== 'draft' && invoice.number)
+    .map((invoice) => ({ id: invoice.id, number: invoice.number, lifecycle: invoice.lifecycle }));
+  res.json({ numbers });
+});
+
 router.post('/', (req, res) => {
   const { createdBy: _ignored, ...invoice } = req.body || {};
   if (!invoice.client || !String(invoice.client.fullName || '').trim()) {

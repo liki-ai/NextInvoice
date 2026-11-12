@@ -332,13 +332,34 @@ function companiesOf(primaryId) {
   return primary ? [primary, ...opened] : opened;
 }
 
+/**
+ * Which of the account's companies a user may work in. Members carry `companyIds` when they were
+ * given only some of them; without it (and always for the owner) they have all, including later ones.
+ */
+function mayOpenCompany(user, companyId) {
+  if (!user.companyId || !Array.isArray(user.companyIds)) return true;
+  return user.companyIds.includes(companyId);
+}
+
+/**
+ * The companies picked for a user, kept only when they are some of the account's and not all of
+ * them; null means all. None at all is refused, so nobody is left with nowhere to work.
+ */
+function companyAccess(primaryId, ids) {
+  if (!Array.isArray(ids)) return null;
+  const all = companiesOf(primaryId).map((item) => item.id);
+  const picked = all.filter((id) => ids.includes(id));
+  if (picked.length === 0) throw teamError('COMPANIES_REQUIRED');
+  return picked.length === all.length ? null : picked;
+}
+
 function companyChoice(db, company) {
   const profile = db.profiles[company.id] || {};
   return { id: company.id, companyName: profile.companyName || '', currency: profile.currency || 'EUR' };
 }
 
 /** Opens a new company under the main one, with the main one's language and a profile to fill in. */
-function createCompany(primaryId, { companyName, currency, createdBy }) {
+function createCompany(primaryId, { companyName, currency, createdBy, createdById }) {
   return withWriteLock(async () => {
     const db = readDb();
     const name = String(companyName || '').trim().slice(0, 160);
@@ -356,6 +377,9 @@ function createCompany(primaryId, { companyName, currency, createdBy }) {
     };
     ensureUserCollections(db, company.id);
     db.migrations[company.id] = { v: DATA_VERSION, at: nowIso() };
+    // An administrator given only some of the companies may work in the one they opened.
+    const opener = createdById && db.users.find((item) => item.id === createdById);
+    if (opener && Array.isArray(opener.companyIds)) opener.companyIds = [...opener.companyIds, company.id];
     await writeDb(db);
     return companyChoice(db, company);
   });
@@ -371,8 +395,10 @@ function sessionUser(user, companyId) {
   const primary = companyOwner(user);
   if (!primary) return null;
   const db = readDb();
-  const companies = companiesOf(primary.id);
-  const owner = (companyId && companies.find((item) => item.id === companyId)) || primary;
+  const companies = companiesOf(primary.id).filter((item) => mayOpenCompany(user, item.id));
+  // A user given none of the companies any more is not signed in.
+  if (companies.length === 0) return null;
+  const owner = (companyId && companies.find((item) => item.id === companyId)) || companies[0];
   const profile = db.profiles[owner.id] || {};
   return {
     ...publicUser(owner),
@@ -399,7 +425,7 @@ function liveInvites(db, ownerId) {
 }
 
 function describeInvite(invite) {
-  return { id: invite.id, email: invite.email, role: invite.role, createdAt: invite.createdAt, expiresAt: invite.expiresAt, invitedBy: invite.invitedBy || '' };
+  return { id: invite.id, email: invite.email, role: invite.role, companyIds: invite.companyIds || null, createdAt: invite.createdAt, expiresAt: invite.expiresAt, invitedBy: invite.invitedBy || '' };
 }
 
 function listTeam(ownerId) {
@@ -407,7 +433,15 @@ function listTeam(ownerId) {
   const people = db.users.filter((item) => item.id === ownerId || item.companyId === ownerId);
   people.sort((a, b) => (a.id === ownerId ? -1 : b.id === ownerId ? 1 : String(a.createdAt || '').localeCompare(String(b.createdAt || ''))));
   return {
-    members: people.map((item) => ({ id: item.id, email: item.email, role: roleOf(item), createdAt: item.createdAt, addedBy: item.addedBy || '' })),
+    members: people.map((item) => ({
+      id: item.id,
+      email: item.email,
+      role: roleOf(item),
+      companyIds: item.companyId && Array.isArray(item.companyIds) ? item.companyIds : null,
+      createdAt: item.createdAt,
+      addedBy: item.addedBy || '',
+    })),
+    companies: companiesOf(ownerId).map((item) => companyChoice(db, item)),
     invites: liveInvites(db, ownerId).map(describeInvite),
   };
 }
@@ -423,14 +457,16 @@ function assertRoomInTeam(db, ownerId, { replacingInvite } = {}) {
 }
 
 /** A user created by an administrator, with a password the administrator chose for them. */
-function addMember(ownerId, { email, passwordHash, role, addedBy }) {
+function addMember(ownerId, { email, passwordHash, role, addedBy, companyIds }) {
   return withWriteLock(async () => {
     const db = readDb();
     const normalized = normalizeEmail(email);
+    const access = companyAccess(ownerId, companyIds);
     if (db.users.some((item) => item.email === normalized)) throw teamError('EMAIL_TAKEN');
     const pending = liveInvites(db, ownerId).some((item) => item.email === normalized);
     assertRoomInTeam(db, ownerId, { replacingInvite: pending });
     const user = { id: crypto.randomUUID(), email: normalized, passwordHash, createdAt: nowIso(), companyId: ownerId, role: memberRole(role), addedBy: addedBy || '' };
+    if (access) user.companyIds = access;
     db.users.push(user);
     if (db.invites[ownerId]) db.invites[ownerId] = db.invites[ownerId].filter((item) => item.email !== normalized);
     await writeDb(db);
@@ -438,11 +474,17 @@ function addMember(ownerId, { email, passwordHash, role, addedBy }) {
   });
 }
 
-function setMemberRole(ownerId, memberId, role) {
+/** Changes a user's role, or the companies they may work in, or both; what is not given stays. */
+function setMemberRole(ownerId, memberId, role, { companyIds } = {}) {
   const db = readDb();
   const user = db.users.find((item) => item.id === memberId && item.companyId === ownerId);
   if (!user) return null;
-  user.role = memberRole(role);
+  if (companyIds !== undefined) {
+    const access = companyAccess(ownerId, companyIds);
+    if (access) user.companyIds = access;
+    else delete user.companyIds;
+  }
+  if (role !== undefined) user.role = memberRole(role);
   writeDb(db);
   return { id: user.id, email: user.email, role: roleOf(user), createdAt: user.createdAt };
 }
@@ -461,9 +503,10 @@ function removeMember(ownerId, memberId) {
 }
 
 /** An invitation to join the company. Only its hash is kept; the link itself goes to the invited person. */
-function createInvite(ownerId, { email, role, invitedBy }) {
+function createInvite(ownerId, { email, role, invitedBy, companyIds }) {
   const db = readDb();
   const normalized = normalizeEmail(email);
+  const access = companyAccess(ownerId, companyIds);
   if (db.users.some((item) => item.email === normalized)) throw teamError('EMAIL_TAKEN');
   const current = liveInvites(db, ownerId);
   assertRoomInTeam(db, ownerId, { replacingInvite: current.some((item) => item.email === normalized) });
@@ -476,6 +519,7 @@ function createInvite(ownerId, { email, role, invitedBy }) {
     createdAt: nowIso(),
     expiresAt: new Date(Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000).toISOString(),
     invitedBy: invitedBy || '',
+    ...(access ? { companyIds: access } : {}),
   };
   // One open invitation per address: a new one replaces the old link. Expired ones are dropped here too.
   db.invites[ownerId] = [...current.filter((item) => item.email !== normalized), invite];
@@ -514,6 +558,11 @@ function acceptInvite(token, passwordHash) {
     const db = readDb();
     if (db.users.some((item) => item.email === found.invite.email)) throw teamError('EMAIL_TAKEN');
     const user = { id: crypto.randomUUID(), email: found.invite.email, passwordHash, createdAt: nowIso(), companyId: found.ownerId, role: found.invite.role, addedBy: found.invite.invitedBy };
+    // Only companies that still exist; with none of them left, all, as when the invitation named none.
+    if (Array.isArray(found.invite.companyIds)) {
+      const still = companiesOf(found.ownerId).map((item) => item.id).filter((id) => found.invite.companyIds.includes(id));
+      if (still.length) user.companyIds = still;
+    }
     db.users.push(user);
     db.invites[found.ownerId] = (db.invites[found.ownerId] || []).filter((item) => item.id !== found.invite.id);
     await writeDb(db);

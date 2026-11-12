@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Copy, Mail, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import { Building2, Check, Copy, Mail, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
@@ -24,6 +24,58 @@ function RoleSelect({ label, value, onChange }: { label: string; value: MemberRo
   )
 }
 
+type Company = { id: string; companyName: string }
+
+/** null means all of the companies, later ones too. */
+type CompanyAccess = string[] | null
+
+function toggleCompany(access: CompanyAccess, id: string, companies: Company[]): CompanyAccess {
+  const current = access ?? companies.map((item) => item.id)
+  const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+  return companies.every((item) => next.includes(item.id)) ? null : companies.map((item) => item.id).filter((item) => next.includes(item))
+}
+
+function companyNames(access: CompanyAccess | undefined, companies: Company[], all: string) {
+  if (!access) return all
+  return companies.filter((item) => access.includes(item.id)).map((item) => item.companyName || '—').join(', ')
+}
+
+/** Ticks for the companies a user may work in; the last one ticked cannot be taken off. */
+function CompanyChecks({ companies, value, onChange, disabled }: { companies: Company[]; value: CompanyAccess; onChange: (access: CompanyAccess) => void; disabled?: boolean }) {
+  return (
+    <div className="space-y-1.5">
+      {companies.map((company) => {
+        const checked = !value || value.includes(company.id)
+        const last = checked && value !== null && value.length === 1
+        return (
+          <label key={company.id} className={cn('flex items-center gap-2.5 text-sm', last || disabled ? 'cursor-default' : 'cursor-pointer')}>
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-brand-ink/25 accent-[#2C6E7F]"
+              checked={checked}
+              disabled={disabled || last}
+              onChange={() => onChange(toggleCompany(value, company.id, companies))}
+            />
+            <span className="truncate">{company.companyName || '—'}</span>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
+function CompanyField({ companies, value, onChange }: { companies: Company[]; value: CompanyAccess; onChange: (access: CompanyAccess) => void }) {
+  const { t } = useI18n()
+  if (companies.length < 2) return null
+  return (
+    <fieldset className="mb-4">
+      <legend className="mb-2 text-sm font-medium text-brand-ink/70">{t('team.companies')}</legend>
+      <CompanyChecks companies={companies} value={value} onChange={onChange} />
+      <p className="mt-2 text-xs leading-5 text-brand-ink/50">{t('team.companiesHint')}</p>
+    </fieldset>
+  )
+}
+
 /** The company's users: who has access, adding someone directly, or inviting them by email. */
 export function UsersPage() {
   const { user } = useAuth()
@@ -37,12 +89,16 @@ export function UsersPage() {
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<MemberRole>('member')
+  const [inviteCompanies, setInviteCompanies] = useState<CompanyAccess>(null)
   const [invited, setInvited] = useState<InviteResult | null>(null)
   const [copied, setCopied] = useState(false)
 
   const [addEmail, setAddEmail] = useState('')
   const [addPassword, setAddPassword] = useState('')
   const [addRole, setAddRole] = useState<MemberRole>('member')
+  const [addCompanies, setAddCompanies] = useState<CompanyAccess>(null)
+  // The user whose companies are open for changing.
+  const [editingCompanies, setEditingCompanies] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -79,6 +135,8 @@ export function UsersPage() {
   if (!team) return <p className="text-brand-ink/60">{t('common.loading')}</p>
 
   const company = displayCompanyValue('companyName', profile?.companyName) || 'Next Invoice'
+  const companies = team.companies || []
+  const severalCompanies = companies.length > 1
 
   function onInvite(e: FormEvent) {
     e.preventDefault()
@@ -88,6 +146,7 @@ export function UsersPage() {
         body: {
           email: inviteEmail.trim(),
           role: inviteRole,
+          companyIds: inviteCompanies,
           subject: t('team.inviteSubject', { company }),
           message: t('team.inviteBody', { company, inviter: user?.email || company }),
           button: t('team.inviteButton'),
@@ -97,6 +156,7 @@ export function UsersPage() {
       setInvited(res)
       setCopied(false)
       setInviteEmail('')
+      setInviteCompanies(null)
     })
   }
 
@@ -104,15 +164,20 @@ export function UsersPage() {
     e.preventDefault()
     void run('add', async () => {
       const email = addEmail.trim()
-      setTeam(await api<Team>('/api/team/members', { method: 'POST', body: { email, password: addPassword, role: addRole } }))
+      setTeam(await api<Team>('/api/team/members', { method: 'POST', body: { email, password: addPassword, role: addRole, companyIds: addCompanies } }))
       setAddEmail('')
       setAddPassword('')
+      setAddCompanies(null)
       return t('team.addedOk', { email })
     })
   }
 
   function onRole(member: TeamMember, role: MemberRole) {
     void run(`role:${member.id}`, async () => setTeam(await api<Team>(`/api/team/members/${member.id}`, { method: 'PATCH', body: { role } })))
+  }
+
+  function onCompanies(member: TeamMember, companyIds: CompanyAccess) {
+    void run(`companies:${member.id}`, async () => setTeam(await api<Team>(`/api/team/members/${member.id}`, { method: 'PATCH', body: { companyIds } })))
   }
 
   function onRemove(member: TeamMember) {
@@ -164,6 +229,27 @@ export function UsersPage() {
                         {member.you ? <span className={cn(badge, 'bg-brand-ink/6 py-0.5 text-brand-ink/55')}>{t('team.you')}</span> : null}
                       </p>
                       {formatDay(member.createdAt) ? <p className="mt-0.5 text-xs text-brand-ink/45">{t('team.added', { date: formatDay(member.createdAt) })}</p> : null}
+                      {severalCompanies && member.role !== 'owner' ? (
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-brand-ink/55">
+                          <Building2 className="h-3.5 w-3.5 shrink-0" />
+                          <span className="min-w-0 truncate">{companyNames(member.companyIds, companies, t('team.allCompanies'))}</span>
+                          {fixed ? null : (
+                            <button
+                              type="button"
+                              disabled={busy !== ''}
+                              onClick={() => setEditingCompanies(editingCompanies === member.id ? '' : member.id)}
+                              className="shrink-0 font-semibold text-brand underline-offset-2 hover:underline disabled:opacity-50"
+                            >
+                              {editingCompanies === member.id ? t('team.doneCompanies') : t('team.editCompanies')}
+                            </button>
+                          )}
+                        </p>
+                      ) : null}
+                      {severalCompanies && !fixed && editingCompanies === member.id ? (
+                        <div className="mt-3 rounded-xl border border-brand-ink/10 bg-brand-bg/60 px-3.5 py-3">
+                          <CompanyChecks companies={companies} value={member.companyIds ?? null} disabled={busy !== ''} onChange={(access) => onCompanies(member, access)} />
+                        </div>
+                      ) : null}
                     </div>
                     {fixed ? (
                       <span className={cn(badge, canManageCompany(member) ? 'bg-brand/10 text-brand' : 'bg-brand-ink/6 text-brand-ink/60')}>
@@ -210,6 +296,12 @@ export function UsersPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{invite.email}</p>
                       <p className="mt-0.5 text-xs text-brand-ink/45">{t('team.expires', { date: formatDay(invite.expiresAt) })}</p>
+                      {severalCompanies ? (
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-brand-ink/55">
+                          <Building2 className="h-3.5 w-3.5 shrink-0" />
+                          <span className="min-w-0 truncate">{companyNames(invite.companyIds, companies, t('team.allCompanies'))}</span>
+                        </p>
+                      ) : null}
                     </div>
                     <span className={cn(badge, 'bg-[#FFF6E5] text-[#8A5A00]')}>{t(roleLabelKey(invite.role))}</span>
                     {team.canManage ? (
@@ -242,6 +334,7 @@ export function UsersPage() {
               <form onSubmit={onInvite} className="mt-5">
                 <Field label={t('team.email')} type="email" required autoComplete="off" spellCheck={false} value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
                 <RoleSelect label={t('team.role')} value={inviteRole} onChange={setInviteRole} />
+                <CompanyField companies={companies} value={inviteCompanies} onChange={setInviteCompanies} />
                 {team.mailReady ? null : (
                   <p className="mb-4 rounded-xl bg-[#FFF6E5] px-3.5 py-2.5 text-xs leading-5 text-[#8A5A00]">
                     {t('team.inviteNoMail')}{' '}
@@ -287,6 +380,7 @@ export function UsersPage() {
                 <Field label={t('team.email')} type="email" required autoComplete="off" spellCheck={false} value={addEmail} onChange={(e) => setAddEmail(e.target.value)} />
                 <Field label={t('team.password')} type="password" required minLength={8} autoComplete="new-password" value={addPassword} onChange={(e) => setAddPassword(e.target.value)} />
                 <RoleSelect label={t('team.role')} value={addRole} onChange={setAddRole} />
+                <CompanyField companies={companies} value={addCompanies} onChange={setAddCompanies} />
                 <Button type="submit" variant="secondary" className="w-full" disabled={busy !== '' || !addEmail.trim() || addPassword.length < 8}>
                   <UserPlus className="h-4 w-4" />
                   {busy === 'add' ? t('common.loading') : t('team.addCta')}

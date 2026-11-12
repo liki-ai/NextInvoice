@@ -283,23 +283,45 @@ export function InvoiceFormPage() {
     if (canSaveOnly) syncInvoices().catch(() => undefined)
   }, [canSaveOnly, syncInvoices])
 
+  // An invoicer's list holds only their own invoices, so the numbers come from all of the company's
+  // issued ones, fetched again whenever the list is, and the next number follows everyone's last.
+  const [companyNumbers, setCompanyNumbers] = useState<Invoice[] | null>(null)
+  useEffect(() => {
+    if (!invoicer || !canSaveOnly) return
+    let live = true
+    api<{ numbers: Invoice[] }>('/api/invoices/numbers')
+      .then((res) => {
+        if (live) setCompanyNumbers(res.numbers || [])
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [invoicer, canSaveOnly, invoices])
+  const numbering = invoicer ? companyNumbers || invoices : invoices
+  // The first numbers to arrive only correct the guess made from the invoicer's own list, without a note.
+  const numberingSeenRef = useRef(!invoicer)
+
   // The proposed number follows the list until the user types their own. A number that another
   // invoice was issued with meanwhile is replaced by the next free one, as the server would do
   // anyway, and the form says why.
   useEffect(() => {
     if (!canSaveOnly) return
+    if (invoicer && !companyNumbers) return
+    const quiet = !numberingSeenRef.current
+    numberingSeenRef.current = true
     const current = formRef.current.invoiceNumber
-    const taken = numberIssuedElsewhere(invoices, current, persistedIdRef.current || invoiceId || '')
+    const taken = numberIssuedElsewhere(numbering, current, persistedIdRef.current || invoiceId || '')
     const following = autoNumberRef.current !== '' && current === autoNumberRef.current
     const placeholder = !current.trim() || current.startsWith('DRAFT-')
     if (!following && (numberTyped || (!taken && !placeholder))) return
-    const next = generateInvoiceNumber(invoices)
+    const next = generateInvoiceNumber(numbering)
     if (next === current) return
     autoNumberRef.current = next
     setInvoiceNumber(next)
-    setNumberNote(taken ? t('newInvoice.numberUpdated', { taken: current, number: next }) : '')
-  }, [invoices, canSaveOnly, numberTyped, invoiceId, t])
-  const numberTaken = canSaveOnly && numberTyped && numberIssuedElsewhere(invoices, invoiceNumber, persistedIdRef.current || invoiceId || '')
+    setNumberNote(taken && !quiet ? t('newInvoice.numberUpdated', { taken: current, number: next }) : '')
+  }, [numbering, invoicer, companyNumbers, canSaveOnly, numberTyped, invoiceId, t])
+  const numberTaken = canSaveOnly && numberTyped && numberIssuedElsewhere(numbering, invoiceNumber, persistedIdRef.current || invoiceId || '')
 
   formRef.current = {
     client,

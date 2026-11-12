@@ -73,3 +73,40 @@ test('the new company has the main company\'s plan and nobody signs in as it', (
 test('a company needs a name', async () => {
   await assert.rejects(store.createCompany(owner.id, { companyName: '  ' }), /COMPANY_NAME_REQUIRED/);
 });
+
+test('a user given only some companies works in those alone, and starts in the first of them', async () => {
+  const accountant = await store.addMember(owner.id, { email: 'llc@tretek.test', passwordHash: 'x', role: 'invoicer', companyIds: [llc.id, 'not-ours'] });
+  assert.deepEqual(accountant.companyIds, [llc.id]);
+  const session = store.sessionUser(store.findUserById(accountant.id));
+  assert.equal(session.id, llc.id);
+  assert.deepEqual(session.companies.map((item) => item.id), [llc.id]);
+  // Asking for the main company gives the one they have.
+  assert.equal(store.sessionUser(store.findUserById(accountant.id), owner.id).id, llc.id);
+  assert.deepEqual(store.listTeam(owner.id).members.find((item) => item.id === accountant.id).companyIds, [llc.id]);
+});
+
+test('picking every company means all of them, later ones too; picking none is refused', async () => {
+  const all = await store.addMember(owner.id, { email: 'all@tretek.test', passwordHash: 'x', companyIds: [owner.id, llc.id] });
+  assert.equal(all.companyIds, undefined);
+  await assert.rejects(store.addMember(owner.id, { email: 'none@tretek.test', passwordHash: 'x', companyIds: [] }), /COMPANIES_REQUIRED/);
+  assert.throws(() => store.createInvite(owner.id, { email: 'none@tretek.test', companyIds: ['not-ours'] }), /COMPANIES_REQUIRED/);
+});
+
+test('the companies of a user can be changed without touching the role, and an invitation carries them', async () => {
+  const user = store.findUserByEmail('member@tretek.test');
+  store.setMemberRole(owner.id, user.id, undefined, { companyIds: [owner.id] });
+  assert.equal(store.findUserById(user.id).role, 'member');
+  assert.deepEqual(store.sessionUser(store.findUserById(user.id), llc.id).companies.map((item) => item.id), [owner.id]);
+  store.setMemberRole(owner.id, user.id, undefined, { companyIds: null });
+  assert.equal(store.sessionUser(store.findUserById(user.id), llc.id).id, llc.id);
+
+  const { token } = store.createInvite(owner.id, { email: 'invited@tretek.test', role: 'member', companyIds: [llc.id] });
+  const joined = await store.acceptInvite(token, 'x');
+  assert.deepEqual(joined.companyIds, [llc.id]);
+});
+
+test('an administrator given some companies may work in the one they open', async () => {
+  const admin = await store.addMember(owner.id, { email: 'admin@tretek.test', passwordHash: 'x', role: 'admin', companyIds: [llc.id] });
+  const opened = await store.createCompany(owner.id, { companyName: 'Tretek GmbH', createdById: admin.id });
+  assert.deepEqual(store.findUserById(admin.id).companyIds, [llc.id, opened.id]);
+});

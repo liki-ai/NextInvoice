@@ -23,6 +23,7 @@ router.post('/', managerRequired, async (req, res) => {
       companyName: req.body && req.body.companyName,
       currency: req.body && req.body.currency,
       createdBy: req.user.email,
+      createdById: req.user.accountId,
     });
     // The person as they are in the new company, which the app switches to.
     return res.status(201).json({ company, user: sessionUser(findUserById(req.user.accountId), company.id) });

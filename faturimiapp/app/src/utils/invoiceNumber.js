@@ -13,9 +13,12 @@ export function generateInvoiceNumber(existingInvoices, date = new Date()) {
     return `${period}-${String(last + 1).padStart(3, '0')}`;
   }
   const prefix = MONTH_ABBR[date.getMonth()];
-  const sameMonthCount = existingInvoices.filter((inv) => (inv.number || '').startsWith(`${prefix}-`)).length;
-  const seq = String(sameMonthCount + 1).padStart(3, '0');
-  return `${prefix}-${seq}`;
+  // The one after the highest of the month, as the server does, so a gap never leads to a number already used.
+  const last = issued.reduce((max, inv) => {
+    const match = String(inv.number || '').match(/^([A-Z]{3})-(\d+)$/);
+    return match && match[1] === prefix ? Math.max(max, Number(match[2]) || 0) : max;
+  }, 0);
+  return `${prefix}-${String(last + 1).padStart(3, '0')}`;
 }
 
 export function formatDateForInvoice(date, locale) {

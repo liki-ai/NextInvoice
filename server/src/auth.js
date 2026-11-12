@@ -46,6 +46,7 @@ const INVOICER_ALLOWED = [
   ['GET', /^\/api\/companies$/],
   ['GET', /^\/api\/mail$/],
   ['GET', /^\/api\/invoices$/],
+  ['GET', /^\/api\/invoices\/numbers$/],
   ['POST', /^\/api\/invoices$/],
   ['GET PUT DELETE', /^\/api\/invoices\/([^/]+)$/, 'own'],
   ['POST', /^\/api\/invoices\/([^/]+)\/(issue|share|send|deliver)$/, 'own'],

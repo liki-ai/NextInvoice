@@ -1,13 +1,16 @@
 export type TeamRole = 'owner' | 'admin' | 'member' | 'invoicer'
 
-export type TeamMember = { id: string; email: string; role: TeamRole; createdAt?: string; addedBy?: string; you: boolean }
+/** `companyIds`: the companies the user works in when only some of them; null for all. */
+export type TeamMember = { id: string; email: string; role: TeamRole; companyIds?: string[] | null; createdAt?: string; addedBy?: string; you: boolean }
 
-export type TeamInvite = { id: string; email: string; role: Exclude<TeamRole, 'owner'>; createdAt: string; expiresAt: string; invitedBy?: string }
+export type TeamInvite = { id: string; email: string; role: Exclude<TeamRole, 'owner'>; companyIds?: string[] | null; createdAt: string; expiresAt: string; invitedBy?: string }
 
 /** The users of the company and the invitations still open. */
 export type Team = {
   members: TeamMember[]
   invites: TeamInvite[]
+  /** All of the account's companies, the main one first. */
+  companies?: { id: string; companyName: string }[]
   /** Whether the person looking may add, change and remove users. */
   canManage: boolean
   /** Whether the company's mailbox is connected, so invitations can be emailed from the app. */
@@ -46,6 +49,7 @@ const ERROR_KEYS: Record<string, string> = {
   OWNER_FIXED: 'team.errOwnerFixed',
   SELF_FIXED: 'team.errSelfFixed',
   INVOICER_ONLY: 'team.errInvoicerOnly',
+  COMPANIES_REQUIRED: 'team.errCompaniesRequired',
 }
 
 export function teamErrorText(err: unknown, t: (key: string) => string) {
