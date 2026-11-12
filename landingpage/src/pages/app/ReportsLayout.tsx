@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { FolderKanban, HeartPulse, Landmark, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { canManageCompany } from '../../lib/team'
 import { useI18n } from '../../i18n'
 import { cn } from '../../lib/cn'
 
@@ -17,7 +18,7 @@ const TABS = [
 export function ReportsLayout() {
   const { user } = useAuth()
   const { t } = useI18n()
-  if (user?.role === 'member') return <Outlet />
+  if (!canManageCompany(user)) return <Outlet />
   return (
     <>
       {/* All three pages span the screen, so the tabs stay in the same place when switching. */}

@@ -74,12 +74,17 @@ function sendError(res, err) {
   return res.status(mapped[0]).json(body);
 }
 
+/** An invoicer sees the invoices they wrote; everyone else sees all of the company's. */
+function visibleTo(user) {
+  return (invoice) => user.role !== 'invoicer' || invoice.createdBy === user.accountId;
+}
+
 router.get('/', (req, res) => {
-  res.json({ invoices: listInvoices(req.user.id) });
+  res.json({ invoices: listInvoices(req.user.id).filter(visibleTo(req.user)) });
 });
 
 router.post('/', (req, res) => {
-  const invoice = req.body || {};
+  const { createdBy: _ignored, ...invoice } = req.body || {};
   if (!invoice.client || !String(invoice.client.fullName || '').trim()) {
     return res.status(400).json({ error: 'Client name is required.' });
   }
@@ -87,7 +92,7 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Add at least one item.' });
   }
   try {
-    const saved = addInvoice(req.user.id, invoice);
+    const saved = addInvoice(req.user.id, invoice, { createdBy: req.user.accountId });
     res.status(201).json({ invoice: saved });
   } catch (err) {
     sendError(res, err);

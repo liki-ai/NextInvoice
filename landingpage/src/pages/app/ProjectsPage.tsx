@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type React
 import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ChevronDown, ChevronRight, FolderKanban, Info, Landmark, Loader2, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { canManageCompany } from '../../lib/team'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card } from '../../components/ui'
@@ -189,7 +190,7 @@ export function ProjectsPage() {
   const [searchParams] = useSearchParams()
   const selected = searchParams.get('project')
   const fileInput = useRef<HTMLInputElement>(null)
-  const manager = user?.role !== 'member'
+  const manager = canManageCompany(user)
   const currency = profile?.currency || 'EUR'
   const symbol = currencySymbol(currency)
 

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { Bell, BellRing, Eye, FileSpreadsheet, Landmark, FileText, Pencil, PieChart, Plus, Search, Send, Settings, Trash2, Circle, CheckCircle2, Loader2, User, X } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useAuth } from '../../context/AuthContext'
+import { canManageCompany, isInvoicer } from '../../lib/team'
 import { useI18n } from '../../i18n'
 import { api } from '../../lib/api'
 import { Button, Modal } from '../../components/ui'
@@ -46,7 +47,9 @@ export function InvoiceListPage() {
   const { t, dict } = useI18n()
   const { user } = useAuth()
   // Cancelled invoices can be deleted only by the company's owner and administrators.
-  const manager = user?.role !== 'member'
+  const manager = canManageCompany(user)
+  // Writes and sends invoices; receiving payments, imports and reminders are someone else's.
+  const invoicer = isInvoicer(user)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue' | 'toSend'>('all')
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
@@ -355,6 +358,8 @@ export function InvoiceListPage() {
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          {invoicer ? null : (
+          <>
           <Link
             to="/app/invoices/settings"
             title={t('recurring.settings.open')}
@@ -381,6 +386,8 @@ export function InvoiceListPage() {
               {t('bank.button')}
             </button>
           ) : null}
+          </>
+          )}
           <Link
             to="/app/new"
             onClick={(e) => {
@@ -646,7 +653,7 @@ export function InvoiceListPage() {
                       type="checkbox"
                       aria-label={t('invoiceList.selectAll')}
                       title={t('invoiceList.selectAll')}
-                      disabled={payable.length === 0}
+                      disabled={invoicer || payable.length === 0}
                       checked={allChosen}
                       onChange={() => setSelected(allChosen ? new Set() : new Set(payable.map((item) => item.id)))}
                       className="h-4 w-4 cursor-pointer accent-[#2C6E7F] disabled:cursor-default disabled:opacity-40"
@@ -694,7 +701,7 @@ export function InvoiceListPage() {
                   return (
                   <tr key={item.id} className={`border-b border-brand-ink/5 last:border-0 ${visible === 'cancelled' ? 'opacity-60' : ''} ${pulseId === item.id ? 'bg-[#EEF5F7] ring-2 ring-inset ring-brand/40' : ''} ${selected.has(item.id) && (status === 'unpaid' || status === 'partial') ? 'bg-[#F4F9FA]' : ''}`}>
                     <td className="w-10 py-2.5 pl-5">
-                      {(status === 'unpaid' || status === 'partial') && remainingOf(item) > 0 ? (
+                      {!invoicer && (status === 'unpaid' || status === 'partial') && remainingOf(item) > 0 ? (
                         <input
                           type="checkbox"
                           aria-label={t('invoiceList.selectOne', { number: item.number })}
@@ -735,7 +742,7 @@ export function InvoiceListPage() {
                         </button>
                         <button
                           type="button"
-                          disabled={paying || visible === 'cancelled'}
+                          disabled={paying || visible === 'cancelled' || invoicer}
                           onClick={() => {
                             if (visible === 'cancelled') return
                             markPaidOrUnpaid()
@@ -777,7 +784,7 @@ export function InvoiceListPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5">
                       <div className="flex justify-end gap-1">
-                        {canRemind ? (
+                        {canRemind && !invoicer ? (
                           <button
                             type="button"
                             onClick={() => setRemindId(item.id)}

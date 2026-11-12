@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { TeamRole } from '../lib/team'
 import { api, chooseCompanyForNextLoad, getActiveCompany, getToken, keepTabCompany, setActiveCompany, setToken } from '../lib/api'
 
 /** One of the companies the account works in. */
@@ -14,8 +15,8 @@ export type User = {
   /** The person's own account. */
   accountId?: string
   email: string
-  /** owner and admin run the company's settings and users; member works with its documents. */
-  role?: 'owner' | 'admin' | 'member'
+  /** owner and admin run the company's settings and users; member works with its documents; invoicer writes invoices only. */
+  role?: TeamRole
   companyName?: string
   createdAt?: string
   plan?: 'free' | 'premium'

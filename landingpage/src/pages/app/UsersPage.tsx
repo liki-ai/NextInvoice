@@ -8,16 +8,17 @@ import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { displayCompanyValue } from '../../lib/companySamples'
 import { mailErrorText } from '../../lib/mail'
-import { formatDay, roleLabelKey, teamErrorText, type InviteResult, type Team, type TeamMember } from '../../lib/team'
+import { canManageCompany, formatDay, roleLabelKey, teamErrorText, type InviteResult, type Team, type TeamMember } from '../../lib/team'
 import { Button, Card, Field, Select } from '../../components/ui'
 
-type MemberRole = 'admin' | 'member'
+type MemberRole = 'admin' | 'member' | 'invoicer'
 
 function RoleSelect({ label, value, onChange }: { label: string; value: MemberRole; onChange: (role: MemberRole) => void }) {
   const { t } = useI18n()
   return (
     <Select label={label} value={value} onChange={(e) => onChange(e.target.value as MemberRole)}>
       <option value="member">{t('team.roleMember')}</option>
+      <option value="invoicer">{t('team.roleInvoicer')}</option>
       <option value="admin">{t('team.roleAdmin')}</option>
     </Select>
   )
@@ -165,8 +166,8 @@ export function UsersPage() {
                       {formatDay(member.createdAt) ? <p className="mt-0.5 text-xs text-brand-ink/45">{t('team.added', { date: formatDay(member.createdAt) })}</p> : null}
                     </div>
                     {fixed ? (
-                      <span className={cn(badge, member.role === 'member' ? 'bg-brand-ink/6 text-brand-ink/60' : 'bg-brand/10 text-brand')}>
-                        {member.role !== 'member' ? <ShieldCheck className="h-3.5 w-3.5" /> : null}
+                      <span className={cn(badge, canManageCompany(member) ? 'bg-brand/10 text-brand' : 'bg-brand-ink/6 text-brand-ink/60')}>
+                        {canManageCompany(member) ? <ShieldCheck className="h-3.5 w-3.5" /> : null}
                         {t(roleLabelKey(member.role))}
                       </span>
                     ) : (
@@ -179,6 +180,7 @@ export function UsersPage() {
                           className="rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
                         >
                           <option value="member">{t('team.roleMember')}</option>
+                          <option value="invoicer">{t('team.roleInvoicer')}</option>
                           <option value="admin">{t('team.roleAdmin')}</option>
                         </select>
                         <button
@@ -223,6 +225,7 @@ export function UsersPage() {
 
           <div className="space-y-1 text-xs leading-5 text-brand-ink/50">
             <p>{t('team.roleMemberHint')}</p>
+            <p>{t('team.roleInvoicerHint')}</p>
             <p>{t('team.roleAdminHint')}</p>
             {team.canManage ? null : <p className="font-medium text-brand-ink/60">{t('team.readOnly')}</p>}
           </div>

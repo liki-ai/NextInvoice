@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { Link } from 'react-router-dom'
 import { AlertTriangle, CalendarClock, Download, FileText, Inbox, Landmark, Loader2, Mail, RefreshCw, RotateCcw, Settings2, Trash2, Undo2, Upload } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { canManageCompany } from '../../lib/team'
 import { useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal, Select } from '../../components/ui'
@@ -164,7 +165,7 @@ export function FinancePage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const wasBusy = useRef(false)
   const currency = profile?.currency || 'EUR'
-  const manager = user?.role !== 'member'
+  const manager = canManageCompany(user)
 
   const load = useCallback(async () => {
     try {

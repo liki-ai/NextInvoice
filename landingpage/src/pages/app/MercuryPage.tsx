@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowDownLeft, ArrowUpRight, Check, Copy, ExternalLink, Landmark, RefreshCw, Repeat, Search, Settings2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { canManageCompany } from '../../lib/team'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal } from '../../components/ui'
 import { api, apiBase } from '../../lib/api'
@@ -128,7 +129,7 @@ export function MercuryPage() {
   const [query, setQuery] = useState('')
   const [shown, setShown] = useState(40)
   const [syncing, setSyncing] = useState(false)
-  const manager = user?.role !== 'member'
+  const manager = canManageCompany(user)
 
   const load = useCallback(async () => {
     try {

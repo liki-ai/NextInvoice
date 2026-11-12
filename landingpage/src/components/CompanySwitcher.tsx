@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Building2, Check, ChevronsUpDown, Plus } from 'lucide-react'
 import { useAuth, type CompanyChoice } from '../context/AuthContext'
+import { canManageCompany } from '../lib/team'
 import { useI18n } from '../i18n'
 import { cn } from '../lib/cn'
 import { CURRENCIES } from '../lib/invoice'
@@ -41,7 +42,7 @@ export function CompanySwitcher({ variant = 'dark', className, fallback = null }
 
   if (!user) return <>{fallback}</>
   const companies: CompanyChoice[] = user.companies?.length ? user.companies : [{ id: user.id, companyName: user.companyName || '' }]
-  const canAdd = user.role !== 'member'
+  const canAdd = canManageCompany(user)
   // A member of a company with nothing to switch to has no use for the menu.
   if (companies.length < 2 && !canAdd) return <>{fallback}</>
   const nameOf = (item: CompanyChoice) => displayCompanyValue('companyName', item.companyName) || t('companies.unnamed')

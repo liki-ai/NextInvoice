@@ -289,7 +289,7 @@ function publicUser(user) {
 // The person who signed up owns the company's data (it is stored under their id). People they add
 // are users of their own, with their own password, who work in that same data.
 
-const MEMBER_ROLES = ['admin', 'member'];
+const MEMBER_ROLES = ['admin', 'member', 'invoicer'];
 const TEAM_MAX = 25;
 const INVITE_DAYS = 14;
 
@@ -299,10 +299,13 @@ function companyOwner(user) {
   return user.companyId ? findUserById(user.companyId) : user;
 }
 
-/** owner: signed up the company. admin: may change settings and users. member: works with invoices only. */
+/**
+ * owner: signed up the company. admin: may change settings and users. member: works with invoices,
+ * clients, items and bills. invoicer: writes and sends invoices, and sees only the ones they wrote.
+ */
 function roleOf(user) {
   if (!user.companyId) return 'owner';
-  return user.role === 'admin' ? 'admin' : 'member';
+  return MEMBER_ROLES.includes(user.role) ? user.role : 'member';
 }
 
 // ---- several companies under one account ------------------------------------------------------
@@ -753,7 +756,8 @@ function totalFields(items, discount, taxRate) {
   return { subtotal: totals.subtotal, taxRate: totals.taxRate, taxAmount: totals.taxAmount, total: totals.total };
 }
 
-function addInvoice(userId, invoice) {
+/** `createdBy`: the account of the person writing it, which an invoicer's list is limited to. */
+function addInvoice(userId, invoice, { createdBy } = {}) {
   const allowed = canCreateInvoice(userId);
   if (!allowed.ok) {
     const err = new Error('PLAN_LIMIT');
@@ -778,6 +782,7 @@ function addInvoice(userId, invoice) {
     lifecycle,
     status: invoice.status === 'paid' ? 'paid' : invoice.status === 'cancelled' ? 'cancelled' : 'unpaid',
     ...totalFields(invoice.items, invoice.discount, invoice.taxRate),
+    ...(createdBy ? { createdBy } : {}),
   };
   if (lifecycle === 'issued') {
     saved.number = uniqueIssuedNumber(userId, invoice.number, invoice.date);
@@ -801,6 +806,9 @@ function fieldsChanged(current, partial, keys) {
 }
 
 function updateInvoice(userId, invoiceId, partial, options = {}) {
+  // Who wrote an invoice is never changed afterwards.
+  const { createdBy: _creator, ...changes } = partial || {};
+  partial = changes;
   migrateUserData(userId);
   const db = readDb();
   const list = db.invoices[userId] || [];

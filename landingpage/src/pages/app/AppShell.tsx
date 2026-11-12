@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { FileSignature, FileText, LayoutDashboard, LogOut, Menu, Plus, Settings, Tag, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { canManageCompany, invoicerMayOpen, isInvoicer } from '../../lib/team'
 import { AppDataProvider, useAppData } from '../../context/AppDataContext'
 import { useI18n } from '../../i18n'
 import { LanguagePicker } from '../../components/LangSwitch'
@@ -76,15 +77,21 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <CompanySwitcher variant="dark" className="mx-3 mb-5" />
       <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-4">
-        {NAV_GROUPS.map((group, index) => (
+        {NAV_GROUPS.map((group) => ({
+          ...group,
+          // An invoicer has the invoices and nothing else.
+          items: group.items.filter((item) => (isInvoicer(user) ? item.key === 'nav.invoices' : !item.managerOnly || canManageCompany(user))),
+        }))
+          .filter((group) => group.items.length > 0)
+          .map((group, index) => (
           <div key={group.label || index}>
             {group.label ? (
               <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">{t(group.label)}</p>
             ) : null}
             <div className="space-y-1">
-              {group.items.filter((item) => !item.managerOnly || user?.role !== 'member').map((item) => {
+              {group.items.map((item) => {
                 const active = item.active(pathname, search)
-                const to = item.managerTo && user?.role !== 'member' ? item.managerTo : item.to
+                const to = item.managerTo && canManageCompany(user) ? item.managerTo : item.to
                 return (
                   <Link
                     key={item.to}
@@ -106,7 +113,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
       <div className="border-t border-white/10 px-4 py-4">
-        <NavLink to="/app/profile" onClick={onNavigate} className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-white/6">
+        <NavLink
+          to={isInvoicer(user) ? '/app' : '/app/profile'}
+          onClick={onNavigate}
+          className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-white/6"
+        >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-sm font-bold text-brand-dark">
             {logo ? <img src={logo} alt="" className="h-full w-full object-contain" /> : (companyName || user?.email || '?').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 1).toUpperCase() || '?'}
           </span>
@@ -130,7 +141,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </button>
         </div>
         {/* A company that never pays sees nothing of the subscription. */}
-        {user?.billingSource !== 'complimentary' ? (
+        {user?.billingSource !== 'complimentary' && !isInvoicer(user) ? (
           <NavLink
             to="/app/upgrade"
             onClick={onNavigate}
@@ -146,12 +157,15 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
 function ShellInner() {
   const { t } = useI18n()
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
   const composeTo = pathname.startsWith('/app/obligations') ? '/app/obligations/new' : '/app/new'
   const showCompose =
     pathname === '/app' ||
     (pathname.startsWith('/app/obligations') && !pathname.includes('/new') && !pathname.includes('/edit'))
+
+  if (isInvoicer(user) && !invoicerMayOpen(pathname)) return <Navigate to="/app" replace />
 
   return (
     <div className="min-h-screen bg-brand-bg lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">

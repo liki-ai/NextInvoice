@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronDown, Eye, FileText, MapPin, Phone, Plus, Repeat, Save, Trash2, UserPlus, Users } from 'lucide-react'
 import { DEFAULT_REPEAT, planFromInvoice, repeatSummary, type RepeatSettings } from '../../lib/recurring'
 import { RepeatInvoiceButton, RepeatModal } from '../../components/RepeatModal'
@@ -33,6 +33,7 @@ import { UnsignedToggle } from '../../components/UnsignedToggle'
 import { SignerPicker } from '../../components/SignerPicker'
 import { InvoiceNotes } from '../../components/InvoiceNotes'
 import { useAuth } from '../../context/AuthContext'
+import { isInvoicer } from '../../lib/team'
 import { proposedSigner } from '../../lib/signers'
 import { clientDisplayName, clientMatchesQuery, composeClient, frequentClients } from '../../lib/client'
 import { invoiceLineFromCatalog } from '../../lib/catalog'
@@ -246,7 +247,9 @@ export function InvoiceFormPage() {
   const issued = Boolean(existing && existing.lifecycle !== 'draft')
   const canSaveOnly = !issued
   // A new invoice or a draft can start a plan; one a plan made already belongs to it.
-  const canRepeat = !issued && !existing?.recurring
+  // An invoicer neither corrects issued invoices nor sets them to repeat.
+  const invoicer = isInvoicer(user)
+  const canRepeat = !issued && !existing?.recurring && !invoicer
   const [correctReason, setCorrectReason] = useState('')
   // Price boxes the user has typed in show exactly what was typed; the others show two decimals.
   const [typedPrices, setTypedPrices] = useState<Set<string>>(() => new Set())
@@ -582,6 +585,9 @@ export function InvoiceFormPage() {
 
   const inputClass =
     'w-full rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm outline-none placeholder:text-brand-ink/40 focus:border-brand focus:ring-2 focus:ring-brand/15'
+
+  // An issued invoice is changed by correction, which an invoicer does not do.
+  if (invoicer && issued && existing) return <Navigate to={`/app/invoices/${existing.id}`} replace />
 
   return (
     <div>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Eye, Pencil, Send, Trash2 } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
 import { useAuth } from '../../context/AuthContext'
+import { canManageCompany, isInvoicer } from '../../lib/team'
 import { useI18n } from '../../i18n'
 import { Button, Card, Field, Modal } from '../../components/ui'
 import { buildInvoiceHtml, downloadHtmlAsPdf, formatMoney, invoiceStatus } from '../../lib/invoice'
@@ -24,7 +25,9 @@ export function InvoiceDetailPage() {
   const { t, dict } = useI18n()
   const { user } = useAuth()
   // Cancelled invoices can be deleted only by the company's owner and administrators.
-  const manager = user?.role !== 'member'
+  const manager = canManageCompany(user)
+  // Writes and sends invoices; payments, corrections and cancelling are someone else's.
+  const invoicer = isInvoicer(user)
   const navigate = useNavigate()
   const [preview, setPreview] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -179,7 +182,7 @@ export function InvoiceDetailPage() {
                 {t('docs.issue')}
               </Button>
             </>
-          ) : (
+          ) : invoicer ? null : (
             <Link
               to={`/app/invoices/${invoice.id}/edit`}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/12 bg-white px-4 py-2.5 text-sm font-semibold hover:border-brand/30 hover:bg-brand/5"
@@ -195,7 +198,7 @@ export function InvoiceDetailPage() {
           <Button type="button" variant="secondary" onClick={onDuplicate}>
             {t('invoiceDetail.duplicate')}
           </Button>
-          <RepeatInvoiceButton invoice={invoice} />
+          {invoicer ? null : <RepeatInvoiceButton invoice={invoice} />}
           <Button type="button" onClick={onDownload}>
             {t('invoiceDetail.downloadPdf')}
           </Button>
@@ -269,7 +272,7 @@ export function InvoiceDetailPage() {
                         <p className="text-xs text-brand-ink/50">{item.date}{item.method ? ` · ${item.method}` : ''}{item.note ? ` · ${item.note}` : ''}</p>
                         {item.voidedAt ? <p className="text-xs text-[#C0503A]">{t('docs.voided')}: {item.voidReason}</p> : null}
                       </div>
-                      {!item.voidedAt && status !== 'cancelled' ? (
+                      {!invoicer && !item.voidedAt && status !== 'cancelled' ? (
                         <button
                           type="button"
                           className="text-xs font-semibold text-[#C0503A]"
@@ -359,7 +362,7 @@ export function InvoiceDetailPage() {
           {invoice.notes ? <NoteText notes={invoice.notes} className="mt-5 text-sm text-brand-ink/55" /> : null}
           {invoice.cancelReason ? <p className="mt-5 text-sm text-[#C0503A]">{t('docs.cancelInvoice')}: {invoice.cancelReason}</p> : null}
           <div className="mt-5 flex flex-col gap-2">
-            {status !== 'draft' && status !== 'cancelled' && due > 0 ? (
+            {!invoicer && status !== 'draft' && status !== 'cancelled' && due > 0 ? (
               <Button
                 type="button"
                 onClick={() => {
@@ -370,12 +373,12 @@ export function InvoiceDetailPage() {
                 {t('invoiceList.statusPaid')}
               </Button>
             ) : null}
-            {status !== 'draft' && status !== 'cancelled' && due > 0 ? (
+            {!invoicer && status !== 'draft' && status !== 'cancelled' && due > 0 ? (
               <Button type="button" variant="secondary" onClick={() => setPayOpen(true)}>
                 {t('docs.payPartial')}
               </Button>
             ) : null}
-            {status !== 'cancelled' && status !== 'draft' ? (
+            {!invoicer && status !== 'cancelled' && status !== 'draft' ? (
               <Button type="button" variant="secondary" disabled={busy} onClick={() => setCancelOpen(true)}>
                 {t('docs.cancelInvoice')}
               </Button>
