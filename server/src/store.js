@@ -1927,6 +1927,13 @@ function applySyncChange(userId, change) {
     return null;
   }
 
+  // A change to something the account no longer has (deleted, or moved to another company) is
+  // refused, never turned into a new record: a phone holding an old copy once made blank invoices
+  // with fresh numbers from "sent" and "paid" changes. Only a whole new record is created.
+  function refuseIfGone(whole) {
+    if (baseUpdatedAt || !whole) throw new Error('RECORD_GONE');
+  }
+
   if (collection === 'profile' && op === 'upsert') {
     // A phone's placeholders never replace the company's real details.
     const change = syncedProfileChange(getProfile(userId), body);
@@ -1942,6 +1949,7 @@ function applySyncChange(userId, change) {
     const hit = conflictIfNeeded(current);
     if (hit) return hit;
     if (current) return { client: updateClient(userId, id, body) };
+    refuseIfGone(String(body.fullName || '').trim());
     return addClient(userId, { ...body, id });
   }
   if (collection === 'items') {
@@ -1953,6 +1961,7 @@ function applySyncChange(userId, change) {
     const hit = conflictIfNeeded(current);
     if (hit) return hit;
     if (current) return { item: updateItem(userId, id, body) };
+    refuseIfGone(true);
     return addItem(userId, { ...body, id });
   }
   if (collection === 'invoices') {
@@ -1969,6 +1978,8 @@ function applySyncChange(userId, change) {
     const hit = conflictIfNeeded(current);
     if (hit) return hit;
     if (current) return { invoice: updateInvoice(userId, id, body) };
+    // A phone draft may have no lines yet, but always has its client and its list of lines.
+    refuseIfGone(Array.isArray(body.items) && body.client && String(body.client.fullName || '').trim());
     return { invoice: addInvoice(userId, { ...body, id }) };
   }
   if (collection === 'obligations') {
@@ -1982,6 +1993,7 @@ function applySyncChange(userId, change) {
     const hit = conflictIfNeeded(current);
     if (hit) return hit;
     if (current) return { obligation: updateObligation(userId, id, body) };
+    refuseIfGone(true);
     return { obligation: addObligation(userId, { ...body, id }) };
   }
   const err = new Error('UNKNOWN_CHANGE');

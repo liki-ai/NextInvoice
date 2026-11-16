@@ -11,6 +11,7 @@ function sendError(res, err) {
     RESTORE_EMPTY: [400, 'Backup data is missing.'],
     RESTORE_CHECKSUM: [400, 'Backup checksum does not match.'],
     UNKNOWN_CHANGE: [400, 'Unknown sync change.'],
+    RECORD_GONE: [409, 'This is no longer in the account (deleted or moved), so the change was not saved.'],
     PLAN_LIMIT: [402, 'Free plan includes 10 invoices per month. Upgrade to Premium for unlimited invoices.'],
     ISSUED_LOCKED: [409, 'Issued invoices cannot be edited silently. Use correction or cancel.'],
     CANCELLED_LOCKED: [409, 'Cancelled invoices cannot be changed.'],
