@@ -484,7 +484,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$8 = {
+const sq$9 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -748,7 +748,7 @@ const sq$8 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$8 = {
+const en$9 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -1012,8 +1012,8 @@ const en$8 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$8 = {
-	...en$8,
+const it$9 = {
+	...en$9,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1279,17 +1279,17 @@ const it$8 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$8,
+		...sq$9,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$8,
+		...en$9,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$8,
+		...it$9,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1301,7 +1301,7 @@ const financeNav = {
 };
 //#endregion
 //#region src/i18nMercury.ts
-const sq$7 = {
+const sq$8 = {
 	tab: "Mercury",
 	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
 	settings: "Lidhja me Mercury",
@@ -1395,7 +1395,7 @@ const sq$7 = {
 		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
 	}
 };
-const en$7 = {
+const en$8 = {
 	tab: "Mercury",
 	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
 	settings: "Mercury connection",
@@ -1490,10 +1490,10 @@ const en$7 = {
 	}
 };
 const mercuryTexts = {
-	sq: sq$7,
-	en: en$7,
+	sq: sq$8,
+	en: en$8,
 	it: {
-		...en$7,
+		...en$8,
 		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
 		settings: "Collegamento Mercury",
 		syncNow: "Aggiorna",
@@ -1544,7 +1544,7 @@ const mercuryTexts = {
 };
 //#endregion
 //#region src/i18nProjectDetail.ts
-const sq$6 = {
+const sq$7 = {
 	back: "Të gjitha projektet",
 	addProject: "Shto projekt",
 	projectName: "Emri, p.sh. TeamPlaner",
@@ -1607,7 +1607,7 @@ const sq$6 = {
 		costPerHour: "Kosto / orë"
 	}
 };
-const en$6 = {
+const en$7 = {
 	back: "All projects",
 	addProject: "Add project",
 	projectName: "Name, e.g. TeamPlaner",
@@ -1671,10 +1671,10 @@ const en$6 = {
 	}
 };
 const projectDetailTexts = {
-	sq: sq$6,
-	en: en$6,
+	sq: sq$7,
+	en: en$7,
 	it: {
-		...en$6,
+		...en$7,
 		back: "Tutti i progetti",
 		addProject: "Aggiungi progetto",
 		projectName: "Nome, es. TeamPlaner",
@@ -1696,7 +1696,7 @@ const projectDetailTexts = {
 		monthlyTitle: "Mese per mese: ricavi contro costi",
 		teamTitle: "Squadra ({count})",
 		col: {
-			...en$6.col,
+			...en$7.col,
 			month: "Mese",
 			hours: "Ore",
 			cost: "Costo",
@@ -3015,6 +3015,7 @@ const listsTexts = {
 		vatLong: "TVSH (€)",
 		total: "Me TVSH",
 		totalRow: "Totali",
+		totalCol: "Totali",
 		totalRowCount: "Totali · {count} fatura",
 		showing: "Po shfaqen {from}–{to} nga {total}",
 		showMore: "Shfaq edhe {count}",
@@ -3065,6 +3066,7 @@ const listsTexts = {
 		vatLong: "VAT (€)",
 		total: "Incl. VAT",
 		totalRow: "Total",
+		totalCol: "Total",
 		totalRowCount: "Total · {count} invoices",
 		showing: "Showing {from}–{to} of {total}",
 		showMore: "Show {count} more",
@@ -3115,6 +3117,7 @@ const listsTexts = {
 		vatLong: "IVA (€)",
 		total: "Con IVA",
 		totalRow: "Totale",
+		totalCol: "Totale",
 		totalRowCount: "Totale · {count} fatture",
 		showing: "Mostrate {from}–{to} di {total}",
 		showMore: "Mostra altre {count}",
@@ -3152,6 +3155,80 @@ const listsTexts = {
 		delete: "Elimina il cliente"
 	}
 };
+const purchasesTexts = {
+	sq: {
+		invoiceNumber: "Nr. i faturës",
+		invoiceNumberShort: "Nr.",
+		phInvoiceNumber: "p.sh. 2026-118",
+		invoiceDate: "Data e faturës",
+		pickDate: "Zgjidh datën",
+		pickVendor: "Zgjidh furnitorin ose shkruaj një të ri",
+		addVendor: "Shto furnitorin e ri “{name}”",
+		newVendor: "Furnitor i ri",
+		purchases: "{count} blerje",
+		owed: "borxh {amount}",
+		noVendors: "Shkruaj emrin e furnitorit të parë.",
+		items: "Artikujt",
+		itemsHint: "Opsionale. Kur ka rreshta, shuma llogaritet nga ata.",
+		addLine: "Shto rresht",
+		item: "Artikulli",
+		phItem: "p.sh. Letër A4",
+		quantity: "Sasia",
+		price: "Çmimi",
+		lineTotal: "Totali",
+		removeLine: "Hiq rreshtin",
+		amountFromLines: "Nga rreshtat",
+		linesTotal: "Totali i rreshtave"
+	},
+	en: {
+		invoiceNumber: "Invoice no.",
+		invoiceNumberShort: "No.",
+		phInvoiceNumber: "e.g. 2026-118",
+		invoiceDate: "Invoice date",
+		pickDate: "Pick a date",
+		pickVendor: "Pick a supplier or type a new one",
+		addVendor: "Add new supplier “{name}”",
+		newVendor: "New supplier",
+		purchases: "{count} purchases",
+		owed: "{amount} owed",
+		noVendors: "Type the name of your first supplier.",
+		items: "Items",
+		itemsHint: "Optional. With lines, the amount is their sum.",
+		addLine: "Add line",
+		item: "Item",
+		phItem: "e.g. A4 paper",
+		quantity: "Qty",
+		price: "Price",
+		lineTotal: "Total",
+		removeLine: "Remove line",
+		amountFromLines: "From the lines",
+		linesTotal: "Lines total"
+	},
+	it: {
+		invoiceNumber: "N. fattura",
+		invoiceNumberShort: "N.",
+		phInvoiceNumber: "es. 2026-118",
+		invoiceDate: "Data fattura",
+		pickDate: "Scegli la data",
+		pickVendor: "Scegli il fornitore o scrivine uno nuovo",
+		addVendor: "Aggiungi il nuovo fornitore “{name}”",
+		newVendor: "Nuovo fornitore",
+		purchases: "{count} acquisti",
+		owed: "da pagare {amount}",
+		noVendors: "Scrivi il nome del primo fornitore.",
+		items: "Articoli",
+		itemsHint: "Facoltativo. Con le righe, l’importo è la loro somma.",
+		addLine: "Aggiungi riga",
+		item: "Articolo",
+		phItem: "es. Carta A4",
+		quantity: "Qtà",
+		price: "Prezzo",
+		lineTotal: "Totale",
+		removeLine: "Togli la riga",
+		amountFromLines: "Dalle righe",
+		linesTotal: "Totale righe"
+	}
+};
 //#endregion
 //#region src/i18nCore.ts
 const LANGS = [
@@ -3185,14 +3262,15 @@ const translations = {
 		companies: companiesTexts.sq,
 		notesEditor: notesTexts.sq,
 		lists: listsTexts.sq,
+		purchases: purchasesTexts.sq,
 		nav: {
 			finance: financeNav.sq,
 			recurring: recurringNav.sq,
 			invoices: "Faturat",
-			obligations: "Detyrimet",
+			obligations: "Blerjet",
 			overview: "Pasqyra",
 			newInvoice: "Faturë e re",
-			newObligation: "Detyrim i ri",
+			newObligation: "Blerje e re",
 			profile: "Cilësimet",
 			more: "Më shumë",
 			login: "Hyr",
@@ -3662,9 +3740,9 @@ const translations = {
 			asOf: "Në datën {date}"
 		},
 		obligations: {
-			title: "Detyrimet",
+			title: "Blerjet",
 			subtitle: "Qira, transport, materiale dhe pagesa të tjera ndaj furnitorëve — të ndara nga faturat që lëshon.",
-			emptyTitle: "Nuk ka detyrime ende",
+			emptyTitle: "Nuk ka blerje ende",
 			empty: "Shto të parën këtu — qira, transport ose çdo pagesë ndaj furnitorëve.",
 			search: "Kërko sipas furnitorit ose faturës",
 			vendor: "Furnitori",
@@ -3674,13 +3752,13 @@ const translations = {
 			relatedInvoice: "Lidhur me faturën",
 			unpaidTotal: "Për të paguar",
 			paidTotal: "Paguar",
-			countLabel: "{count} detyrime",
+			countLabel: "{count} blerje",
 			vendorCount: "{count} rreshta",
 			stillDue: "ende e papaguar",
 			invoiceBanner: "Ke pagesa të hapura ndaj furnitorëve.",
 			allVendors: "Të gjithë furnitorët",
-			newTitle: "Detyrim i ri",
-			editTitle: "Ndrysho detyrimin",
+			newTitle: "Blerje e re",
+			editTitle: "Ndrysho blerjen",
 			formHint: "Shëno furnitorin, shumën dhe kategorinë. Shënimet, afati dhe fatura janë opsionale.",
 			phVendor: "p.sh. DHL",
 			phDescription: "p.sh. Dërgesat e marsit, ose numri i tracking",
@@ -3692,14 +3770,14 @@ const translations = {
 			noRelatedInvoice: "Pa lidhje me faturë",
 			validationVendor: "Shkruaj emrin e furnitorit.",
 			validationAmount: "Shkruaj një shumë më të madhe se 0.",
-			deleteConfirm: "Të fshihet ky detyrim? Ky veprim nuk kthehet.",
-			delete: "Fshij detyrimin",
+			deleteConfirm: "Të fshihet kjo blerje? Ky veprim nuk kthehet.",
+			delete: "Fshij blerjen",
 			sendPaid: "Dërgo të paguarat",
-			sendPaidTitle: "Detyrimet e paguara",
+			sendPaidTitle: "Blerjet e paguara",
 			sendUnpaid: "Dërgo të papaguarat",
-			sendUnpaidTitle: "Detyrimet e papaguara",
+			sendUnpaidTitle: "Blerjet e papaguara",
 			sendList: "Dërgo listën",
-			sendAllTitle: "Detyrimet",
+			sendAllTitle: "Blerjet",
 			proofTitle: "Dëshmia e pagesës",
 			proofHint: "Ngarko PDF ose foto nga transaksioni.",
 			proofAdd: "Ngarko dëshmi",
@@ -4193,14 +4271,15 @@ const translations = {
 		companies: companiesTexts.en,
 		notesEditor: notesTexts.en,
 		lists: listsTexts.en,
+		purchases: purchasesTexts.en,
 		nav: {
 			finance: financeNav.en,
 			recurring: recurringNav.en,
 			invoices: "Invoices",
-			obligations: "Obligations",
+			obligations: "Purchases",
 			overview: "Overview",
 			newInvoice: "New invoice",
-			newObligation: "New bill",
+			newObligation: "New purchase",
 			profile: "Settings",
 			more: "More",
 			login: "Log in",
@@ -4670,9 +4749,9 @@ const translations = {
 			asOf: "As of {date}"
 		},
 		obligations: {
-			title: "To pay",
+			title: "Purchases",
 			subtitle: "Rent, shipping, supplies, and other bills you owe — kept separate from invoices you issue.",
-			emptyTitle: "No bills yet",
+			emptyTitle: "No purchases yet",
 			empty: "Add the first one here — rent, shipping, or any vendor bill.",
 			search: "Search by vendor or invoice",
 			vendor: "Vendor",
@@ -4687,8 +4766,8 @@ const translations = {
 			stillDue: "still unpaid",
 			invoiceBanner: "You have open bills to vendors.",
 			allVendors: "All vendors",
-			newTitle: "New bill",
-			editTitle: "Edit bill",
+			newTitle: "New purchase",
+			editTitle: "Edit purchase",
 			formHint: "Enter the vendor, amount, and category. Notes, due date, and invoice link are optional.",
 			phVendor: "e.g. DHL",
 			phDescription: "e.g. March shipments, or tracking number",
@@ -4700,14 +4779,14 @@ const translations = {
 			noRelatedInvoice: "Not linked to an invoice",
 			validationVendor: "Enter the vendor name.",
 			validationAmount: "Enter an amount greater than 0.",
-			deleteConfirm: "Delete this bill? This cannot be undone.",
-			delete: "Delete bill",
+			deleteConfirm: "Delete this purchase? This cannot be undone.",
+			delete: "Delete purchase",
 			sendPaid: "Send paid list",
-			sendPaidTitle: "Paid bills",
+			sendPaidTitle: "Paid purchases",
 			sendUnpaid: "Send unpaid list",
-			sendUnpaidTitle: "Unpaid bills",
+			sendUnpaidTitle: "Unpaid purchases",
 			sendList: "Send list",
-			sendAllTitle: "Bills",
+			sendAllTitle: "Purchases",
 			proofTitle: "Payment proof",
 			proofHint: "Upload a PDF or photo from the transaction.",
 			proofAdd: "Add proof",
@@ -5201,14 +5280,15 @@ const translations = {
 		companies: companiesTexts.it,
 		notesEditor: notesTexts.it,
 		lists: listsTexts.it,
+		purchases: purchasesTexts.it,
 		nav: {
 			finance: financeNav.it,
 			recurring: recurringNav.it,
 			invoices: "Fatture",
-			obligations: "Obblighi",
+			obligations: "Acquisti",
 			overview: "Panoramica",
 			newInvoice: "Nuova fattura",
-			newObligation: "Nuovo pagamento",
+			newObligation: "Nuovo acquisto",
 			profile: "Impostazioni",
 			more: "Altro",
 			login: "Accedi",
@@ -5678,9 +5758,9 @@ const translations = {
 			asOf: "Al {date}"
 		},
 		obligations: {
-			title: "Da pagare",
+			title: "Acquisti",
 			subtitle: "Affitto, trasporto, materiali e altri pagamenti ai fornitori — separati dalle fatture che emetti.",
-			emptyTitle: "Nessun pagamento",
+			emptyTitle: "Nessun acquisto",
 			empty: "Aggiungi il primo qui — affitto, trasporto o qualsiasi pagamento ai fornitori.",
 			search: "Cerca per fornitore o fattura",
 			vendor: "Fornitore",
@@ -5695,8 +5775,8 @@ const translations = {
 			stillDue: "ancora da pagare",
 			invoiceBanner: "Hai pagamenti aperti verso i fornitori.",
 			allVendors: "Tutti i fornitori",
-			newTitle: "Nuovo pagamento",
-			editTitle: "Modifica pagamento",
+			newTitle: "Nuovo acquisto",
+			editTitle: "Modifica acquisto",
 			formHint: "Inserisci fornitore, importo e categoria. Note, scadenza e fattura sono opzionali.",
 			phVendor: "es. DHL",
 			phDescription: "es. Spedizioni di marzo, o numero di tracking",
@@ -5708,14 +5788,14 @@ const translations = {
 			noRelatedInvoice: "Non collegata a una fattura",
 			validationVendor: "Inserisci il nome del fornitore.",
 			validationAmount: "Inserisci un importo maggiore di 0.",
-			deleteConfirm: "Eliminare questo pagamento? L’operazione non può essere annullata.",
-			delete: "Elimina pagamento",
+			deleteConfirm: "Eliminare questo acquisto? L’operazione non può essere annullata.",
+			delete: "Elimina acquisto",
 			sendPaid: "Invia pagati",
-			sendPaidTitle: "Pagamenti effettuati",
+			sendPaidTitle: "Acquisti pagati",
 			sendUnpaid: "Invia da pagare",
-			sendUnpaidTitle: "Pagamenti da saldare",
+			sendUnpaidTitle: "Acquisti da pagare",
 			sendList: "Invia elenco",
-			sendAllTitle: "Pagamenti",
+			sendAllTitle: "Acquisti",
 			proofTitle: "Prova di pagamento",
 			proofHint: "Carica un PDF o una foto della transazione.",
 			proofAdd: "Aggiungi prova",
