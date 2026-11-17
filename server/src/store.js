@@ -1556,10 +1556,29 @@ function getObligation(userId, obligationId) {
   return listObligations(userId).find((item) => item.id === obligationId) || null;
 }
 
+/** A purchase's lines as the supplier's invoice lists them; ones with neither a name nor an amount are dropped. */
+function normalizeObligationItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => {
+      const quantity = Number(String(item?.quantity ?? '').replace(',', '.'));
+      const unitPrice = Number(String(item?.unitPrice ?? '').replace(',', '.'));
+      return {
+        description: String(item?.description || '').trim().slice(0, 500),
+        quantity: Number.isFinite(quantity) ? quantity : 0,
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+      };
+    })
+    .filter((item) => item.description || item.quantity * item.unitPrice)
+    .slice(0, 200);
+}
+
 function normalizeObligation(raw) {
   const amount = Number(raw.amount);
   return {
     vendor: String(raw.vendor || '').trim(),
+    invoiceNumber: String(raw.invoiceNumber || '').trim().slice(0, 100),
+    items: normalizeObligationItems(raw.items),
     description: String(raw.description || '').trim(),
     amount: Number.isFinite(amount) ? money(amount) : 0,
     date: String(raw.date || ''),

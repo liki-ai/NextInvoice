@@ -82,7 +82,7 @@ export function ObligationListPage() {
       if (vendorFilter !== 'all' && item.vendor.trim().toLowerCase() !== vendorFilter) return false
       if (!q) return true
       const related = invoices.find((inv) => inv.id === item.relatedInvoiceId)
-      const hay = `${item.vendor} ${item.notes || ''} ${item.description} ${item.date} ${related?.number || ''} ${related?.client?.fullName || ''}`.toLowerCase()
+      const hay = `${item.vendor} ${item.invoiceNumber || ""} ${item.notes || ''} ${item.description} ${item.date} ${related?.number || ''} ${related?.client?.fullName || ''}`.toLowerCase()
       return hay.includes(q)
     })
   }, [obligations, invoices, query, statusFilter, vendorFilter])
@@ -323,10 +323,10 @@ export function ObligationListPage() {
                           {item.vendor}
                         </Link>
                         <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-brand-ink/40">
-                          {t(`obligations.category.${item.category || 'other'}`)}
+                          {t(`obligations.category.${item.category || 'other'}`)}{item.invoiceNumber ? <span className="ml-2 normal-case tracking-normal text-brand-ink/55">· {t('purchases.invoiceNumberShort')} {item.invoiceNumber}</span> : null}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-brand-ink/70">{item.notes || item.description || '—'}</td>
+                      <td className="px-5 py-4 text-brand-ink/70">{item.notes || item.description || (item.items?.length ? item.items.map((line) => line.description).filter(Boolean).join(', ') : '') || '—'}</td>
                       <td className="px-5 py-4 text-brand-ink/60">
                         <div className="font-semibold">{item.date}</div>
                         <div className="text-xs text-brand-ink/40">{item.dueDate || t('pdf.onReceipt')}</div>

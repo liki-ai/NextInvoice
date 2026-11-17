@@ -6,9 +6,21 @@ export type ObligationStatus = 'paid' | 'unpaid' | 'partial' | 'cancelled'
 export const OBLIGATION_CATEGORIES = ['shipping', 'supplies', 'rent', 'tax', 'other'] as const
 export type ObligationCategory = (typeof OBLIGATION_CATEGORIES)[number]
 
+/** One line of a purchase, as the supplier's invoice lists it; the price is what was paid per unit. */
+export type PurchaseLine = { description: string; quantity: number; unitPrice: number }
+
+/** The sum of the lines, rounded to cents. */
+export function purchaseLinesTotal(lines: { quantity: unknown; unitPrice: unknown }[]) {
+  const sum = lines.reduce((total, line) => total + toNumber(line.quantity) * toNumber(line.unitPrice), 0)
+  return Math.round(sum * 100) / 100
+}
+
 export type Obligation = {
   id: string
   vendor: string
+  /** The number on the supplier's invoice. */
+  invoiceNumber?: string
+  items?: PurchaseLine[]
   description: string
   amount: number
   date: string

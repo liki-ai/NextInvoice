@@ -266,7 +266,7 @@ export function ClientCardPage() {
                     <th className={th}>{t('invoiceList.status')}</th>
                     <th className={`${th} text-right`}>{t('lists.netLong')}</th>
                     <th className={`${th} text-right`}>{t('lists.vatLong')}</th>
-                    <th className={`${th} text-right`}>{t('invoiceList.amount')}</th>
+                    <th className={`${th} text-right`}>{t('lists.totalCol')}</th>
                     <th className={`${th} text-right`}>{t('lists.paid')}</th>
                     <th className={`${th} pr-5 text-right`}>{t('lists.remaining')}</th>
                   </tr>

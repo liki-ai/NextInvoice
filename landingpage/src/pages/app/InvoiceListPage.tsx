@@ -746,7 +746,7 @@ export function InvoiceListPage() {
                   <th className="px-3 py-2.5 font-semibold">{t('invoiceList.status')}</th>
                   <th className="px-3 py-2.5 text-right font-semibold">{t('lists.netLong')}</th>
                   <th className="px-3 py-2.5 text-right font-semibold">{t('lists.vatLong')}</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">{t('invoiceList.amount')}</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">{t('lists.totalCol')}</th>
                   <th className="px-3 py-2.5 text-right font-semibold">{t('common.edit')}</th>
                 </tr>
               </thead>
