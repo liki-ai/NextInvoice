@@ -484,7 +484,7 @@ const reportTabs = {
 };
 //#endregion
 //#region src/i18nFinance.ts
-const sq$7 = {
+const sq$8 = {
 	title: "Shëndeti financiar",
 	subtitle: "Si po ecën kompania: shifrat kryesore sipas faturave, bankës dhe dokumenteve që dërgon kontabilisti, me detajet më poshtë.",
 	managersOnly: "Këtë faqe e shohin vetëm pronari dhe administratorët e kompanisë.",
@@ -748,7 +748,7 @@ const sq$7 = {
 		FILE_REQUIRED: "Zgjidh të paktën një skedar."
 	}
 };
-const en$7 = {
+const en$8 = {
 	title: "Financial health",
 	subtitle: "How the company is doing: the key figures from invoices, the bank and the documents your accountant sends, with the detail below.",
 	managersOnly: "Only the owner and the administrators of the company see this page.",
@@ -1012,8 +1012,8 @@ const en$7 = {
 		FILE_REQUIRED: "Choose at least one file."
 	}
 };
-const it$7 = {
-	...en$7,
+const it$8 = {
+	...en$8,
 	title: "Salute finanziaria",
 	subtitle: "Come va l’azienda: le cifre principali da fatture, banca e documenti del commercialista, con i dettagli sotto.",
 	managersOnly: "Solo il titolare e gli amministratori dell’azienda vedono questa pagina.",
@@ -1279,17 +1279,17 @@ const it$7 = {
 };
 const financeTexts = {
 	sq: {
-		...sq$7,
+		...sq$8,
 		projects: projectsTexts.sq,
 		tabs: reportTabs.sq
 	},
 	en: {
-		...en$7,
+		...en$8,
 		projects: projectsTexts.en,
 		tabs: reportTabs.en
 	},
 	it: {
-		...it$7,
+		...it$8,
 		projects: projectsTexts.it,
 		tabs: reportTabs.it
 	}
@@ -1301,7 +1301,7 @@ const financeNav = {
 };
 //#endregion
 //#region src/i18nMercury.ts
-const sq$6 = {
+const sq$7 = {
 	tab: "Mercury",
 	subtitle: "Llogaria bankare në Mercury, në kohë reale: nga vijnë paratë, ku shkojnë, si po ndryshojnë dhe çka ia vlen të ndryshohet.",
 	settings: "Lidhja me Mercury",
@@ -1395,7 +1395,7 @@ const sq$6 = {
 		MERCURY_SINCE: "Shkruaj një datë të vlefshme."
 	}
 };
-const en$6 = {
+const en$7 = {
 	tab: "Mercury",
 	subtitle: "Your Mercury bank account in real time: where the money comes from, where it goes, how that is changing and what is worth changing.",
 	settings: "Mercury connection",
@@ -1490,10 +1490,10 @@ const en$6 = {
 	}
 };
 const mercuryTexts = {
-	sq: sq$6,
-	en: en$6,
+	sq: sq$7,
+	en: en$7,
 	it: {
-		...en$6,
+		...en$7,
 		subtitle: "Il conto Mercury in tempo reale: da dove arrivano i soldi, dove vanno, come cambia e cosa conviene cambiare.",
 		settings: "Collegamento Mercury",
 		syncNow: "Aggiorna",
@@ -1544,7 +1544,7 @@ const mercuryTexts = {
 };
 //#endregion
 //#region src/i18nProjectDetail.ts
-const sq$5 = {
+const sq$6 = {
 	back: "Të gjitha projektet",
 	addProject: "Shto projekt",
 	projectName: "Emri, p.sh. TeamPlaner",
@@ -1607,7 +1607,7 @@ const sq$5 = {
 		costPerHour: "Kosto / orë"
 	}
 };
-const en$5 = {
+const en$6 = {
 	back: "All projects",
 	addProject: "Add project",
 	projectName: "Name, e.g. TeamPlaner",
@@ -1671,10 +1671,10 @@ const en$5 = {
 	}
 };
 const projectDetailTexts = {
-	sq: sq$5,
-	en: en$5,
+	sq: sq$6,
+	en: en$6,
 	it: {
-		...en$5,
+		...en$6,
 		back: "Tutti i progetti",
 		addProject: "Aggiungi progetto",
 		projectName: "Nome, es. TeamPlaner",
@@ -1696,7 +1696,7 @@ const projectDetailTexts = {
 		monthlyTitle: "Mese per mese: ricavi contro costi",
 		teamTitle: "Squadra ({count})",
 		col: {
-			...en$5.col,
+			...en$6.col,
 			month: "Mese",
 			hours: "Ore",
 			cost: "Costo",
@@ -3000,6 +3000,158 @@ const notesTexts = {
 		onInvoice: "Sulla fattura:"
 	}
 };
+const listsTexts = {
+	sq: {
+		period: "Periudha",
+		from: "Prej",
+		to: "Deri",
+		thisMonth: "Ky muaj",
+		lastMonth: "Muaji i kaluar",
+		thisYear: "Ky vit",
+		clearPeriod: "Hiq periudhën",
+		net: "Pa TVSH",
+		vat: "TVSH",
+		netLong: "Shuma pa TVSH",
+		vatLong: "TVSH (€)",
+		total: "Me TVSH",
+		totalRow: "Totali",
+		totalRowCount: "Totali · {count} fatura",
+		showing: "Po shfaqen {from}–{to} nga {total}",
+		showMore: "Shfaq edhe {count}",
+		searchShortcut: "Shtyp / për të kërkuar",
+		clearSearch: "Fshij kërkimin",
+		card: "Kartela e klientit",
+		back: "Klientët",
+		edit: "Ndrysho të dhënat",
+		newInvoice: "Faturë e re",
+		invoices: "Faturat",
+		payments: "Pagesat",
+		statInvoices: "Fatura",
+		statInvoiced: "Faturuar",
+		statPaid: "Paguar",
+		statRemaining: "Mbetur për t’u paguar",
+		statOverdue: "Me vonesë",
+		statNet: "Pa TVSH",
+		statVat: "TVSH",
+		statLast: "Fatura e fundit",
+		statAvgDays: "Paguan mesatarisht pas",
+		days: "{days} ditësh",
+		allTime: "Gjithsej, nga fillimi",
+		inPeriod: "Në periudhën e zgjedhur",
+		paid: "Paguar",
+		remaining: "Mbetur",
+		paymentDate: "Data e pagesës",
+		invoice: "Fatura",
+		method: "Mënyra",
+		note: "Shënim",
+		amount: "Shuma",
+		noInvoices: "Asnjë faturë në këtë periudhë.",
+		noPayments: "Asnjë pagesë në këtë periudhë.",
+		paymentsCount: "Totali · {count} pagesa",
+		notFound: "Ky klient nuk u gjet.",
+		delete: "Fshij klientin"
+	},
+	en: {
+		period: "Period",
+		from: "From",
+		to: "To",
+		thisMonth: "This month",
+		lastMonth: "Last month",
+		thisYear: "This year",
+		clearPeriod: "Clear period",
+		net: "Excl. VAT",
+		vat: "VAT",
+		netLong: "Amount excl. VAT",
+		vatLong: "VAT (€)",
+		total: "Incl. VAT",
+		totalRow: "Total",
+		totalRowCount: "Total · {count} invoices",
+		showing: "Showing {from}–{to} of {total}",
+		showMore: "Show {count} more",
+		searchShortcut: "Press / to search",
+		clearSearch: "Clear search",
+		card: "Client card",
+		back: "Clients",
+		edit: "Edit details",
+		newInvoice: "New invoice",
+		invoices: "Invoices",
+		payments: "Payments",
+		statInvoices: "Invoices",
+		statInvoiced: "Invoiced",
+		statPaid: "Paid",
+		statRemaining: "Still owed",
+		statOverdue: "Overdue",
+		statNet: "Excl. VAT",
+		statVat: "VAT",
+		statLast: "Last invoice",
+		statAvgDays: "Pays on average after",
+		days: "{days} days",
+		allTime: "All time",
+		inPeriod: "In the chosen period",
+		paid: "Paid",
+		remaining: "Owed",
+		paymentDate: "Payment date",
+		invoice: "Invoice",
+		method: "Method",
+		note: "Note",
+		amount: "Amount",
+		noInvoices: "No invoices in this period.",
+		noPayments: "No payments in this period.",
+		paymentsCount: "Total · {count} payments",
+		notFound: "This client was not found.",
+		delete: "Delete client"
+	},
+	it: {
+		period: "Periodo",
+		from: "Dal",
+		to: "Al",
+		thisMonth: "Questo mese",
+		lastMonth: "Mese scorso",
+		thisYear: "Quest’anno",
+		clearPeriod: "Togli il periodo",
+		net: "Senza IVA",
+		vat: "IVA",
+		netLong: "Importo senza IVA",
+		vatLong: "IVA (€)",
+		total: "Con IVA",
+		totalRow: "Totale",
+		totalRowCount: "Totale · {count} fatture",
+		showing: "Mostrate {from}–{to} di {total}",
+		showMore: "Mostra altre {count}",
+		searchShortcut: "Premi / per cercare",
+		clearSearch: "Cancella la ricerca",
+		card: "Scheda cliente",
+		back: "Clienti",
+		edit: "Modifica i dati",
+		newInvoice: "Nuova fattura",
+		invoices: "Fatture",
+		payments: "Pagamenti",
+		statInvoices: "Fatture",
+		statInvoiced: "Fatturato",
+		statPaid: "Pagato",
+		statRemaining: "Ancora da pagare",
+		statOverdue: "In ritardo",
+		statNet: "Senza IVA",
+		statVat: "IVA",
+		statLast: "Ultima fattura",
+		statAvgDays: "Paga in media dopo",
+		days: "{days} giorni",
+		allTime: "Dall’inizio",
+		inPeriod: "Nel periodo scelto",
+		paid: "Pagato",
+		remaining: "Da pagare",
+		paymentDate: "Data del pagamento",
+		invoice: "Fattura",
+		method: "Metodo",
+		note: "Nota",
+		amount: "Importo",
+		noInvoices: "Nessuna fattura in questo periodo.",
+		noPayments: "Nessun pagamento in questo periodo.",
+		paymentsCount: "Totale · {count} pagamenti",
+		notFound: "Cliente non trovato.",
+		delete: "Elimina il cliente"
+	}
+};
 //#endregion
 //#region src/i18nCore.ts
 const LANGS = [
@@ -3032,6 +3184,7 @@ const translations = {
 		contracts: contractsTexts.sq,
 		companies: companiesTexts.sq,
 		notesEditor: notesTexts.sq,
+		lists: listsTexts.sq,
 		nav: {
 			finance: financeNav.sq,
 			recurring: recurringNav.sq,
@@ -4039,6 +4192,7 @@ const translations = {
 		contracts: contractsTexts.en,
 		companies: companiesTexts.en,
 		notesEditor: notesTexts.en,
+		lists: listsTexts.en,
 		nav: {
 			finance: financeNav.en,
 			recurring: recurringNav.en,
@@ -5046,6 +5200,7 @@ const translations = {
 		contracts: contractsTexts.it,
 		companies: companiesTexts.it,
 		notesEditor: notesTexts.it,
+		lists: listsTexts.it,
 		nav: {
 			finance: financeNav.it,
 			recurring: recurringNav.it,
