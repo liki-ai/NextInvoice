@@ -31,6 +31,8 @@ import { clientInvoiceSummary, invoiceClientGroups, isOwed, matchClientGroups } 
 import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
+import { MoneyStack, PagerFooter, PeriodFilter, usePaged, usePeriodParam } from '../../components/ListTools'
+import { hasPeriod, invoiceInPeriod, invoiceListTotals, vatSplit } from '../../lib/listTools'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
   if (filter === 'paid') {
@@ -116,10 +118,13 @@ export function InvoiceListPage() {
   }, [invoices, currentYear])
   const yearParam = searchParams.get('year')
   const year: number | 'all' = yearParam === 'all' ? 'all' : yearCounts.some(([value]) => String(value) === yearParam) ? Number(yearParam) : currentYear
-  const yearInvoices = useMemo(
-    () => (year === 'all' ? invoices : invoices.filter((item) => (invoiceYear(item) ?? currentYear) === year)),
-    [invoices, year, currentYear],
-  )
+  // A chosen period (from–to) looks across every year; picking a year again clears it.
+  const [period, setPeriod] = usePeriodParam()
+  const periodSet = hasPeriod(period)
+  const yearInvoices = useMemo(() => {
+    if (periodSet) return invoices.filter((item) => invoiceInPeriod(item, period))
+    return year === 'all' ? invoices : invoices.filter((item) => (invoiceYear(item) ?? currentYear) === year)
+  }, [invoices, year, currentYear, period, periodSet])
 
   function setYear(next: number | 'all') {
     setSearchParams(
@@ -127,11 +132,35 @@ export function InvoiceListPage() {
         const params = new URLSearchParams(prev)
         if (next === currentYear) params.delete('year')
         else params.set('year', String(next))
+        params.delete('from')
+        params.delete('to')
         return params
       },
       { replace: true },
     )
   }
+
+  // The search is what this page is mostly for: it has the focus on arrival, and "/" brings it back.
+  // Only with a mouse: on a phone the focus would open the keyboard over the list on every visit.
+  const searchRef = useRef<HTMLInputElement>(null)
+  const searchFocused = useRef(false)
+  const hasInvoices = invoices.length > 0
+  useEffect(() => {
+    if (searchFocused.current || !hasInvoices || !searchRef.current) return
+    searchFocused.current = true
+    if (window.matchMedia?.('(pointer: fine)').matches) searchRef.current.focus()
+  }, [hasInvoices])
+  useEffect(() => {
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
+      e.preventDefault()
+      searchRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     if (!addedId) return undefined
@@ -161,7 +190,10 @@ export function InvoiceListPage() {
   const limitReached = usage?.plan === 'free' && usage.limit !== null && usage.used >= usage.limit
 
   const filtered = useMemo(() => {
-    if (client) return clientTab === 'unpaid' ? client.invoices.filter(isOwed) : client.invoices
+    if (client) {
+      const mine = periodSet ? client.invoices.filter((item) => invoiceInPeriod(item, period)) : client.invoices
+      return clientTab === 'unpaid' ? mine.filter(isOwed) : mine
+    }
     const q = query.trim().toLowerCase()
     const list = !q
       ? yearInvoices
@@ -184,7 +216,9 @@ export function InvoiceListPage() {
       const status = invoiceStatus(item)
       return status === 'unpaid' || status === 'partial'
     })
-  }, [yearInvoices, query, statusFilter, client, clientTab])
+  }, [yearInvoices, query, statusFilter, client, clientTab, period, periodSet])
+  const listTotals = useMemo(() => invoiceListTotals(filtered), [filtered])
+  const paged = usePaged(filtered, [query, statusFilter, clientKey, clientTab, year, period.from, period.to].join('|'))
   const clientSummary = useMemo(() => (client ? clientInvoiceSummary(filtered) : null), [client, filtered])
 
   // Rows that can be ticked: issued invoices with something still owed, among those on screen.
@@ -335,21 +369,21 @@ export function InvoiceListPage() {
                   key={value}
                   type="button"
                   role="radio"
-                  aria-checked={year === value}
+                  aria-checked={!periodSet && year === value}
                   onClick={() => setYear(value)}
-                  className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold tabular-nums transition ${year === value ? 'bg-brand-ink text-white' : 'border border-brand-ink/10 bg-white text-brand-ink/65 hover:border-brand/30 hover:text-brand-ink'}`}
+                  className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold tabular-nums transition ${!periodSet && year === value ? 'bg-brand-ink text-white' : 'border border-brand-ink/10 bg-white text-brand-ink/65 hover:border-brand/30 hover:text-brand-ink'}`}
                 >
                   {value}
-                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] ${year === value ? 'bg-white/15 text-white/85' : 'bg-brand-bg text-brand-ink/50'}`}>{count}</span>
+                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] ${!periodSet && year === value ? 'bg-white/15 text-white/85' : 'bg-brand-bg text-brand-ink/50'}`}>{count}</span>
                 </button>
               ))}
               {yearCounts.length > 1 ? (
                 <button
                   type="button"
                   role="radio"
-                  aria-checked={year === 'all'}
+                  aria-checked={!periodSet && year === 'all'}
                   onClick={() => setYear('all')}
-                  className={`rounded-xl px-3.5 py-2 text-sm font-semibold transition ${year === 'all' ? 'bg-brand-ink text-white' : 'border border-brand-ink/10 bg-white text-brand-ink/65 hover:border-brand/30 hover:text-brand-ink'}`}
+                  className={`rounded-xl px-3.5 py-2 text-sm font-semibold transition ${!periodSet && year === 'all' ? 'bg-brand-ink text-white' : 'border border-brand-ink/10 bg-white text-brand-ink/65 hover:border-brand/30 hover:text-brand-ink'}`}
                 >
                   {t('invoiceList.allYears')}
                 </button>
@@ -483,39 +517,80 @@ export function InvoiceListPage() {
 
       {invoices.length > 0 ? (
         <div className="mt-6 overflow-hidden rounded-2xl border border-brand-ink/8 bg-white">
-          <div className="flex items-center gap-3 border-b border-brand-ink/8 px-4 py-3">
-            <Search className="h-4 w-4 shrink-0 text-brand-ink/35" />
-            {client ? (
-              <span className="-my-1 inline-flex min-w-0 items-center gap-2 rounded-xl bg-brand/10 py-1 pl-3 pr-1 text-sm font-semibold text-brand">
-                <User className="h-4 w-4 shrink-0" />
-                <span className="truncate">{client.client.fullName}</span>
-                <button
-                  type="button"
-                  onClick={() => setClientKey(null)}
-                  title={t('invoiceList.clearClient')}
-                  aria-label={t('invoiceList.clearClient')}
-                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg hover:bg-brand/15"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </span>
-            ) : (
-              <input
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value)
-                  setSuggestIndex(0)
-                  setSuggestHidden(false)
-                }}
-                onKeyDown={onSearchKey}
-                placeholder={t('invoiceList.searchClient')}
-                role="combobox"
-                aria-expanded={suggestions.length > 0}
-                aria-controls="invoice-client-suggestions"
-                aria-autocomplete="list"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-brand-ink/35"
-              />
-            )}
+          <div className="border-b border-brand-ink/8 bg-[#F7FAFA] px-4 py-4">
+            <div className="flex min-h-[52px] items-center gap-3 rounded-2xl border-2 border-brand/25 bg-white px-4 shadow-[0_2px_10px_rgba(44,110,127,0.08)] transition focus-within:border-brand focus-within:shadow-[0_0_0_4px_rgba(44,110,127,0.12)]">
+              <Search className="h-5 w-5 shrink-0 text-brand" />
+              {client ? (
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="inline-flex min-w-0 items-center gap-2 rounded-xl bg-brand/10 py-1.5 pl-3 pr-1 text-sm font-semibold text-brand">
+                    <User className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{client.client.fullName}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientKey(null)
+                        window.setTimeout(() => searchRef.current?.focus(), 0)
+                      }}
+                      title={t('invoiceList.clearClient')}
+                      aria-label={t('invoiceList.clearClient')}
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg hover:bg-brand/15"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                  {client.key.startsWith('id:') && clients.some((row) => `id:${row.id}` === client.key) ? (
+                    <Link to={`/app/clients/${client.key.slice(3)}`} className="ml-auto shrink-0 text-sm font-semibold text-brand hover:underline">
+                      {t('lists.card')} →
+                    </Link>
+                  ) : null}
+                </span>
+              ) : (
+                <>
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value)
+                      setSuggestIndex(0)
+                      setSuggestHidden(false)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && !suggestions.length && query) {
+                        setQuery('')
+                        return
+                      }
+                      onSearchKey(e)
+                    }}
+                    placeholder={t('invoiceList.searchClient')}
+                    aria-label={t('invoiceList.searchClient')}
+                    role="combobox"
+                    aria-expanded={suggestions.length > 0}
+                    aria-controls="invoice-client-suggestions"
+                    aria-autocomplete="list"
+                    className="h-12 w-full min-w-0 bg-transparent text-base text-brand-ink outline-none placeholder:text-brand-ink/40"
+                  />
+                  {query ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuery('')
+                        searchRef.current?.focus()
+                      }}
+                      title={t('lists.clearSearch')}
+                      aria-label={t('lists.clearSearch')}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-brand-ink/45 hover:bg-brand-ink/5 hover:text-brand-ink"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <kbd title={t('lists.searchShortcut')} className="hidden shrink-0 rounded-md border border-brand-ink/15 bg-brand-bg px-2 py-0.5 font-sans text-xs font-semibold text-brand-ink/45 sm:inline">
+                      /
+                    </kbd>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {suggestions.length > 0 ? (
@@ -614,6 +689,12 @@ export function InvoiceListPage() {
           </div>
           )}
 
+          {statusFilter === 'toSend' && !client ? null : (
+            <div className="border-t border-brand-ink/6 px-4 py-3">
+              <PeriodFilter period={period} onChange={setPeriod} showYear={false} />
+            </div>
+          )}
+
           {statusFilter === 'toSend' && !client ? (
             <DeliveryQueue invoices={invoices} />
           ) : (
@@ -644,7 +725,7 @@ export function InvoiceListPage() {
           ) : null}
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
+            <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="border-b border-brand-ink/8 bg-[#FAFBFB] text-[11px] uppercase tracking-[0.08em] text-brand-ink/40">
                 <tr>
                   <th className="w-10 py-3 pl-5">
@@ -659,16 +740,19 @@ export function InvoiceListPage() {
                       className="h-4 w-4 cursor-pointer accent-[#2C6E7F] disabled:cursor-default disabled:opacity-40"
                     />
                   </th>
-                  <th className="px-4 py-2.5 font-semibold">{t('newInvoice.invoiceNumber')}</th>
-                  <th className="px-4 py-2.5 font-semibold">{t('invoiceList.client')}</th>
-                  <th className="px-4 py-2.5 font-semibold">{t('newInvoice.date')}</th>
-                  <th className="px-4 py-2.5 font-semibold">{t('invoiceList.status')}</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">{t('invoiceList.amount')}</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">{t('common.edit')}</th>
+                  <th className="px-3 py-2.5 font-semibold">{t('newInvoice.invoiceNumber')}</th>
+                  <th className="px-3 py-2.5 font-semibold">{t('invoiceList.client')}</th>
+                  <th className="px-3 py-2.5 font-semibold">{t('newInvoice.date')}</th>
+                  <th className="px-3 py-2.5 font-semibold">{t('invoiceList.status')}</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">{t('lists.netLong')}</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">{t('lists.vatLong')}</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">{t('invoiceList.amount')}</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">{t('common.edit')}</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => {
+                {paged.visible.map((item) => {
+                  const split = vatSplit(item)
                   const status = invoiceStatus(item)
                   const visible = visiblePaymentStatus(item)
                   const subject = invoiceSubject(item)
@@ -711,22 +795,22 @@ export function InvoiceListPage() {
                         />
                       ) : null}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5">
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <Link to={status === 'draft' ? `/app/invoices/${item.id}/edit` : `/app/invoices/${item.id}`} className="font-semibold text-brand hover:underline">
                         {item.number}
                       </Link>
                     </td>
-                    <td className="w-full min-w-[140px] max-w-0 px-4 py-2.5" title={[item.client?.fullName, subject].filter(Boolean).join(' — ')}>
+                    <td className="w-full min-w-[120px] max-w-0 px-3 py-2.5" title={[item.client?.fullName, subject].filter(Boolean).join(' — ')}>
                       <span className="block truncate">{item.client?.fullName}</span>
                       {subject ? <span className="block truncate text-xs text-brand-ink/45">{subject}</span> : null}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-brand-ink/70">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-brand-ink/70">
                       <div className="font-medium">{item.date}</div>
-                      <div className="text-xs text-brand-ink/40">
+                      <div className="max-w-[150px] truncate text-xs text-brand-ink/40" title={`${t('pdf.dueDateLabel')}: ${item.dueDate || t('pdf.onReceipt')}`}>
                         {t('pdf.dueDateLabel')}: {item.dueDate || t('pdf.onReceipt')}
                       </div>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -779,10 +863,16 @@ export function InvoiceListPage() {
                         ) : null}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-brand-ink/70">
+                      {formatMoney(split.net, item.currency || currency)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-brand-ink/70">
+                      {formatMoney(split.vat, item.currency || currency)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums">
                       {formatMoney(Number(item.total) || 0, item.currency || currency)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5">
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <div className="flex justify-end gap-1">
                         {canRemind && !invoicer ? (
                           <button
@@ -837,7 +927,7 @@ export function InvoiceListPage() {
                           className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-brand hover:bg-brand/5"
                         >
                           <Eye className="h-3.5 w-3.5" />
-                          {t('newInvoice.preview')}
+                          <span className="sr-only">{t('newInvoice.preview')}</span>
                         </button>
                       </div>
                     </td>
@@ -845,11 +935,33 @@ export function InvoiceListPage() {
                   )
                 })}
               </tbody>
+              {filtered.length > 0 ? (
+                // Totals of every invoice the filters keep, not only the rows loaded so far; drafts and cancelled ones carry no money.
+                <tfoot className="border-t-2 border-brand-ink/12 bg-[#F4F8F9] text-sm">
+                  <tr>
+                    <td className="py-3 pl-5" />
+                    <td colSpan={4} className="px-4 py-3 font-semibold text-brand-ink">
+                      {t('lists.totalRowCount', { count: listTotals.count })}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-brand-ink/80">
+                      <MoneyStack rows={listTotals.net} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-brand-ink/80">
+                      <MoneyStack rows={listTotals.vat} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-bold tabular-nums text-brand-ink">
+                      <MoneyStack rows={listTotals.total} />
+                    </td>
+                    <td className="px-4 py-3" />
+                  </tr>
+                </tfoot>
+              ) : null}
             </table>
           </div>
           {filtered.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-brand-ink/50">{client ? t('invoiceList.clientNoUnpaid') : t('invoiceList.emptyTitle')}</p>
           ) : null}
+          <PagerFooter paged={paged} />
           </>
           )}
         </div>

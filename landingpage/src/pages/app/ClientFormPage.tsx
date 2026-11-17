@@ -69,7 +69,7 @@ export function ClientFormPage() {
       const saved = existing ? await updateClient(existing.id, payload as Partial<ClientRecord>) : await createClient(payload as Omit<ClientRecord, 'id' | 'createdAt'>)
       const id = existing?.id || saved.id
       if (thenInvoice) navigate(`/app/new?clientId=${encodeURIComponent(id)}`)
-      else navigate('/app/clients')
+      else navigate(existing ? `/app/clients/${existing.id}` : '/app/clients')
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.error'))
     } finally {
@@ -79,8 +79,8 @@ export function ClientFormPage() {
 
   return (
     <div>
-      <Link to="/app/clients" className="text-sm font-semibold text-brand-ink/50 hover:text-brand">
-        ← {t('clients.title')}
+      <Link to={existing ? `/app/clients/${existing.id}` : '/app/clients'} className="text-sm font-semibold text-brand-ink/50 hover:text-brand">
+        ← {existing ? clientDisplayName(existing) : t('clients.title')}
       </Link>
       <h1 className="mt-3 font-display text-4xl font-medium tracking-tight">
         {existing ? t('clients.edit') : t('clients.add')}

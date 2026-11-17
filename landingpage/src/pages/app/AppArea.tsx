@@ -17,6 +17,7 @@ import { ReportsLayout } from './ReportsLayout'
 import { UpgradePage } from './UpgradePage'
 import { ClientListPage } from './ClientListPage'
 import { ClientFormPage } from './ClientFormPage'
+import { ClientCardPage } from './ClientCardPage'
 import { ItemListPage } from './ItemListPage'
 import { ItemFormPage } from './ItemFormPage'
 import { ContractsPage } from './ContractsPage'
@@ -56,7 +57,8 @@ export default function AppArea() {
         <Route path="recurring" element={<Navigate to="/app/invoices/settings/recurring" replace />} />
         <Route path="clients" element={<ClientListPage />} />
         <Route path="clients/new" element={<ClientFormPage />} />
-        <Route path="clients/:clientId" element={<ClientFormPage />} />
+        <Route path="clients/:clientId" element={<ClientCardPage />} />
+        <Route path="clients/:clientId/edit" element={<ClientFormPage />} />
         <Route path="items" element={<ItemListPage />} />
         <Route path="items/new" element={<ItemFormPage />} />
         <Route path="items/:itemId" element={<ItemFormPage />} />
