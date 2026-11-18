@@ -299,8 +299,8 @@ export function InvoiceDetailPage() {
                 <ProofField
                   proof={current}
                   t={t}
-                  onChange={(proof) => {
-                    void updateInvoice(current.id, proof)
+                  onChange={async (proof) => {
+                    await updateInvoice(current.id, proof)
                   }}
                 />
               </div>

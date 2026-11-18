@@ -26,7 +26,7 @@ export function ProofField({
     try {
       await onChange(await fileToProof(file))
     } catch (err) {
-      setError(err instanceof Error && err.message === 'PROOF_TOO_LARGE' ? t('obligations.proofTooLarge') : t('common.error'))
+      setError(err instanceof Error && err.message === 'PROOF_TOO_LARGE' ? t('obligations.proofTooLarge') : err instanceof Error && err.message ? err.message : t('common.error'))
     } finally {
       setBusy(false)
     }

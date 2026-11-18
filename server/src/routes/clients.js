@@ -1,6 +1,6 @@
 const express = require('express');
-const { authRequired } = require('../auth');
-const { listClients, getClient, addClient, updateClient, deleteClient } = require('../store');
+const { authRequired, managerRequired } = require('../auth');
+const { listClients, getClient, addClient, updateClient, deleteClient, mergeClients } = require('../store');
 
 const router = express.Router();
 router.use(authRequired);
@@ -22,6 +22,17 @@ router.post('/', (req, res) => {
     res.status(result.duplicate ? 200 : 201).json(result);
   } catch (err) {
     sendError(res, err);
+  }
+});
+
+// Several clients that are the same become one: { keepId, mergeIds }.
+router.post('/merge', managerRequired, (req, res) => {
+  const { keepId, mergeIds } = req.body || {};
+  try {
+    res.json(mergeClients(req.user.id, String(keepId || ''), mergeIds));
+  } catch (err) {
+    if (err.message === 'CLIENT_NOT_FOUND') return res.status(404).json({ error: 'Client not found.', code: 'CLIENT_NOT_FOUND' });
+    throw err;
   }
 });
 

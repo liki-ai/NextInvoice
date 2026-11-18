@@ -854,6 +854,8 @@ function fieldsChanged(current, partial, keys) {
   });
 }
 
+const PROOF_FIELDS = ['proofUri', 'proofName', 'proofMime', 'proofData'];
+
 function updateInvoice(userId, invoiceId, partial, options = {}) {
   // Who wrote an invoice is never changed afterwards.
   const { createdBy: _creator, ...changes } = partial || {};
@@ -885,7 +887,9 @@ function updateInvoice(userId, invoiceId, partial, options = {}) {
       ...(partial.proofData !== undefined ? { proofData: partial.proofData } : {}),
     };
   }
-  if (lifecycle === 'cancelled' && !options.allowCancelledEdit) {
+  // The payment proof changes no figure, so it may be attached even to a cancelled invoice.
+  const proofOnly = Object.keys(partial).length > 0 && Object.keys(partial).every((key) => PROOF_FIELDS.includes(key));
+  if (lifecycle === 'cancelled' && !options.allowCancelledEdit && !proofOnly) {
     const err = new Error('CANCELLED_LOCKED');
     throw err;
   }
@@ -1794,6 +1798,78 @@ function deleteClient(userId, clientId) {
   return true;
 }
 
+/** A name compared loosely: no case, accents (ë, ç), punctuation or spaces, so "Kosoves" and "Kosovës" are the same. */
+function looseName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+const MERGE_FILL_FIELDS = ['address', 'phone', 'email', 'businessId', 'vatNumber', 'fiscalNumber', 'language', 'notes'];
+
+/**
+ * Makes one client out of several that are the same: everything that pointed at the others
+ * (invoices, recurring plans, contracts, timesheet projects) points at the one kept, details the
+ * kept one lacks are taken from the others, and the others are deleted. What an issued invoice
+ * shows of the client is left as it was; only the link to the client changes.
+ */
+function mergeClients(userId, keepId, mergeIds) {
+  migrateUserData(userId);
+  const db = readDb();
+  ensureUserCollections(db, userId);
+  const list = db.clients[userId] || [];
+  const keep = list.find((item) => item.id === keepId);
+  if (!keep) throw new Error('CLIENT_NOT_FOUND');
+  const ids = new Set((Array.isArray(mergeIds) ? mergeIds : []).map(String).filter((id) => id && id !== keepId));
+  const merged = list.filter((item) => ids.has(item.id));
+  if (merged.length === 0 || merged.length !== ids.size) throw new Error('CLIENT_NOT_FOUND');
+
+  const now = nowIso();
+  const kept = { ...keep };
+  for (const other of merged) {
+    for (const key of MERGE_FILL_FIELDS) {
+      if (!String(kept[key] || '').trim() && String(other[key] || '').trim()) kept[key] = other[key];
+    }
+    if ((kept.taxRate === null || kept.taxRate === undefined) && other.taxRate !== null && other.taxRate !== undefined) kept.taxRate = other.taxRate;
+    if (!(kept.photos || []).length && (other.photos || []).length) kept.photos = other.photos;
+    if (!Object.keys(kept.measurements || {}).length && Object.keys(other.measurements || {}).length) kept.measurements = other.measurements;
+  }
+  kept.updatedAt = now;
+
+  // Invoices saved without a client id were matched to a client by name; keep that link too.
+  const names = new Set([keep, ...merged].map((item) => looseName(item.fullName)).filter(Boolean));
+  const relink = (obj) => (obj && typeof obj === 'object' && ids.has(obj.id) ? { ...obj, id: keepId } : obj);
+  let invoices = 0;
+  db.invoices[userId] = (db.invoices[userId] || []).map((inv) => {
+    const id = inv.clientId || inv.client?.id || inv.clientSnapshot?.id;
+    const byId = id && ids.has(id);
+    const byName = !id && names.has(looseName(inv.client?.fullName || inv.clientSnapshot?.fullName));
+    if (!byId && !byName) return inv;
+    invoices += 1;
+    return { ...inv, clientId: keepId, client: relink(inv.client), clientSnapshot: relink(inv.clientSnapshot), updatedAt: now };
+  });
+
+  const recurring = db.recurring && db.recurring[userId];
+  if (recurring && Array.isArray(recurring.plans)) {
+    recurring.plans = recurring.plans.map((plan) => (ids.has(plan.clientId) ? { ...plan, clientId: keepId } : plan));
+  }
+  if (db.contracts && Array.isArray(db.contracts[userId])) {
+    db.contracts[userId] = db.contracts[userId].map((item) => (ids.has(item.clientId) ? { ...item, clientId: keepId } : item));
+  }
+  const timesheet = db.finance && db.finance[userId] && db.finance[userId].timesheet;
+  if (timesheet && timesheet.projects && typeof timesheet.projects === 'object') {
+    for (const [name, project] of Object.entries(timesheet.projects)) {
+      if (project && ids.has(project.clientId)) timesheet.projects[name] = { ...project, clientId: keepId };
+    }
+  }
+
+  db.clients[userId] = list.filter((item) => !ids.has(item.id)).map((item) => (item.id === keepId ? kept : item));
+  writeDb(db);
+  return { client: kept, merged: merged.length, invoices };
+}
+
 function itemSnapshot(item) {
   return {
     description: String(item?.description || '').trim(),
@@ -2126,6 +2202,7 @@ module.exports = {
   addClient,
   updateClient,
   deleteClient,
+  mergeClients,
   listItems,
   getItem,
   addItem,

@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowDownAZ, ArrowDownWideNarrow, ArrowDownZA, ArrowUpDown, ArrowUpNarrowWide, Plus, Search, Trash2, Users } from 'lucide-react'
+import { ArrowDownAZ, ArrowDownWideNarrow, ArrowDownZA, ArrowUpDown, ArrowUpNarrowWide, ChevronRight, Copy, Plus, Search, Trash2, Users } from 'lucide-react'
 import { useAppData } from '../../context/AppDataContext'
+import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../i18n'
 import { clientDisplayName, clientMatchesQuery } from '../../lib/client'
+import { duplicateClientGroups, mergeTexts } from '../../lib/clientMerge'
 import { clientMoneyTotals, formatMoney } from '../../lib/invoice'
 import { formatMoneyList } from '../../lib/document'
+import { canManageCompany } from '../../lib/team'
+import { ClientMergeModal } from '../../components/ClientMergeModal'
 
 type SortKey = 'name' | 'invoiced' | 'paid'
 type Sort = { key: SortKey; desc: boolean }
@@ -46,11 +50,16 @@ function SortHeading({ column, label, sort, onSort, right }: { column: SortKey; 
 
 export function ClientListPage() {
   const { clients, invoices, removeClient, loading } = useAppData()
-  const { t, dict } = useI18n()
+  const { user } = useAuth()
+  const { t, dict, lang } = useI18n()
+  const texts = mergeTexts(lang)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>({ key: 'name', desc: false })
+  const [merging, setMerging] = useState(false)
 
   const money = useMemo(() => clientMoneyTotals(clients, invoices), [clients, invoices])
+  const duplicates = useMemo(() => duplicateClientGroups(clients, (id) => money.get(id)?.invoicedSum || 0), [clients, money])
+  const repeated = duplicates.reduce((total, group) => total + group.members.length, 0)
   const sorted = useMemo(() => {
     const byName = (a: (typeof clients)[number], b: (typeof clients)[number]) => clientDisplayName(a).localeCompare(clientDisplayName(b))
     const amount = (item: (typeof clients)[number]) => (sort.key === 'paid' ? money.get(item.id)?.paidSum : money.get(item.id)?.invoicedSum) || 0
@@ -83,6 +92,31 @@ export function ClientListPage() {
         </div>
       ) : null}
 
+      {duplicates.length > 0 && canManageCompany(user) ? (
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-[#F0D9A8] bg-[#FDF6E7] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-3 text-sm text-brand-ink/75">
+            <Copy className="mt-0.5 h-4 w-4 shrink-0 text-[#B7791F]" />
+            {texts.banner.replace('{count}', String(repeated)).replace('{groups}', String(duplicates.length))}
+          </p>
+          <button
+            type="button"
+            onClick={() => setMerging(true)}
+            className="shrink-0 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"
+          >
+            {texts.open}
+          </button>
+        </div>
+      ) : null}
+
+      {merging ? (
+        <ClientMergeModal
+          groups={duplicates}
+          invoicedLabel={(id) => formatMoneyList(money.get(id)?.invoiced || [], formatMoney) || formatMoney(0, 'EUR')}
+          texts={texts}
+          onClose={() => setMerging(false)}
+        />
+      ) : null}
+
       {clients.length > 0 ? (
         <>
           <label className="relative mt-8 block max-w-md">
@@ -107,7 +141,7 @@ export function ClientListPage() {
                 <SortHeading column="invoiced" label={t('overview.invoiced')} sort={sort} onSort={setSort} right />
                 <SortHeading column="paid" label={t('invoiceList.paidTotal')} sort={sort} onSort={setSort} right />
               </div>
-              <span className="w-8 shrink-0" />
+              <span className="w-[72px] shrink-0" />
             </div>
             {visible.length === 0 ? <p className="px-5 py-8 text-center text-sm text-brand-ink/55">{t('common.noResults')}</p> : null}
             <ul>
@@ -117,16 +151,17 @@ export function ClientListPage() {
                 const invoiced = formatMoneyList(totals?.invoiced || [], formatMoney)
                 const paid = formatMoneyList(totals?.paid || [], formatMoney)
                 return (
-                  <li key={item.id} className="flex items-center gap-2 border-b border-brand-ink/5 pr-2 last:border-0 hover:bg-brand-bg/60">
+                  <li key={item.id} className="group flex items-center gap-2 border-b border-brand-ink/5 pr-2 last:border-0 hover:bg-brand-bg/60">
                     <Link
                       to={`/app/clients/${item.id}`}
-                      className={`grid min-w-0 flex-1 grid-cols-1 items-center gap-x-4 gap-y-1 px-5 py-3.5 ${COLUMNS}`}
+                      title={texts.openCard}
+                      className={`grid min-w-0 flex-1 cursor-pointer grid-cols-1 items-center gap-x-4 gap-y-1 px-5 py-3.5 ${COLUMNS}`}
                     >
                       <span className="flex min-w-0 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">{initials(name)}</span>
                         <span className="min-w-0">
                           <span className="flex min-w-0 items-center gap-2">
-                            <span className="truncate font-semibold text-brand-ink">{name}</span>
+                            <span className="truncate font-semibold text-brand-ink underline-offset-2 group-hover:text-brand group-hover:underline">{name}</span>
                             {item.taxRate === 0 ? (
                               <span className="shrink-0 rounded-md bg-brand-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/55">{t('clients.taxNone')}</span>
                             ) : item.taxRate ? (
@@ -149,6 +184,14 @@ export function ClientListPage() {
                           {t('invoiceList.paidTotal')} <span className="font-semibold text-brand-ink">{paid}</span>
                         </span>
                       </span>
+                    </Link>
+                    <Link
+                      to={`/app/clients/${item.id}`}
+                      aria-label={`${texts.openCard}: ${name}`}
+                      title={texts.openCard}
+                      className="rounded-lg p-2 text-brand-ink/30 transition group-hover:translate-x-0.5 group-hover:text-brand"
+                    >
+                      <ChevronRight className="h-4 w-4" />
                     </Link>
                     <button
                       type="button"

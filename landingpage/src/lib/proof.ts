@@ -117,12 +117,27 @@ export async function fileToProof(file: File) {
   }
 }
 
+/** A data: URL as a blob: URL. Browsers refuse to open data: URLs (a PDF opened blank) but open blob: ones. */
+function dataUrlToBlobUrl(src: string) {
+  const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(src)
+  if (!match) return src
+  const [, mime, base64, body] = match
+  const text = base64 ? atob(body) : decodeURIComponent(body)
+  const bytes = new Uint8Array(text.length)
+  for (let i = 0; i < text.length; i += 1) bytes[i] = text.charCodeAt(i)
+  return URL.createObjectURL(new Blob([bytes], { type: mime || 'application/octet-stream' }))
+}
+
 export function openProofData(src: string, name?: string) {
   if (!src) return
-  const opened = window.open(src, '_blank', 'noopener')
-  if (opened) return
-  const link = document.createElement('a')
-  link.href = src
-  link.download = name || 'proof'
-  link.click()
+  const url = src.startsWith('data:') ? dataUrlToBlobUrl(src) : src
+  // Without "noopener", so the browser reports whether the tab opened.
+  const opened = window.open(url, '_blank')
+  if (!opened) {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name || 'proof'
+    link.click()
+  }
+  if (url !== src) setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
