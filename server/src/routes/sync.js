@@ -37,7 +37,7 @@ router.get('/', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const result = applySync(req.user.id, req.body || {});
+    const result = applySync(req.user.id, req.body || {}, { createdBy: req.user.accountId, createdByEmail: req.user.email });
     res.json({ ...result, snapshot: snapshotForUser(req.user.id) });
   } catch (err) {
     sendError(res, err);

@@ -137,6 +137,11 @@ export function InvoiceDetailPage() {
           <p className="mt-1 text-sm text-brand-ink/55">
             {t('newInvoice.dueDate')}: {invoice.dueDate || dict.pdf.onReceipt}
           </p>
+          {invoice.createdByEmail ? (
+            <p className="mt-1 text-sm text-brand-ink/55">
+              {t('invoiceDetail.createdBy')}: <span className="font-semibold text-brand-ink/75">{invoice.createdByEmail}</span>
+            </p>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"

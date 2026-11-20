@@ -630,6 +630,18 @@ const CLIENT_IDENTITY_FIELDS = ['businessId', 'vatNumber', 'fiscalNumber'];
  * Nothing that was on the invoice is ever replaced, and nothing is written back.
  */
 function hydrateFor(db, userId, raw) {
+  return withCreator(db, withClientIdentity(db, userId, raw));
+}
+
+/** Who wrote the invoice, by the address they sign in with; empty for ones written before this was kept. */
+function withCreator(db, invoice) {
+  if (!invoice.createdBy) return invoice;
+  const person = (db.users || []).find((item) => item.id === invoice.createdBy);
+  const email = (person && person.email) || invoice.createdByEmail || '';
+  return email === invoice.createdByEmail ? invoice : { ...invoice, createdByEmail: email };
+}
+
+function withClientIdentity(db, userId, raw) {
   const invoice = hydrateInvoice(raw, db.profiles[userId]);
   const snapshot = invoice.clientSnapshot || {};
   const blank = CLIENT_IDENTITY_FIELDS.filter((key) => !String(snapshot[key] || '').trim());
@@ -805,8 +817,11 @@ function totalFields(items, discount, taxRate) {
   return { subtotal: totals.subtotal, taxRate: totals.taxRate, taxAmount: totals.taxAmount, total: totals.total };
 }
 
-/** `createdBy`: the account of the person writing it, which an invoicer's list is limited to. */
-function addInvoice(userId, invoice, { createdBy } = {}) {
+/**
+ * `createdBy`: the account of the person writing it, which an invoicer's list is limited to;
+ * `createdByEmail` keeps their address in case the account is later removed.
+ */
+function addInvoice(userId, invoice, { createdBy, createdByEmail } = {}) {
   const allowed = canCreateInvoice(userId);
   if (!allowed.ok) {
     const err = new Error('PLAN_LIMIT');
@@ -831,7 +846,8 @@ function addInvoice(userId, invoice, { createdBy } = {}) {
     lifecycle,
     status: invoice.status === 'paid' ? 'paid' : invoice.status === 'cancelled' ? 'cancelled' : 'unpaid',
     ...totalFields(invoice.items, invoice.discount, invoice.taxRate),
-    ...(createdBy ? { createdBy } : {}),
+    createdBy: createdBy || '',
+    createdByEmail: createdBy ? String(createdByEmail || '') : '',
   };
   if (lifecycle === 'issued') {
     saved.number = uniqueIssuedNumber(userId, invoice.number, invoice.date);
@@ -2007,7 +2023,7 @@ function rememberOp(userId, opId, result) {
   writeDb(db);
 }
 
-function applySyncChange(userId, change) {
+function applySyncChange(userId, change, author = {}) {
   const collection = change.collection;
   const op = change.op;
   const id = change.id;
@@ -2075,7 +2091,7 @@ function applySyncChange(userId, change) {
     if (current) return { invoice: updateInvoice(userId, id, body) };
     // A phone draft may have no lines yet, but always has its client and its list of lines.
     refuseIfGone(Array.isArray(body.items) && body.client && String(body.client.fullName || '').trim());
-    return { invoice: addInvoice(userId, { ...body, id }) };
+    return { invoice: addInvoice(userId, { ...body, id }, author) };
   }
   if (collection === 'obligations') {
     if (op === 'delete') {
@@ -2095,12 +2111,13 @@ function applySyncChange(userId, change) {
   throw err;
 }
 
-function applySync(userId, { opId, changes }) {
+/** `author`: { createdBy, createdByEmail } of the person whose phone sent the changes. */
+function applySync(userId, { opId, changes }, author = {}) {
   const remembered = rememberedOp(userId, opId);
   if (remembered) return remembered.result;
   const results = [];
   for (const change of changes || []) {
-    results.push(applySyncChange(userId, change));
+    results.push(applySyncChange(userId, change, author));
   }
   const result = { ok: true, results };
   rememberOp(userId, opId, result);

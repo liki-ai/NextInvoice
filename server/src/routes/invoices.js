@@ -103,7 +103,7 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Add at least one item.' });
   }
   try {
-    const saved = addInvoice(req.user.id, invoice, { createdBy: req.user.accountId });
+    const saved = addInvoice(req.user.id, invoice, { createdBy: req.user.accountId, createdByEmail: req.user.email });
     res.status(201).json({ invoice: saved });
   } catch (err) {
     sendError(res, err);

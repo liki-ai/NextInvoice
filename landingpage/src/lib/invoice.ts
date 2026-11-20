@@ -24,6 +24,9 @@ export type InvoiceStatus = 'draft' | 'unpaid' | 'partial' | 'paid' | 'cancelled
 
 export type Invoice = {
   id: string
+  /** The account of the person who wrote it, and their sign-in address; empty for older invoices. */
+  createdBy?: string
+  createdByEmail?: string
   number: string
   date: string
   dueDate?: string
