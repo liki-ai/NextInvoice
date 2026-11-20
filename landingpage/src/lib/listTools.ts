@@ -1,5 +1,5 @@
-import { computeTotals, normalizeTaxRate, type Invoice } from './invoice'
-import { documentTotals, isActiveDocument, money, parseLooseDate, remainingOf, totalsByCurrency } from './document'
+import { computeTotals, invoiceStatus, normalizeTaxRate, type Invoice } from './invoice'
+import { documentTotals, isActiveDocument, isOverdue, money, parseLooseDate, remainingOf, totalsByCurrency } from './document'
 
 /** A stretch of days, each end as YYYY-MM-DD; an empty end is open. */
 export type Period = { from: string; to: string }
@@ -66,4 +66,39 @@ export function invoiceListTotals(invoices: Invoice[]) {
     paid: totalsByCurrency(counted, (item) => money(documentTotals(item).total - remainingOf(item))),
     remaining: totalsByCurrency(counted, (item) => remainingOf(item)),
   }
+}
+
+export type InvoiceSortKey = 'number' | 'client' | 'date' | 'status' | 'net' | 'vat' | 'total'
+
+// What needs attention first: overdue, then owed, partly paid, paid, drafts, cancelled.
+const STATUS_RANK: Record<string, number> = { overdue: 0, unpaid: 1, partial: 2, paid: 3, draft: 4, cancelled: 5 }
+
+function statusRank(invoice: Invoice) {
+  const status = invoiceStatus(invoice)
+  if ((status === 'unpaid' || status === 'partial') && isOverdue(invoice)) return STATUS_RANK.overdue
+  return STATUS_RANK[status] ?? 6
+}
+
+/**
+ * Invoices in the order of a column; without one, as they came. Ties keep the order they came in,
+ * and invoices of the same day go by number.
+ */
+export function sortInvoices(invoices: Invoice[], sort: { key: InvoiceSortKey; desc: boolean } | null) {
+  if (!sort) return invoices
+  const text = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+  const day = (inv: Invoice) => parseLooseDate(inv.date)?.getTime() ?? 0
+  const compare: (a: Invoice, b: Invoice) => number = {
+    number: (a: Invoice, b: Invoice) => text.compare(String(a.number || ''), String(b.number || '')),
+    client: (a: Invoice, b: Invoice) => text.compare(String(a.client?.fullName || '').trim(), String(b.client?.fullName || '').trim()),
+    date: (a: Invoice, b: Invoice) => day(a) - day(b) || text.compare(String(a.number || ''), String(b.number || '')),
+    status: (a: Invoice, b: Invoice) => statusRank(a) - statusRank(b),
+    net: (a: Invoice, b: Invoice) => vatSplit(a).net - vatSplit(b).net,
+    vat: (a: Invoice, b: Invoice) => vatSplit(a).vat - vatSplit(b).vat,
+    total: (a: Invoice, b: Invoice) => vatSplit(a).total - vatSplit(b).total,
+  }[sort.key]
+  const sign = sort.desc ? -1 : 1
+  return invoices
+    .map((invoice, index) => ({ invoice, index }))
+    .sort((a, b) => sign * compare(a.invoice, b.invoice) || a.index - b.index)
+    .map((row) => row.invoice)
 }

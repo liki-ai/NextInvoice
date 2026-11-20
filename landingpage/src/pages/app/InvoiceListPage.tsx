@@ -31,8 +31,8 @@ import { clientInvoiceSummary, invoiceClientGroups, isOwed, matchClientGroups } 
 import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
-import { MoneyStack, PagerFooter, PeriodFilter, usePaged, usePeriodParam } from '../../components/ListTools'
-import { hasPeriod, invoiceInPeriod, invoiceListTotals, vatSplit } from '../../lib/listTools'
+import { MoneyStack, PagerFooter, PeriodFilter, SortButton, sortState, usePaged, usePeriodParam, type ListSort } from '../../components/ListTools'
+import { hasPeriod, invoiceInPeriod, invoiceListTotals, sortInvoices, vatSplit, type InvoiceSortKey } from '../../lib/listTools'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
   if (filter === 'paid') {
@@ -217,8 +217,11 @@ export function InvoiceListPage() {
       return status === 'unpaid' || status === 'partial'
     })
   }, [yearInvoices, query, statusFilter, client, clientTab, period, periodSet])
+  // No column chosen: the order above (what is owed first). A heading click sorts by that column.
+  const [sort, setSort] = useState<ListSort<InvoiceSortKey> | null>(null)
+  const sorted = useMemo(() => sortInvoices(filtered, sort), [filtered, sort])
   const listTotals = useMemo(() => invoiceListTotals(filtered), [filtered])
-  const paged = usePaged(filtered, [query, statusFilter, clientKey, clientTab, year, period.from, period.to].join('|'))
+  const paged = usePaged(sorted, [query, statusFilter, clientKey, clientTab, year, period.from, period.to, sort?.key, sort?.desc].join('|'))
   const clientSummary = useMemo(() => (client ? clientInvoiceSummary(filtered) : null), [client, filtered])
 
   // Rows that can be ticked: issued invoices with something still owed, among those on screen.
@@ -740,13 +743,27 @@ export function InvoiceListPage() {
                       className="h-4 w-4 cursor-pointer accent-[#2C6E7F] disabled:cursor-default disabled:opacity-40"
                     />
                   </th>
-                  <th className="px-3 py-2.5 font-semibold">{t('newInvoice.invoiceNumber')}</th>
-                  <th className="px-3 py-2.5 font-semibold">{t('invoiceList.client')}</th>
-                  <th className="px-3 py-2.5 font-semibold">{t('newInvoice.date')}</th>
-                  <th className="px-3 py-2.5 font-semibold">{t('invoiceList.status')}</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">{t('lists.netLong')}</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">{t('lists.vatLong')}</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">{t('lists.totalCol')}</th>
+                  <th className="px-3 py-2.5 font-semibold" aria-sort={sortState(sort, 'number')}>
+                    <SortButton column="number" label={t('newInvoice.invoiceNumber')} sort={sort} onSort={setSort} />
+                  </th>
+                  <th className="px-3 py-2.5 font-semibold" aria-sort={sortState(sort, 'client')}>
+                    <SortButton column="client" label={t('invoiceList.client')} sort={sort} onSort={setSort} ascFirst />
+                  </th>
+                  <th className="px-3 py-2.5 font-semibold" aria-sort={sortState(sort, 'date')}>
+                    <SortButton column="date" label={t('newInvoice.date')} sort={sort} onSort={setSort} />
+                  </th>
+                  <th className="px-3 py-2.5 font-semibold" aria-sort={sortState(sort, 'status')}>
+                    <SortButton column="status" label={t('invoiceList.status')} sort={sort} onSort={setSort} ascFirst />
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-semibold" aria-sort={sortState(sort, 'net')}>
+                    <SortButton column="net" label={t('lists.netLong')} sort={sort} onSort={setSort} />
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-semibold" aria-sort={sortState(sort, 'vat')}>
+                    <SortButton column="vat" label={t('lists.vatLong')} sort={sort} onSort={setSort} />
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-semibold" aria-sort={sortState(sort, 'total')}>
+                    <SortButton column="total" label={t('lists.totalCol')} sort={sort} onSort={setSort} />
+                  </th>
                   <th className="px-3 py-2.5 text-right font-semibold">{t('common.edit')}</th>
                 </tr>
               </thead>

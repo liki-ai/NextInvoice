@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CalendarRange, ChevronDown, X } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpDown, ArrowUpNarrowWide, CalendarRange, ChevronDown, X } from 'lucide-react'
 import { useI18n } from '../i18n'
 import { formatMoney } from '../lib/invoice'
 import { NO_PERIOD, hasPeriod, monthPeriod, yearPeriod, type Period } from '../lib/listTools'
@@ -167,4 +167,30 @@ export function MoneyStack({ rows, className }: { rows: { currency: string; amou
       ))}
     </>
   )
+}
+
+export type ListSort<K extends string> = { key: K; desc: boolean }
+
+/**
+ * A column heading that sorts a list: a first click sorts names A to Z and amounts and dates from
+ * the largest or newest, a second click turns the order round. Put it inside the heading cell,
+ * which carries `aria-sort={sortState(sort, column)}`.
+ */
+export function SortButton<K extends string>({ column, label, sort, onSort, ascFirst }: { column: K; label: string; sort: ListSort<K> | null; onSort: (next: ListSort<K>) => void; ascFirst?: boolean }) {
+  const active = sort?.key === column
+  const Icon = !active ? ArrowUpDown : sort.desc ? ArrowDownWideNarrow : ArrowUpNarrowWide
+  return (
+    <button
+      type="button"
+      onClick={() => onSort({ key: column, desc: active ? !sort.desc : !ascFirst })}
+      className={`inline-flex items-center gap-1.5 rounded-md font-semibold uppercase tracking-[0.08em] hover:text-brand-ink ${active ? 'text-brand' : ''}`}
+    >
+      {label}
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+    </button>
+  )
+}
+
+export function sortState<K extends string>(sort: ListSort<K> | null, column: K) {
+  return sort?.key === column ? (sort.desc ? 'descending' : 'ascending') : 'none'
 }
