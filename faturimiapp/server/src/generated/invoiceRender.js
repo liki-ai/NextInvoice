@@ -3608,6 +3608,7 @@ const translations = {
 		},
 		invoiceDetail: {
 			title: "Detajet e faturës",
+			createdBy: "Krijuar nga",
 			downloadPdf: "Shkarko PDF",
 			deleteInvoice: "Fshij faturën",
 			issuedTo: "Lëshuar për",
@@ -4617,6 +4618,7 @@ const translations = {
 		},
 		invoiceDetail: {
 			title: "Invoice details",
+			createdBy: "Created by",
 			downloadPdf: "Download PDF",
 			deleteInvoice: "Delete invoice",
 			issuedTo: "Issued to",
@@ -5626,6 +5628,7 @@ const translations = {
 		},
 		invoiceDetail: {
 			title: "Dettagli fattura",
+			createdBy: "Creata da",
 			downloadPdf: "Scarica PDF",
 			deleteInvoice: "Elimina fattura",
 			issuedTo: "Intestata a",
