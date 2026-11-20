@@ -349,8 +349,10 @@ export function lastReminderTime(invoice: Pick<Invoice, 'reminders'>) {
 export type ClientMoney = {
   invoiced: { currency: string; amount: number }[]
   paid: { currency: string; amount: number }[]
+  unpaid: { currency: string; amount: number }[]
   invoicedSum: number
   paidSum: number
+  unpaidSum: number
 }
 
 /**
@@ -377,7 +379,8 @@ export function clientMoneyTotals(clients: { id: string; fullName?: string }[], 
   for (const [id, list] of groups) {
     const invoiced = totalsByCurrency(list, (inv) => documentTotals(inv).total)
     const paid = totalsByCurrency(list, (inv) => Math.round((documentTotals(inv).total - remainingOf(inv)) * 100) / 100)
-    totals.set(id, { invoiced, paid, invoicedSum: sum(invoiced), paidSum: sum(paid) })
+    const unpaid = totalsByCurrency(list, (inv) => remainingOf(inv))
+    totals.set(id, { invoiced, paid, unpaid, invoicedSum: sum(invoiced), paidSum: sum(paid), unpaidSum: sum(unpaid) })
   }
   return totals
 }

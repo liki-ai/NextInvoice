@@ -11,10 +11,10 @@ import { formatMoneyList } from '../../lib/document'
 import { canManageCompany } from '../../lib/team'
 import { ClientMergeModal } from '../../components/ClientMergeModal'
 
-type SortKey = 'name' | 'invoiced' | 'paid'
+type SortKey = 'name' | 'invoiced' | 'paid' | 'unpaid'
 type Sort = { key: SortKey; desc: boolean }
 
-const COLUMNS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)]'
+const COLUMNS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]'
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -54,7 +54,8 @@ export function ClientListPage() {
   const { t, dict, lang } = useI18n()
   const texts = mergeTexts(lang)
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<Sort>({ key: 'name', desc: false })
+  // Who owes the most comes first.
+  const [sort, setSort] = useState<Sort>({ key: 'unpaid', desc: true })
   const [merging, setMerging] = useState(false)
 
   const money = useMemo(() => clientMoneyTotals(clients, invoices), [clients, invoices])
@@ -62,7 +63,10 @@ export function ClientListPage() {
   const repeated = duplicates.reduce((total, group) => total + group.members.length, 0)
   const sorted = useMemo(() => {
     const byName = (a: (typeof clients)[number], b: (typeof clients)[number]) => clientDisplayName(a).localeCompare(clientDisplayName(b))
-    const amount = (item: (typeof clients)[number]) => (sort.key === 'paid' ? money.get(item.id)?.paidSum : money.get(item.id)?.invoicedSum) || 0
+    const amount = (item: (typeof clients)[number]) => {
+      const totals = money.get(item.id)
+      return (sort.key === 'paid' ? totals?.paidSum : sort.key === 'unpaid' ? totals?.unpaidSum : totals?.invoicedSum) || 0
+    }
     return [...clients].sort((a, b) => {
       if (sort.key === 'name') return sort.desc ? byName(b, a) : byName(a, b)
       return (sort.desc ? amount(b) - amount(a) : amount(a) - amount(b)) || byName(a, b)
@@ -140,6 +144,7 @@ export function ClientListPage() {
                 <span className="hidden md:block">{dict.pdf.nuiLabel}</span>
                 <SortHeading column="invoiced" label={t('overview.invoiced')} sort={sort} onSort={setSort} right />
                 <SortHeading column="paid" label={t('invoiceList.paidTotal')} sort={sort} onSort={setSort} right />
+                <SortHeading column="unpaid" label={texts.unpaid} sort={sort} onSort={setSort} right />
               </div>
               <span className="w-[72px] shrink-0" />
             </div>
@@ -150,6 +155,9 @@ export function ClientListPage() {
                 const totals = money.get(item.id)
                 const invoiced = formatMoneyList(totals?.invoiced || [], formatMoney)
                 const paid = formatMoneyList(totals?.paid || [], formatMoney)
+                const unpaid = formatMoneyList((totals?.unpaid || []).filter((row) => row.amount > 0), formatMoney)
+                const owes = (totals?.unpaidSum || 0) > 0
+                const unpaidClass = owes ? 'font-semibold text-[#C0503A]' : 'text-brand-ink/45'
                 return (
                   <li key={item.id} className="group flex items-center gap-2 border-b border-brand-ink/5 pr-2 last:border-0 hover:bg-brand-bg/60">
                     <Link
@@ -176,12 +184,16 @@ export function ClientListPage() {
                       <span className="hidden truncate text-sm text-brand-ink/60 md:block">{item.businessId}</span>
                       <span className="hidden text-right text-sm font-semibold tabular-nums text-brand-ink md:block">{stacked(invoiced)}</span>
                       <span className="hidden text-right text-sm tabular-nums text-brand-ink/70 md:block">{stacked(paid)}</span>
+                      <span className={`hidden text-right text-sm tabular-nums md:block ${unpaidClass}`}>{stacked(unpaid)}</span>
                       <span className="flex flex-wrap gap-x-3 pl-12 text-xs tabular-nums text-brand-ink/55 md:hidden">
                         <span className="whitespace-nowrap">
                           {t('overview.invoiced')} <span className="font-semibold text-brand-ink">{invoiced}</span>
                         </span>
                         <span className="whitespace-nowrap">
                           {t('invoiceList.paidTotal')} <span className="font-semibold text-brand-ink">{paid}</span>
+                        </span>
+                        <span className="whitespace-nowrap">
+                          {texts.unpaid} <span className={unpaidClass}>{unpaid}</span>
                         </span>
                       </span>
                     </Link>

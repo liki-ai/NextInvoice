@@ -44,6 +44,7 @@ export const MERGE_TEXTS = {
     none: 'Nuk ka më klientë të përsëritur.',
     close: 'Mbyll',
     openCard: 'Hap kartelën e klientit',
+    unpaid: 'E papaguar',
   },
   en: {
     title: 'Repeated clients',
@@ -62,6 +63,7 @@ export const MERGE_TEXTS = {
     none: 'No repeated clients left.',
     close: 'Close',
     openCard: 'Open the client card',
+    unpaid: 'Unpaid',
   },
   it: {
     title: 'Clienti ripetuti',
@@ -80,6 +82,7 @@ export const MERGE_TEXTS = {
     none: 'Non ci sono più clienti ripetuti.',
     close: 'Chiudi',
     openCard: 'Apri la scheda del cliente',
+    unpaid: 'Non pagato',
   },
 } as const
 
