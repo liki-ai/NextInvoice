@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowDownWideNarrow, ArrowUpDown, ArrowUpNarrowWide, CalendarRange, ChevronDown, X } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpDown, ArrowUpNarrowWide, CalendarRange, Check, ChevronDown, Link2, X } from 'lucide-react'
 import { useI18n } from '../i18n'
 import { formatMoney } from '../lib/invoice'
 import { NO_PERIOD, hasPeriod, monthPeriod, yearPeriod, type Period } from '../lib/listTools'
@@ -193,4 +193,80 @@ export function SortButton<K extends string>({ column, label, sort, onSort, ascF
 
 export function sortState<K extends string>(sort: ListSort<K> | null, column: K) {
   return sort?.key === column ? (sort.desc ? 'descending' : 'ascending') : 'none'
+}
+
+/** "asc"/"desc" sort as it is written in a shared link (?sort=total-desc); null when absent or unknown. */
+export function sortFromParam<K extends string>(value: string | null, keys: readonly K[]): ListSort<K> | null {
+  const match = /^([a-z]+)-(asc|desc)$/.exec(value || '')
+  if (!match || !keys.includes(match[1] as K)) return null
+  return { key: match[1] as K, desc: match[2] === 'desc' }
+}
+
+export function sortToParam<K extends string>(sort: ListSort<K> | null) {
+  return sort ? `${sort.key}-${sort.desc ? 'desc' : 'asc'}` : ''
+}
+
+const COPY_LINK_TEXTS = {
+  sq: {
+    label: 'Kopjo linkun',
+    done: 'Linku u kopjua',
+    tip: 'Kopjon linkun e kësaj liste me filtrat, periudhën, kërkimin dhe renditjen që ke zgjedhur. Dërgoja një kolegu dhe ai e sheh listën njësoj si ti (duhet të ketë qasje në këtë kompani).',
+  },
+  en: {
+    label: 'Copy link',
+    done: 'Link copied',
+    tip: 'Copies a link to this list with the filters, period, search and sort you chose. Send it to a colleague and they see the list just as you do (they need access to this company).',
+  },
+  it: {
+    label: 'Copia link',
+    done: 'Link copiato',
+    tip: "Copia il link di questo elenco con i filtri, il periodo, la ricerca e l'ordine scelti. Invialo a un collega e vedrà l'elenco come lo vedi tu (deve avere accesso a questa azienda).",
+  },
+} as const
+
+/** Copies a link to the list as it is shown, with a short explanation on hover or focus. */
+export function CopyLinkButton({ link }: { link: () => string }) {
+  const { lang } = useI18n()
+  const texts = lang === 'en' || lang === 'it' ? COPY_LINK_TEXTS[lang] : COPY_LINK_TEXTS.sq
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  async function copy() {
+    const url = link()
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // No clipboard (an older browser or a page not allowed to write it): show the link to copy by hand.
+      window.prompt(texts.label, url)
+      return
+    }
+    setCopied(true)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setCopied(false), 2200)
+  }
+
+  return (
+    <span className="group/copy relative inline-flex">
+      <button
+        type="button"
+        onClick={() => void copy()}
+        aria-label={texts.label}
+        aria-describedby="copy-link-tip"
+        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${
+          copied ? 'border-brand bg-brand text-white' : 'border-brand-ink/12 bg-white text-brand-ink/70 hover:border-brand/40 hover:text-brand'
+        }`}
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+        {copied ? texts.done : texts.label}
+      </button>
+      <span
+        id="copy-link-tip"
+        role="tooltip"
+        className="pointer-events-none absolute right-0 top-full z-30 mt-2 w-72 rounded-xl bg-brand-ink px-3.5 py-2.5 text-xs font-normal leading-relaxed text-white opacity-0 shadow-lg transition group-focus-within/copy:opacity-100 group-hover/copy:opacity-100"
+      >
+        {texts.tip}
+      </span>
+    </span>
+  )
 }

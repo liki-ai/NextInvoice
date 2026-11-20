@@ -31,7 +31,7 @@ import { clientInvoiceSummary, invoiceClientGroups, isOwed, matchClientGroups } 
 import { daysOverdue, documentTotals, formatMoneyList, isInvoiceSent, isOverdue, remainingOf, totalsByCurrency, togglePaid, visiblePaymentStatus } from '../../lib/document'
 import { localizeCompanyProfile } from '../../lib/companySamples'
 import { fullPaymentPayload } from '../../lib/invoiceBalance'
-import { MoneyStack, PagerFooter, PeriodFilter, SortButton, sortState, usePaged, usePeriodParam, type ListSort } from '../../components/ListTools'
+import { CopyLinkButton, MoneyStack, PagerFooter, PeriodFilter, SortButton, sortFromParam, sortState, sortToParam, usePaged, usePeriodParam, type ListSort } from '../../components/ListTools'
 import { hasPeriod, invoiceInPeriod, invoiceListTotals, sortInvoices, vatSplit, type InvoiceSortKey } from '../../lib/listTools'
 
 function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string) {
@@ -44,16 +44,28 @@ function sendCopy(filter: 'all' | 'paid' | 'unpaid', t: (key: string) => string)
   return { kind: 'all' as const, cta: t('invoiceList.sendList'), title: t('invoiceList.sendAllTitle') }
 }
 
+type StatusFilter = 'all' | 'paid' | 'unpaid' | 'overdue' | 'toSend'
+const STATUS_FILTERS: readonly StatusFilter[] = ['all', 'paid', 'unpaid', 'overdue', 'toSend']
+const SORT_KEYS: readonly InvoiceSortKey[] = ['number', 'client', 'date', 'status', 'net', 'vat', 'total']
+
+/** What a shared link (see "Copy link") asks the list to show, read once as the page opens. */
+function linkParam(name: string) {
+  return new URLSearchParams(window.location.search).get(name)
+}
+
 export function InvoiceListPage() {
   const { invoices, clients, loading, profile, removeInvoice, addInvoicePayment, voidInvoicePayment, updateInvoice, issueInvoice, markInvoicesPaid, syncInvoices } = useAppData()
   const { t, dict } = useI18n()
-  const { user } = useAuth()
+  const { user, switchCompany } = useAuth()
   // Cancelled invoices can be deleted only by the company's owner and administrators.
   const manager = canManageCompany(user)
   // Writes and sends invoices; receiving payments, imports and reminders are someone else's.
   const invoicer = isInvoicer(user)
-  const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue' | 'toSend'>('all')
+  const [query, setQuery] = useState(() => linkParam('q') || '')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const wanted = linkParam('status') as StatusFilter | null
+    return wanted && STATUS_FILTERS.includes(wanted) ? wanted : 'all'
+  })
   const [usage, setUsage] = useState<{ plan: 'free' | 'premium'; used: number; limit: number | null } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
@@ -80,10 +92,11 @@ export function InvoiceListPage() {
   const navigate = useNavigate()
   const currency = profile?.currency || 'EUR'
   // Picking a client from the search shows all of that client's invoices, from every year.
-  const [clientKey, setClientKey] = useState<string | null>(null)
-  const [clientTab, setClientTab] = useState<'unpaid' | 'all'>('unpaid')
+  const [clientKey, setClientKey] = useState<string | null>(() => linkParam('client'))
+  const [clientTab, setClientTab] = useState<'unpaid' | 'all'>(() => (linkParam('tab') === 'all' ? 'all' : 'unpaid'))
   const [suggestIndex, setSuggestIndex] = useState(0)
-  const [suggestHidden, setSuggestHidden] = useState(false)
+  // A search that came with a shared link is not being typed: no suggestions over the list.
+  const [suggestHidden, setSuggestHidden] = useState(() => Boolean(linkParam('q')))
   const clientGroups = useMemo(() => invoiceClientGroups(invoices, clients), [invoices, clients])
   const client = clientKey ? clientGroups.find((group) => group.key === clientKey) : undefined
   const suggestions = useMemo(() => (client || suggestHidden ? [] : matchClientGroups(clientGroups, query)), [client, suggestHidden, clientGroups, query])
@@ -218,8 +231,41 @@ export function InvoiceListPage() {
     })
   }, [yearInvoices, query, statusFilter, client, clientTab, period, periodSet])
   // No column chosen: the order above (what is owed first). A heading click sorts by that column.
-  const [sort, setSort] = useState<ListSort<InvoiceSortKey> | null>(null)
+  const [sort, setSort] = useState<ListSort<InvoiceSortKey> | null>(() => sortFromParam(linkParam('sort'), SORT_KEYS))
   const sorted = useMemo(() => sortInvoices(filtered, sort), [filtered, sort])
+
+  // A shared link names the company it was copied in; open that one if this person works in it too.
+  const linkCompany = searchParams.get('company')
+  useEffect(() => {
+    if (!linkCompany || !user) return
+    const params = new URLSearchParams(window.location.search)
+    params.delete('company')
+    if (linkCompany !== user.id && user.companies?.some((item) => item.id === linkCompany)) {
+      switchCompany(linkCompany, `${location.pathname}?${params}`)
+    } else {
+      setSearchParams(params, { replace: true })
+    }
+  }, [linkCompany, user, switchCompany, location.pathname, setSearchParams])
+
+  /** The address of the list exactly as shown: company, year or period, filter, search, client and sort. */
+  function listLink() {
+    const params = new URLSearchParams()
+    if (user?.id && (user.companies?.length || 0) > 1) params.set('company', user.id)
+    if (period.from || period.to) {
+      if (period.from) params.set('from', period.from)
+      if (period.to) params.set('to', period.to)
+    } else if (year !== currentYear) params.set('year', String(year))
+    if (clientKey) {
+      params.set('client', clientKey)
+      params.set('tab', clientTab)
+    } else {
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (query.trim()) params.set('q', query.trim())
+    }
+    if (sort) params.set('sort', sortToParam(sort))
+    const search = params.toString()
+    return `${window.location.origin}${location.pathname}${search ? `?${search}` : ''}`
+  }
   const listTotals = useMemo(() => invoiceListTotals(filtered), [filtered])
   const paged = usePaged(sorted, [query, statusFilter, clientKey, clientTab, year, period.from, period.to, sort?.key, sort?.desc].join('|'))
   const clientSummary = useMemo(() => (client ? clientInvoiceSummary(filtered) : null), [client, filtered])
@@ -692,11 +738,10 @@ export function InvoiceListPage() {
           </div>
           )}
 
-          {statusFilter === 'toSend' && !client ? null : (
-            <div className="border-t border-brand-ink/6 px-4 py-3">
-              <PeriodFilter period={period} onChange={setPeriod} showYear={false} />
-            </div>
-          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/6 px-4 py-3">
+            {statusFilter === 'toSend' && !client ? <span /> : <PeriodFilter period={period} onChange={setPeriod} showYear={false} />}
+            <CopyLinkButton link={listLink} />
+          </div>
 
           {statusFilter === 'toSend' && !client ? (
             <DeliveryQueue invoices={invoices} />
